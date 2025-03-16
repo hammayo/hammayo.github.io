@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Progress } from "@/components/ui/progress";
+import * as Progress from "@radix-ui/react-progress";
 import React from "react";
 
 export const RouteProgress = React.memo(function RouteProgress() {
@@ -14,13 +14,13 @@ export const RouteProgress = React.memo(function RouteProgress() {
   useEffect(() => {
     // Show the progress bar
     setVisible(true);
-
+    
     // Simulate progress
     let interval: NodeJS.Timeout;
     let timeout: NodeJS.Timeout;
 
     const simulateProgress = () => {
-      setProgress(0); // Reset progress
+      setProgress(0);   // Reset progress
       let simulatedProgress = 0;
 
       interval = setInterval(() => {
@@ -34,6 +34,7 @@ export const RouteProgress = React.memo(function RouteProgress() {
       // Complete the progress after content has likely loaded
       timeout = setTimeout(() => {
         setProgress(100);
+        // Wait for the completion animation to finish
         // Hide after completion animation
         setTimeout(() => setVisible(false), 200);
       }, 600);
@@ -50,14 +51,19 @@ export const RouteProgress = React.memo(function RouteProgress() {
   if (!visible && progress === 0) return null;
 
   return (
-    <Progress
-      value={progress}
+    <Progress.Root
       className="fixed top-0 left-0 right-0 z-[100] h-1 w-full bg-transparent rounded-none transition-opacity duration-200"
       style={{
-        opacity: visible ? 1 : 0,
-        background: "transparent"
+        opacity: visible ? 1 : 0
       }}
-      indicatorClassName="bg-gradient-to-r from-purple-500 via-cyan-500 to-green-500"
-    />
+      value={progress}
+    >
+      <Progress.Indicator
+        className="h-full w-full bg-gradient-to-r from-purple-500 via-cyan-500 to-green-500 transition-transform duration-200"
+        style={{
+          transform: `translateX(-${100 - progress}%)`
+        }}
+      />
+    </Progress.Root>
   );
 });
