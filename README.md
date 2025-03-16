@@ -1,17 +1,29 @@
 # Hammayo's Portfolio Site
 
-A modern, responsive portfolio website built with Next.js 15, TypeScript, and Tailwind CSS featuring a sleek design with glassmorphic UI elements and dynamic GitHub repository integration.
+A modern, responsive portfolio website built with Next.js, TypeScript, and Tailwind CSS featuring a sleek design with glassmorphic UI elements and dynamic GitHub repository integration.
+
+## 📸 Screenshots
+
+![Home Page](/public/screenshots/home.png)
+*Home page featuring title and animated background*
+
+![Projects Page](/public/screenshots/projects.png)
+*Projects page showcasing GitHub repositories in cards*
+
+![Dark/Light Mode](/public/screenshots/contact.png)
+*Seamless theme switching*
+
 
 ## 🌟 Features
 
 - **Modern UI Design**: Glassmorphic elements, subtle animations, and responsive layout
 - **Dynamic Theme Switching**: Seamless light/dark mode transitions
 - **GitHub Integration**: Real-time repository fetching to showcase your latest projects
-- **Blazing Fast Performance**: Built with Next.js 15 and optimized for speed
+- **Blazing Fast Performance**: Built with Next.js and optimized for speed
 - **SEO Optimized**: Proper metadata and structured data for better search engine visibility
 - **Responsive Design**: Perfect viewing experience on all devices from mobile to desktop
-- **Type-Safe Code**: Written in TypeScript for better developer experience and fewer bugs
-- **Custom 404 Page**: Stylish error page that matches the site's design language
+- **Type-Safe Code**: Written in TypeScript for better developer experience
+- **Custom 404 Page**: Stylish error page that matches the site's design
 
 
 ## 🚀 Getting Started
@@ -27,7 +39,7 @@ A modern, responsive portfolio website built with Next.js 15, TypeScript, and Ta
 1. **Clone the repository**
 
 ```bash
-git clone https://github.com/hammayo/portfolio.git
+git clone https://github.com/hammayo/www-portfolio.git
 cd portfolio
 ```
 
@@ -57,7 +69,7 @@ Create a `.env.local` file in the root directory with the following variables (o
 
 ```
 # GitHub Personal Access Token for increased API rate limits (optional)
-GITHUB_ACCESS_TOKEN=your_github_token_here
+GITHUB_ACCESS_TOKEN=_your_github_token_
 ```
 
 ## 📂 Project Structure
