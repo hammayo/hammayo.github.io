@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: CI/CD - Deploy to GitHub Pages
 
 on:
   push:
@@ -19,15 +19,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
       - uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
+          
       - name: Setup Pages
         uses: actions/configure-pages@v4
+        
       - name: Install dependencies
-        run: bun install
+        run: |
+          bun install
+          bunx --bun next telemetry disable
+          
       - name: Build with Next.js
-        run: bun run build
+        run: bunx --bun next build
+        
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
