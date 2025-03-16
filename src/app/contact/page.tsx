@@ -40,6 +40,28 @@ export default function ContactPage() {
             </div>
           </div>
 
+          {/* LinkedIn */}
+          <div className="rounded-xl overflow-hidden border dark:border-zinc-800/50 border-zinc-200/50 dark:bg-black/20 bg-white/20 backdrop-blur-lg p-8 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/20 group hover:border-blue-500/30 relative">
+            {/* Glassmorphic gradient effect */}
+            <div className="absolute inset-0 bg-gradient-to-br opacity-0 from-blue-500/20 via-indigo-500/10 transition-opacity duration-700 group-hover:opacity-100 -z-10"
+                 style={{ maskImage: "radial-gradient(240px at center, white, transparent)", WebkitMaskImage: "radial-gradient(240px at center, white, transparent)" }} />
+
+            <div className="flex flex-col items-center gap-4 relative z-10">
+              <div className="w-16 h-16 flex items-center justify-center border rounded-full dark:border-blue-500/30 border-blue-300/30 dark:bg-black/30 bg-white/30 backdrop-blur-md group-hover:border-blue-500/50 transition-all duration-300">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 448" width="36" height="36">
+                  <path fill="#0077b5" d="M416 32H31.9C14.3 32 0 46.5 0 64.3v319.4C0 401.5 14.3 416 31.9 416H416c17.6 0 32-14.5 32-32.3V64.3c0-17.8-14.4-32.3-32-32.3zM135.4 320H92V186.6h43.4V320zm-21.7-150.8c-14.1 0-25.6-11.5-25.6-25.6s11.5-25.6 25.6-25.6 25.6 11.5 25.6 25.6-11.5 25.6-25.6 25.6zm166.9 150.8h-43.4v-67c0-16.1-.3-36.9-22.5-36.9-22.5 0-25.9 17.6-25.9 35.7V320h-43.4V186.6h41.7v19.1h.6c5.8-11 19.9-22.5 41-22.5 43.8 0 52 28.9 52 66.4V320z" />
+                </svg>
+              </div>
+              <div className="flex flex-col items-center mt-2">
+                <h3 className="text-xl font-medium dark:text-zinc-200 text-zinc-800 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-500 group-hover:via-indigo-500 group-hover:to-purple-500 transition-all duration-300 tracking-tight">hammayo</h3>
+                <span className="mt-4 text-sm text-center dark:text-zinc-400 text-zinc-600 tracking-tight">LinkedIn</span>
+              </div>
+              <a href="https://linkedin.com/in/hammayo" target="_in" rel="noopener noreferrer" className="mt-6 px-5 py-2 text-sm font-medium text-white rounded-md bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 hover:from-blue-600 hover:via-indigo-600 hover:to-purple-600 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/20 tracking-tight">
+                View Profile
+              </a>
+            </div>
+          </div>
+
           {/* Email */}
           <div className="rounded-xl overflow-hidden border dark:border-zinc-800/50 border-zinc-200/50 dark:bg-black/20 bg-white/20 backdrop-blur-lg p-8 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/20 group hover:border-cyan-500/30 relative">
             {/* Glassmorphic gradient effect */}
@@ -62,27 +84,6 @@ export default function ContactPage() {
             </div>
           </div>
 
-          {/* LinkedIn */}
-          <div className="rounded-xl overflow-hidden border dark:border-zinc-800/50 border-zinc-200/50 dark:bg-black/20 bg-white/20 backdrop-blur-lg p-8 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/20 group hover:border-blue-500/30 relative">
-            {/* Glassmorphic gradient effect */}
-            <div className="absolute inset-0 bg-gradient-to-br opacity-0 from-blue-500/20 via-indigo-500/10 transition-opacity duration-700 group-hover:opacity-100 -z-10"
-                 style={{ maskImage: "radial-gradient(240px at center, white, transparent)", WebkitMaskImage: "radial-gradient(240px at center, white, transparent)" }} />
-
-            <div className="flex flex-col items-center gap-4 relative z-10">
-              <div className="w-16 h-16 flex items-center justify-center border rounded-full dark:border-blue-500/30 border-blue-300/30 dark:bg-black/30 bg-white/30 backdrop-blur-md group-hover:border-blue-500/50 transition-all duration-300">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 448" width="36" height="36">
-                  <path fill="#0077b5" d="M416 32H31.9C14.3 32 0 46.5 0 64.3v319.4C0 401.5 14.3 416 31.9 416H416c17.6 0 32-14.5 32-32.3V64.3c0-17.8-14.4-32.3-32-32.3zM135.4 320H92V186.6h43.4V320zm-21.7-150.8c-14.1 0-25.6-11.5-25.6-25.6s11.5-25.6 25.6-25.6 25.6 11.5 25.6 25.6-11.5 25.6-25.6 25.6zm166.9 150.8h-43.4v-67c0-16.1-.3-36.9-22.5-36.9-22.5 0-25.9 17.6-25.9 35.7V320h-43.4V186.6h41.7v19.1h.6c5.8-11 19.9-22.5 41-22.5 43.8 0 52 28.9 52 66.4V320z" />
-                </svg>
-              </div>
-              <div className="flex flex-col items-center mt-2">
-                <h3 className="text-xl font-medium dark:text-zinc-200 text-zinc-800 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-500 group-hover:via-indigo-500 group-hover:to-purple-500 transition-all duration-300 tracking-tight">hammayo</h3>
-                <span className="mt-4 text-sm text-center dark:text-zinc-400 text-zinc-600 tracking-tight">LinkedIn</span>
-              </div>
-              <a href="https://linkedin.com/in/hammayo" target="_in" rel="noopener noreferrer" className="mt-6 px-5 py-2 text-sm font-medium text-white rounded-md bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 hover:from-blue-600 hover:via-indigo-600 hover:to-purple-600 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/20 tracking-tight">
-                View Profile
-              </a>
-            </div>
-          </div>
         </div>
       </Container>
     </PageTransitionWrapper>
