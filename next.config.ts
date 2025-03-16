@@ -1,10 +1,15 @@
 import { NextConfig } from 'next';
 
+const isGithubActions = process.env.GITHUB_ACTIONS || false;
+const repo = process.env.GITHUB_REPOSITORY?.replace(/.*?\//, '') || '';
+
 /** @type {import('next').NextConfig} */
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   distDir: process.env.NODE_ENV === "production" ? "build" : ".next",
+  output: 'export',
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
@@ -20,6 +25,8 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  basePath: isGithubActions ? `/${repo}` : '',
+  assetPrefix: isGithubActions ? `/${repo}/` : '',
 };
 
 export default nextConfig;
