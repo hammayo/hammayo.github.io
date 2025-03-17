@@ -13,7 +13,7 @@ const jetbrainsMono = JetBrains_Mono({
 
 const isGithubActions = process.env.GITHUB_ACTIONS || false;
 const repo = process.env.GITHUB_REPOSITORY?.replace(/.*?\//, '') || '';
-const basePath = isGithubActions ? `/${repo}` : 'https://hammayo.co.uk';
+const basePath = isGithubActions ? `/${repo}` : '';
 
 export const metadata: Metadata = {
   title: "Hammayo's | Backend Software Engineer",
@@ -53,7 +53,9 @@ export const metadata: Metadata = {
       sizes: "180x180",
     },
   },
-  manifest: `${basePath}/icons/site.webmanifest`
+  manifest: process.env.NODE_ENV === 'development' 
+    ? '/icons/site.webmanifest'
+    : `${basePath}/icons/site.webmanifest`
 };
 
 export const viewport: Viewport = {
