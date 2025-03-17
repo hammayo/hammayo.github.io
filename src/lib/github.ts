@@ -10,7 +10,9 @@ export interface GitHubRepository {
   forks_count: number;
   updated_at: string;
   topics: string[];
-  fork?: boolean; // Add optional fork property
+  fork?: boolean;
+  private: boolean;
+  archived: boolean;
 }
 
 export async function fetchGitHubRepositories(username: string): Promise<GitHubRepository[]> {
@@ -31,9 +33,9 @@ export async function fetchGitHubRepositories(username: string): Promise<GitHubR
 
     const repositories = await response.json();
 
-    // Filter out repositories, sort by most recently updated
+    // Filter for public repos only, sort by most recently updated
     return repositories
-      .filter((repo: GitHubRepository) => (!repo.fork || repo.fork)) // Simplified filter
+      .filter((repo: GitHubRepository) => !repo.private && !repo.archived)
       .sort((a: GitHubRepository, b: GitHubRepository) =>
         new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
       )
