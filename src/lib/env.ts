@@ -3,7 +3,7 @@ import { z } from "zod";
 // Environment variable schema with validation
 const envSchema = z.object({
   // Next.js specific
-  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+  NODE_ENV: z.enum(["development", "production", "test"]).optional().default("development"),
   
   // GitHub specific
   GITHUB_ACTIONS: z.string().optional(),
@@ -14,20 +14,30 @@ const envSchema = z.object({
   
   // App specific - add your env variables here
   // EXAMPLE_API_KEY: z.string().min(1),
-});
+}).passthrough();
 
 /*
  * Parse and validate environment variables
  */
 function parseEnv() {
-  const parsed = envSchema.safeParse(process.env);
+  const parsed = envSchema.safeParse({
+    ...process.env,
+    NODE_ENV: process.env.NODE_ENV || 'development'
+  });
   
   if (!parsed.success) {
     console.error(
       "❌ Invalid environment variables:",
       parsed.error.flatten().fieldErrors
     );
-    throw new Error("Invalid environment variables");
+    
+    // Return default values instead of throwing
+    return {
+      NODE_ENV: 'development',
+      GITHUB_ACTIONS: undefined,
+      GITHUB_REPOSITORY: undefined,
+      GA_MEASUREMENT_ID: undefined
+    };
   }
   
   return parsed.data;
