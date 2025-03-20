@@ -1,4 +1,9 @@
-// Update GitHub fetching functionality
+import { logger } from './logger';
+import { API } from './constants';
+
+/**
+ * GitHub repository interface
+ */
 export interface GitHubRepository {
   id: number;
   name: string;
@@ -10,36 +15,96 @@ export interface GitHubRepository {
   forks_count: number;
   updated_at: string;
   topics: string[];
-  fork?: boolean; // Add optional fork property
+  fork?: boolean;
+  private: boolean;
+  archived: boolean;
 }
 
-export async function fetchGitHubRepositories(username: string): Promise<GitHubRepository[]> {
+/**
+ * GitHub API error
+ */
+export class GitHubApiError extends Error {
+  statusCode: number;
+  
+  constructor(message: string, statusCode: number) {
+    super(message);
+    this.name = 'GitHubApiError';
+    this.statusCode = statusCode;
+  }
+}
+
+/**
+ * Configuration options for repository fetching
+ */
+export interface FetchRepositoriesOptions {
+  username: string;
+  sort?: 'updated' | 'created' | 'pushed' | 'full_name';
+  direction?: 'asc' | 'desc';
+  perPage?: number;
+  maxRepos?: number;
+  includeForked?: boolean;
+}
+
+/**
+ * Fetch repositories from GitHub API
+ */
+export async function fetchGitHubRepositories({
+  username,
+  sort = 'updated',
+  direction = 'desc',
+  perPage = 100,
+  maxRepos = 10,
+  includeForked = false
+}: FetchRepositoriesOptions): Promise<GitHubRepository[]> {
   try {
-    const response = await fetch(
-      `https://api.github.com/users/${username}/repos?sort=updated&per_page=100`,
-      {
-        headers: {
-          Accept: 'application/vnd.github.mercy-preview+json', // For topics
-        },
-        next: { revalidate: 3600 } // Cache for 1 hour
-      }
-    );
+    logger.info(`Fetching GitHub repositories for user: ${username}`);
+    
+    const url = new URL(`/users/${username}/repos`, API.github);
+    url.searchParams.append('sort', sort);
+    url.searchParams.append('direction', direction);
+    url.searchParams.append('per_page', perPage.toString());
+    
+    const response = await fetch(url.toString(), {
+      headers: {
+        Accept: 'application/vnd.github.mercy-preview+json', // For topics
+      },
+      next: { revalidate: 3600 } // Cache for 1 hour
+    });
 
     if (!response.ok) {
-      throw new Error(`GitHub API error: ${response.status}`);
+      const error = new GitHubApiError(
+        `GitHub API error: ${response.status} ${response.statusText}`,
+        response.status
+      );
+      throw error;
     }
 
     const repositories = await response.json();
 
-    // Filter out repositories, sort by most recently updated
-    return repositories
-      .filter((repo: GitHubRepository) => (!repo.fork || repo.fork)) // Simplified filter
+    // Filter and process repositories
+    const filteredRepos = repositories
+      .filter((repo: GitHubRepository) => {
+        // Filter out private and archived repos
+        if (repo.private || repo.archived) return false;
+        
+        // Optionally filter out forks
+        if (!includeForked && repo.fork) return false;
+        
+        return true;
+      })
       .sort((a: GitHubRepository, b: GitHubRepository) =>
         new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
       )
-      .slice(0, 10); // Get top 10 repositories
+      .slice(0, maxRepos);
+    
+    logger.info(`Successfully fetched ${filteredRepos.length} repositories for ${username}`);
+    return filteredRepos;
   } catch (error) {
-    console.error('Error fetching GitHub repositories:', error);
+    if (error instanceof GitHubApiError) {
+      logger.error(`GitHub API Error: ${error.message}`, error);
+    } else {
+      logger.error('Error fetching GitHub repositories:', error instanceof Error ? error : new Error(String(error)));
+    }
     return [];
   }
 }

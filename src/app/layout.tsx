@@ -4,6 +4,9 @@ import { JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/providers/theme-provider";
 import { Header } from "@/components/header";
 import { AnimatedBackground } from "@/components/animated-background";
+import { basePath } from "@/lib/env";
+import { SITE, THEME } from "@/lib/constants";
+import { Analytics } from "@/components/analytics";
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -11,15 +14,11 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
-const isGithubActions = process.env.GITHUB_ACTIONS || false;
-const repo = process.env.GITHUB_REPOSITORY?.replace(/.*?\//, '') || '';
-const basePath = isGithubActions ? `/${repo}` : 'https://hammayo.co.uk';
-
 export const metadata: Metadata = {
-  title: "Hammayo's | Backend Software Engineer",
-  description: "Hammayo's portfolio showcasing development projects.",
-  authors: [{ name: "Hammayo Babar" }],
-  keywords: ["backend engineer", "software developer", "portfolio", "web development", "hammy", "HB"],
+  title: SITE.title,
+  description: SITE.description,
+  authors: [{ name: SITE.author }],
+  keywords: SITE.keywords,
   robots: {
     index: true,
     follow: true,
@@ -53,13 +52,15 @@ export const metadata: Metadata = {
       sizes: "180x180",
     },
   },
-  manifest: `${basePath}/icons/site.webmanifest`
+  manifest: process.env.NODE_ENV === 'development' 
+    ? '/icons/site.webmanifest'
+    : `${basePath}/icons/site.webmanifest`
 };
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+    { media: "(prefers-color-scheme: light)", color: THEME.lightThemeColor },
+    { media: "(prefers-color-scheme: dark)", color: THEME.darkThemeColor },
   ],
 };
 
@@ -71,7 +72,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
         <body className={`${jetbrainsMono.variable} font-mono antialiased`}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+        <ThemeProvider attribute="class" defaultTheme={THEME.defaultTheme} enableSystem disableTransitionOnChange>
           <div className="min-h-screen bg-background text-foreground relative">
             <AnimatedBackground />
             <Header />
@@ -79,6 +80,7 @@ export default function RootLayout({
             <main>{children}</main>
           </div>
         </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   );
