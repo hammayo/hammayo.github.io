@@ -77,9 +77,12 @@ function PageViewTracker() {
   
   // Track page views
   useEffect(() => {
-    if (env.GA_MEASUREMENT_ID) {
-      const search = searchParams.toString().length > 0 ? `?${searchParams.toString()}` : '';
-      sendPageView(pathname, search);
+    if (env.GA_MEASUREMENT_ID && searchParams instanceof URLSearchParams) {
+      const searchString = searchParams.toString();
+      const search = searchString.length > 0 ? `?${searchString}` : '';
+      if (pathname) {
+        sendPageView(pathname, search);
+      }
     }
   }, [pathname, searchParams]);
   
