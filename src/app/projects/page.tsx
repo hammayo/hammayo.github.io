@@ -16,7 +16,11 @@ export const revalidate = 3600;
 
 export default async function ProjectsPage() {
   // Fetch projects from GitHub
-  const projects = await fetchGitHubRepositories('hammayo');
+  const projects = await fetchGitHubRepositories({
+    username: 'hammayo',
+    maxRepos: 10,
+    includeForked: false
+  });
 
   const getLanguageColor = (language: string | null) => {
     if (!language) return {

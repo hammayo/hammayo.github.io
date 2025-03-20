@@ -2,6 +2,7 @@
 
 import React from "react";
 import { motion } from "framer-motion";
+import { Card } from "@/components/ui/card";
 import { useTheme } from "next-themes";
 
 export function AsciiTitle() {
@@ -51,6 +52,21 @@ export function AsciiTitle() {
             </motion.div>
           ))}
         </pre>
+      </div>
+
+      <div className="relative">
+      <Card className="backdrop-blur-lg bg-white bg-opacity-10 p-12 rounded-xl border border-white border-opacity-20">
+            <pre className="font-mono text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-500 to-cyan-400">
+              {`
+ _                                                    
+| |__   __ _ _ __ ___  _ __ ___   __ _ _   _  ___   
+| '_ \\ / _\` | '_ \` _ \\| '_ \` _ \\ / _\` | | | |/ _ \\  
+| | | | (_| | | | | | | | | | | | (_| | |_| | (_) | 
+|_| |_|\\__,_|_| |_| |_|_| |_| |_|\\__,_|\\__, |\\___/  
+                                        |___/         
+`}
+            </pre>
+          </Card>        
       </div>
     </motion.div>
   );
