@@ -1,69 +1,48 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import * as Progress from "@radix-ui/react-progress";
 import React from "react";
 
-export const RouteProgress = React.memo(function RouteProgress() {
+// Create a separate client component that uses useSearchParams
+const ProgressIndicator = () => {
   const [progress, setProgress] = useState(0);
   const [visible, setVisible] = useState(false);
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    // Show the progress bar
+    setProgress(0);
+    setProgress(100);    
     setVisible(true);
-    
-    // Simulate progress
-    let interval: NodeJS.Timeout;
-    let timeout: NodeJS.Timeout;
-
-    const simulateProgress = () => {
-      setProgress(0);   // Reset progress
-      let simulatedProgress = 0;
-
-      interval = setInterval(() => {
-        simulatedProgress += Math.random() * 10;
-        if (simulatedProgress > 90) {
-          clearInterval(interval);
-        }
-        setProgress(Math.min(simulatedProgress, 90));
-      }, 100);
-
-      // Complete the progress after content has likely loaded
-      timeout = setTimeout(() => {
-        setProgress(100);
-        // Wait for the completion animation to finish
-        // Hide after completion animation
-        setTimeout(() => setVisible(false), 200);
-      }, 600);
-    };
-
-    simulateProgress();
-
-    return () => {
-      clearInterval(interval);
-      clearTimeout(timeout);
-    };
   }, [pathname, searchParams]);
-
-  if (!visible && progress === 0) return null;
 
   return (
     <Progress.Root
-      className="fixed top-0 left-0 right-0 z-[100] h-1 w-full bg-transparent rounded-none transition-opacity duration-200"
+      className="fixed top-[64px] left-0 right-0 z-[200] h-[2px] w-full overflow-hidden bg-transparent"
       style={{
-        opacity: visible ? 1 : 0
+        opacity: visible ? 1 : 0,
+        transition: "opacity 400ms ease-in-out"
       }}
       value={progress}
     >
       <Progress.Indicator
-        className="h-full w-full bg-gradient-to-r from-purple-500 via-cyan-500 to-green-500 transition-transform duration-200"
+        className="h-full w-full bg-gradient-to-l from-purple-500 via-cyan-500 to-green-500"
         style={{
-          transform: `translateX(-${100 - progress}%)`
+          transform: `translateX(-${100 - progress}%)`,
+          transition: "transform 400ms cubic-bezier(0.4, 0, 0.2, 1)"
         }}
       />
     </Progress.Root>
+  );
+};
+
+// Main component wrapped with Suspense
+export const RouteProgress = React.memo(function RouteProgress() {
+  return (
+    <Suspense fallback={null}>
+      <ProgressIndicator />
+    </Suspense>
   );
 });
