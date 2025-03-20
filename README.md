@@ -1,15 +1,18 @@
-# Hammayo's Portfolio
+[![Build](https://github.com/hammayo/www-portfolio/actions/workflows/deploy.yml/badge.svg)](https://github.com/hammayo/www-portfolio/actions/workflows/deploy.yml)
 
-A modern, responsive portfolio website built with Next.js, TypeScript, and Tailwind CSS.
+[![Version](https://img.shields.io/github/package-json/v/hammayo/www-portfolio)](https://github.com/hammayo/www-portfolio/releases)
 
-![Home Page](/public/screenshots/home.png)
-*Home page featuring title and animated background*
+[![Updated](https://img.shields.io/github/last-commit/hammayo/www-portfolio?logo=github&label=last%20update)](https://github.com/hammayo/www-portfolio/commits)
 
-![Projects Page](/public/screenshots/projects.png)
-*Projects page showcasing GitHub repositories in cards*
 
-![Dark/Light Mode](/public/screenshots/contact.png)
-*Seamless theme switching*
+# Hammayo
+
+>
+> A modern, responsive portfolio website built with Next.js, TypeScript, and Tailwind CSS.
+>
+> *NOTE:* This repo will move to hammayo.github.io repo once all features are completed.
+> https://hammayo.github.io/www-portfolio/ 
+>
 
 ## Features
 
@@ -165,11 +168,11 @@ To add analytics:
 
 ### Personal Information
 
-Edit the following files to customize your portfolio:
+Edit the following files to customize portfolio:
 
-1. **Home Page**: `/src/app/page.tsx` - Update your introduction and hero section
-2. **Projects**: Your GitHub repositories are automatically fetched and displayed
-3. **Contact Information**: `/src/app/contact/page.tsx` - Update your contact details
+1. **Home Page**: `/src/app/page.tsx` - Update introduction and hero section
+2. **Projects**: GitHub repositories are automatically fetched and displayed
+3. **Contact Information**: `/src/app/contact/page.tsx` - Update contact details
 4. **Header Links**: `/src/components/header.tsx` - Modify navigation links
 
 ### Styling
@@ -178,11 +181,11 @@ Edit the following files to customize your portfolio:
 - **Theme**: Modify the theme variables in `/src/app/globals.css`
 - **Typography**: Change the font in `/src/app/layout.tsx`
 
+## 📷 Screenshots
 
+![Home Page](/public/screenshots/home.png)
 
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+![Dark/Light Mode](/public/screenshots/contact.png)
 
 ## Acknowledgements
 
@@ -192,3 +195,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Tailwind CSS](https://tailwindcss.com/)
 - [Framer Motion](https://www.framer.com/motion/)
 
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

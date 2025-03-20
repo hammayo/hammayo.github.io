@@ -1,10 +1,11 @@
+"use client";
+
 import { Container } from "@/components/container";
 import Link from "next/link";
 import { PageTransitionWrapper } from "@/components/page-transition-wrapper";
 import { Suspense } from "react";
 
 // Separate the content into a client component
-"use client";
 const NotFoundContent = () => {
   return (
     <Container className="flex flex-col items-center justify-center text-center min-h-[calc(100vh-144px)]">
