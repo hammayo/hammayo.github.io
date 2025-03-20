@@ -17,6 +17,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      NODE_ENV: production
+      NEXT_PUBLIC_BASE_PATH: ${{ github.event.repository.name }}
     steps:
       - uses: actions/checkout@v4
       
@@ -38,7 +41,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./build
+          path: ./out
 
   deploy:
     environment:
