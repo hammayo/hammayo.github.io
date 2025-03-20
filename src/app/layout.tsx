@@ -7,6 +7,7 @@ import { AnimatedBackground } from "@/components/animated-background";
 import { basePath } from "@/lib/env";
 import { SITE, THEME } from "@/lib/constants";
 import { Analytics } from "@/components/analytics";
+import { RouteProgress } from "@/components/route-progress";
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -71,13 +72,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-        <body className={`${jetbrainsMono.variable} font-mono antialiased`}>
+      <body className={`${jetbrainsMono.variable} font-mono antialiased`}>
         <ThemeProvider attribute="class" defaultTheme={THEME.defaultTheme} enableSystem disableTransitionOnChange>
           <div className="min-h-screen bg-background text-foreground relative">
             <AnimatedBackground />
             <Header />
-            {/* Don't wrap main in animation containers to ensure titles are visible during transitions */}
-            <main>{children}</main>
+            <RouteProgress />
+            <main className="pt-16">{children}</main>
           </div>
         </ThemeProvider>
         <Analytics />
