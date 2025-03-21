@@ -2,17 +2,16 @@ import { z } from "zod";
 
 // Environment variable schema with validation
 const envSchema = z.object({
-  // Next.js specific
+  // Next.js environment
   NODE_ENV: z.enum(["development", "production", "test"]).optional().default("development"),
   
-  // GitHub specific
+  // GitHub
   GITHUB_ACTIONS: z.string().optional(),
   GITHUB_REPOSITORY: z.string().optional(),
-
-  // App specific - add env variables
-  // EXAMPLE_API_KEY: z.string().min(1),  
+  GITHUB_USERNAME: z.string().optional(),
+  GITHUB_TOKEN: z.string().optional(),
   
-  // Analytics
+  // Google Analytics
   GA_MEASUREMENT_ID: z.string().optional(), 
 }).passthrough();
 
@@ -34,6 +33,8 @@ function parseEnv() {
       NODE_ENV: 'development',
       GITHUB_ACTIONS: undefined,
       GITHUB_REPOSITORY: undefined,
+      GITHUB_USERNAME: undefined,
+      GITHUB_TOKEN: undefined,
       GA_MEASUREMENT_ID: undefined
     };
   }

@@ -16,7 +16,7 @@ export default function HomePage() {
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-144px)]">
         <Container className="text-center">
           <div className="my-8 opacity-0 animate-fade-in animate-delay-500">
-            <div className="relative mx-auto max-w-2xl p-6 rounded-2xl backdrop-blur-lg border dark:border-zinc-800/30 border-zinc-200/30 dark:bg-black/10 bg-white/10 group hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-500">
+            <div className="relative mx-auto max-w-6xl p-6 rounded-2xl backdrop-blur-lg border dark:border-zinc-800/30 border-zinc-200/30 dark:bg-black/10 bg-white/10 group hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-500">
               {/* Glassmorphic gradient effect */}
               <div className="absolute inset-0 bg-gradient-to-br opacity-0 from-purple-500/10 via-cyan-500/5 transition-opacity duration-700 group-hover:opacity-100 rounded-2xl -z-10" />
               <HeroTitle />
