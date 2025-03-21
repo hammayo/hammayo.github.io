@@ -20,6 +20,8 @@ jobs:
     env:
       NODE_ENV: production
       NEXT_PUBLIC_BASE_PATH: ${{ github.event.repository.name }}
+      GITHUB_USERNAME: ${{ secrets.GITHUB_USERNAME }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       
