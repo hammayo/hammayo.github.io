@@ -1,10 +1,9 @@
 import { NextConfig } from 'next';
-import { env, isGithubActions, repo, basePath, assetPrefix } from './src/lib/env';
+import { env, basePath, assetPrefix } from './src/lib/env';
 
-/** @type {import('next').NextConfig} */
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  distDir: env.NODE_ENV === "production" ? "build" : ".next",
+  distDir: env.NODE_ENV === "production" ? "out" : ".next",
   output: 'export',
   images: {
     unoptimized: true,
@@ -25,6 +24,10 @@ const nextConfig: NextConfig = {
   },
   basePath,
   assetPrefix,
+  typescript: {
+    ignoreBuildErrors: false,
+  },
+  trailingSlash: true,
 };
 
 export default nextConfig;

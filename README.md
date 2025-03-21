@@ -1,9 +1,4 @@
-[![Build](https://github.com/hammayo/www-portfolio/actions/workflows/deploy.yml/badge.svg)](https://github.com/hammayo/www-portfolio/actions/workflows/deploy.yml)
-
-[![Version](https://img.shields.io/github/package-json/v/hammayo/www-portfolio)](https://github.com/hammayo/www-portfolio/releases)
-
-[![Updated](https://img.shields.io/github/last-commit/hammayo/www-portfolio?logo=github&label=last%20update)](https://github.com/hammayo/www-portfolio/commits)
-
+[![Build](https://github.com/hammayo/www-portfolio/actions/workflows/deploy.yml/badge.svg)](https://github.com/hammayo/www-portfolio/actions/workflows/deploy.yml) [![Version](https://img.shields.io/github/package-json/v/hammayo/www-portfolio)](https://github.com/hammayo/www-portfolio/releases) [![Updated](https://img.shields.io/github/last-commit/hammayo/www-portfolio?logo=github&label=last%20update)](https://github.com/hammayo/www-portfolio/commits)
 
 # Hammayo
 
@@ -122,36 +117,136 @@ For deployment to Vercel, connect your GitHub repository to Vercel for automatic
 ```
 www-portfolio/
 ├── .github/            # GitHub Actions workflows
-├── public/             # Static assets
-│   └── icons/          # Favicon and app icons
+├── .vscode/           # VS Code configuration
+│   └── launch.json    # Debugging configuration
+├── public/            # Static assets
+│   ├── icons/         # Favicon and app icons
+│   └── screenshots/   # README screenshots
 ├── src/
-│   ├── app/            # Next.js App Router
-│   │   ├── contact/    # Contact page
-│   │   ├── projects/   # Projects page
-│   │   ├── layout.tsx  # Root layout
-│   │   └── page.tsx    # Home page
-│   ├── components/     # React components
-│   │   └── ui/         # UI components
-│   ├── lib/            # Utilities
-│   │   ├── constants.ts  # App constants
-│   │   ├── env.ts      # Environment variables
-│   │   ├── github.ts   # GitHub API client
-│   │   ├── logger.ts   # Logging utility
-│   │   └── utils.ts    # Utility functions
-│   └── providers/      # React context providers
-├── .env.local          # Local environment variables
-├── next.config.ts      # Next.js configuration
-└── tailwind.config.ts  # Tailwind CSS configuration
+│   ├── app/           # Next.js App Router
+│   │   ├── contact/   # Contact page
+│   │   ├── projects/  # Projects page
+│   │   ├── layout.tsx # Root layout
+│   │   └── page.tsx   # Home page
+│   ├── components/    # React components
+│   │   ├── ui/        # UI components
+│   │   └── project-card.tsx  # Project specific components
+│   ├── lib/           # Utilities
+│   │   ├── constants.ts # App constants
+│   │   ├── env.ts     # Environment variables
+│   │   ├── github.ts  # GitHub API client
+│   │   ├── logger.ts  # Logging utility
+│   │   └── utils.ts   # Utility functions
+│   └── providers/     # React context providers
+├── .env.local         # Local environment variables
+├── .eslintrc.js      # ESLint configuration
+├── .eslintrc.json    # Additional ESLint rules
+├── bun.lock          # Bun lock file
+├── components.json   # shadcn/ui configuration
+├── netlify.toml     # Netlify configuration
+├── next.config.ts   # Next.js configuration
+├── package.json     # Project dependencies
+├── postcss.config.mjs # PostCSS configuration
+├── tailwind.config.ts # Tailwind CSS configuration
+└── tsconfig.json    # TypeScript configuration
 ```
 
-## 📈 Analytics Integration
+## 🔧 Configuration
 
-To add analytics:
+### Environment Variables
 
-1. Create an account with your preferred analytics provider (Google Analytics, Plausible, etc.)
-2. Add the tracking code to `/src/app/layout.tsx`
+The application uses type-safe environment variables with Zod validation. Create a `.env.local` file with the following variables:
+
+```bash
+# Next.js
+NODE_ENV=development
+NEXT_PUBLIC_BASE_PATH=
+
+# GitHub (for GitHub Pages deployment)
+GITHUB_ACTIONS=
+GITHUB_REPOSITORY=
+
+# Analytics (optional)
+GA_MEASUREMENT_ID=G-xxxxxxxx
+```
+
+Environment variables are managed in `src/lib/env.ts` with runtime validation:
+
+```typescript
+const envSchema = z.object({
+  // Next.js specific
+  NODE_ENV: z.enum(["development", "production", "test"])
+    .optional()
+    .default("development"),
+  
+  // GitHub specific
+  GITHUB_ACTIONS: z.string().optional(),
+  GITHUB_REPOSITORY: z.string().optional(),
+  
+  // Analytics
+  GA_MEASUREMENT_ID: z.string().optional(),
+});
+```
+
+*NOTE*: For GitHub Actions deployment, the following environment variables are automatically set in `.github/workflows/deploy.yml`:
+```yaml
+env:
+  NODE_ENV: production
+  NEXT_PUBLIC_BASE_PATH: ${{ github.event.repository.name }}
+```
 
 
+### Base Path Configuration
+
+The application automatically configures base paths for different environments:
+
+- **Development**: No base path
+- **GitHub Pages**: Uses repository name as base path
+- **Production**: Configurable via environment variables
+
+Base path logic is handled in `src/lib/env.ts`:
+
+```typescript
+export const isGithubActions = Boolean(env.GITHUB_ACTIONS);
+export const repo = env.GITHUB_REPOSITORY?.replace(/.*?\//, '') || '';
+export const basePath = isGithubActions ? `/${repo}` : '';
+export const assetPrefix = isGithubActions ? `/${repo}/` : '';
+```
+
+### Configuration Files
+
+- **next.config.ts**: Next.js configuration including image optimization and base path settings
+- **tailwind.config.ts**: Tailwind CSS theme and plugin configuration
+- **components.json**: shadcn/ui component configuration
+- **tsconfig.json**: TypeScript compiler options
+- **postcss.config.mjs**: PostCSS plugins configuration
+- **eslintrc.js**: ESLint rules and TypeScript integration
+- **netlify.toml**: Netlify deployment configuration
+
+### Constants
+
+Application-wide constants are centralized in `src/lib/constants.ts`:
+
+```typescript
+export const SITE = {
+  name: "Hammayo's Portfolio",
+  title: "Hammayo's | Backend Software Engineer",
+  description: "Portfolio site showcasing dev projects.",
+  // ...
+};
+
+export const SOCIAL = {
+  github: "https://github.com/hammayo",
+  linkedin: "https://linkedin.com/in/hammayo",
+  email: "hammy@hammayo.co.uk",
+};
+
+export const THEME = {
+  defaultTheme: "dark",
+  lightThemeColor: "#ffffff",
+  darkThemeColor: "#000000",
+};
+```
 
 ## 🔧 Best Practices
 
@@ -187,6 +282,7 @@ Edit the following files to customize portfolio:
 
 ![Dark/Light Mode](/public/screenshots/contact.png)
 
+
 ## Acknowledgements
 
 - [Next.js](https://nextjs.org/)
@@ -194,8 +290,3 @@ Edit the following files to customize portfolio:
 - [shadcn/ui](https://ui.shadcn.com/)
 - [Tailwind CSS](https://tailwindcss.com/)
 - [Framer Motion](https://www.framer.com/motion/)
-
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

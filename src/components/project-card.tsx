@@ -3,7 +3,7 @@
 import React from "react";
 import { Card } from "@/components/ui/card";
 import { GitHubRepository } from "@/lib/github";
-import { CalendarDays, Star, GitFork } from "lucide-react";
+import { CalendarDays, Star } from "lucide-react";
 import { motion } from "framer-motion";
 import { formatDistanceToNow } from "@/lib/utils";
 
