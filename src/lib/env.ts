@@ -8,17 +8,15 @@ const envSchema = z.object({
   // GitHub specific
   GITHUB_ACTIONS: z.string().optional(),
   GITHUB_REPOSITORY: z.string().optional(),
+
+  // App specific - add env variables
+  // EXAMPLE_API_KEY: z.string().min(1),  
   
   // Analytics
-  GA_MEASUREMENT_ID: z.string().optional(),
-  
-  // App specific - add your env variables here
-  // EXAMPLE_API_KEY: z.string().min(1),
+  GA_MEASUREMENT_ID: z.string().optional(), 
 }).passthrough();
 
-/*
- * Parse and validate environment variables
- */
+// Parse and validate environment variables
 function parseEnv() {
   const parsed = envSchema.safeParse({
     ...process.env,

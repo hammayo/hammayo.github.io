@@ -39,10 +39,10 @@ const NotFoundContent = () => {
             Return Home
           </Link>
           <Link
-            href="/projects"
-            className="px-6 py-3 text-sm font-medium dark:text-zinc-200 text-zinc-800 rounded-md border dark:border-zinc-800 border-zinc-200 hover:border-purple-500/50 dark:hover:border-purple-500/50 transition-all duration-300 backdrop-blur-md tracking-tight"
+            href="/contact"
+            className="px-6 py-3 text-sm font-medium text-white rounded-md bg-gradient-to-r from-purple-500 via-cyan-400 to-green-400 hover:from-purple-600 hover:via-cyan-600 hover:to-green-600 transition-all duration-300 backdrop-blur-md tracking-tight hover:shadow-lg hover:shadow-purple-500/20 tracking-tight"
           >
-            View Projects
+            Contact Me
           </Link>
         </div>
       </div>

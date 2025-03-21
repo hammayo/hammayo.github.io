@@ -1,7 +1,17 @@
 import { Container } from "@/components/container";
 import Link from "next/link";
+import { NextPageContext } from 'next';
 
-function Error({ statusCode }: { statusCode?: number }) {
+interface ErrorProps {
+  statusCode?: number;
+}
+
+interface ErrorContext extends NextPageContext {
+  res: NextPageContext['res'];
+  err: NextPageContext['err'];
+}
+
+function Error({ statusCode }: ErrorProps) {
   return (
     <Container className="flex flex-col items-center justify-center text-center min-h-[calc(100vh-144px)]">
       <div className="mb-8 relative">
@@ -35,7 +45,7 @@ function Error({ statusCode }: { statusCode?: number }) {
   );
 }
 
-Error.getInitialProps = ({ res, err }: { res: any, err: any }) => {
+Error.getInitialProps = ({ res, err }: ErrorContext) => {
   const statusCode = res ? res.statusCode : err ? err.statusCode : 404;
   return { statusCode };
 };

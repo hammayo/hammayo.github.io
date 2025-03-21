@@ -19,7 +19,7 @@ export default function ContactPage() {
           description="Feel free to reach out through any of these platforms."
         />
 
-        <div className="grid w-full grid-cols-1 gap-8 mx-auto sm:grid-cols-3 lg:gap-16">
+        <div className="grid w-full grid-cols-1 gap-8 mx-auto mt-16 lg:mt-44 sm:grid-cols-3 lg:gap-16">
           {/* GitHub */}
           <ContactCard
             icon={

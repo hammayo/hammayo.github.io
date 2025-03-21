@@ -4,7 +4,7 @@ import { PageHeading } from "@/components/page-heading";
 import { PageTransitionWrapper } from "@/components/page-transition-wrapper";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { fetchGitHubRepositories, type GitHubRepository } from "@/lib/github";
+import { fetchGitHubRepositories } from "@/lib/github";
 
 export const metadata: Metadata = {
   title: "Projects | Hammayo's Portfolio",
