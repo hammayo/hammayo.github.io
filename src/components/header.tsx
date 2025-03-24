@@ -2,10 +2,11 @@
 
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { ThemeToggle } from "./theme-toggle";
 import { Container } from "./container";
 import { cn } from "@/lib/utils";
+import imageLoader from "@/lib/imageLoader";
 
 export function Header() {
   const pathname = usePathname();
@@ -18,8 +19,17 @@ export function Header() {
             <Link
               href="/"
               prefetch
-              className="text-xl font-semibold tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-purple-500 via-cyan-500 to-green-500"
+              className="text-xl font-semibold tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-purple-500 via-cyan-500 to-green-500 flex items-center gap-2"
             >
+              <Image 
+                loader={imageLoader}
+                src="/images/_hb-logo.png"
+                alt="HB"
+                width={38}
+                height={38}
+                priority
+                unoptimized
+              />
               hammayo
             </Link>
 
@@ -48,7 +58,6 @@ export function Header() {
               >
                 Contact
               </Link>
-              <ThemeToggle aria-label="Toggle color theme" />
             </div>
           </div>
         </nav>
