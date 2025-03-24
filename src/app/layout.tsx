@@ -8,6 +8,8 @@ import { basePath } from "@/lib/env";
 import { SITE, THEME } from "@/lib/constants";
 import { Analytics } from "@/components/analytics";
 import { RouteProgress } from "@/components/route-progress";
+import { Footer } from "@/components/footer";
+import { ErrorBoundary } from "@/components/error-boundary";
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -74,12 +76,17 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${jetbrainsMono.variable} font-mono antialiased`}>
         <ThemeProvider attribute="class" defaultTheme={THEME.defaultTheme} enableSystem disableTransitionOnChange>
-          <div className="min-h-screen bg-background text-foreground relative">
-            <AnimatedBackground />
-            <Header />
-            <RouteProgress />
-            <main className="pt-16">{children}</main>
-          </div>
+          <ErrorBoundary>
+            <div className="min-h-screen bg-background text-foreground relative flex flex-col">
+              <AnimatedBackground />
+              <Header />
+              <RouteProgress />
+              <main className="flex-1 pt-2 container mx-auto px-4 sm:px-6 lg:px-8">
+                {children}
+              </main>
+              <Footer />
+            </div>
+          </ErrorBoundary>
         </ThemeProvider>
         <Analytics />
       </body>
