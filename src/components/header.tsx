@@ -6,10 +6,11 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Container } from "./container";
 import { cn } from "@/lib/utils";
-import imageLoader from "@/lib/imageLoader";
+import { basePath } from "@/lib/env";
 
 export function Header() {
   const pathname = usePathname();
+  const logoPath = `${basePath}/images/_hb-logo.png`;
 
   return (
     <header role="banner" className="fixed top-0 left-0 right-0 z-50 dark:bg-black/10 bg-white/10 backdrop-blur-xl border-b dark:border-zinc-800/20 border-zinc-200/20">
@@ -22,15 +23,15 @@ export function Header() {
               className="text-xl font-semibold tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-purple-500 via-cyan-500 to-green-500 flex items-center gap-2"
             >
               <Image 
-                loader={imageLoader}
-                src="/images/_hb-logo.png"
+                src={logoPath}
                 alt="HB"
                 width={38}
                 height={38}
                 priority
                 unoptimized
               />
-              hammayo
+              <span className="md:inline hidden">hammayo</span>
+              <span className="md:hidden">hammy</span>
             </Link>
 
             <div className="flex items-center gap-8">
