@@ -20,7 +20,7 @@ export function Header() {
             <Link
               href="/"
               prefetch
-              className="text-xl font-semibold tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-purple-500 via-cyan-500 to-green-500 flex items-center gap-2"
+              className="text-xl font-semibold tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-purple-500 via-cyan-500 to-green-500 flex items-center gap-2 transition-transform"
             >
               <Image 
                 src={logoPath}
@@ -29,9 +29,10 @@ export function Header() {
                 height={38}
                 priority
                 unoptimized
+                className="animate-float"
               />
-              <span className="md:inline hidden">hammayo</span>
-              <span className="md:hidden">hammy</span>
+              <span className="md:inline hidden opacity-100">hammayo</span>
+              <span className="md:hidden opacity-100">hammy</span>
             </Link>
 
             <div className="flex items-center gap-8">

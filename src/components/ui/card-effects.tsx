@@ -27,6 +27,8 @@ export function CardEffects({ children, variant = "default", className = "" }: C
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
       onMouseMove={handleMouseMove}
       className={`group relative h-full ${className}`}
     >
@@ -42,13 +44,10 @@ export function CardEffects({ children, variant = "default", className = "" }: C
         group-hover:border-purple-300/50 dark:group-hover:border-purple-500/20
         ${variant === "featured" ? 'ring-1 ring-purple-300/40 dark:ring-purple-500/10' : ''}`}
       >
-        {/* Dynamic gradient backgrounds */}
         <div className="absolute inset-0 transition-opacity duration-700 opacity-0 group-hover:opacity-100">
           <div className="absolute inset-0 bg-gradient-to-br from-purple-200/20 via-cyan-200/15 to-pink-200/20 dark:from-purple-500/[0.05] dark:via-cyan-500/[0.05] dark:to-pink-500/[0.05]" />
           <div className="absolute inset-0 bg-gradient-to-tl from-green-200/15 via-blue-200/15 to-purple-200/20 dark:from-green-500/[0.03] dark:via-blue-500/[0.04] dark:to-purple-500/[0.05]" />
         </div>
-
-        {/* Glassmorphic spotlight effect */}
         <motion.div
           className="pointer-events-none absolute -inset-px opacity-0 group-hover:opacity-100 transition-opacity duration-700"
           style={{
@@ -60,7 +59,6 @@ export function CardEffects({ children, variant = "default", className = "" }: C
           }}
         />
 
-        {/* Gradient border glow */}
         <motion.div
           className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-700"
           style={{
@@ -71,8 +69,7 @@ export function CardEffects({ children, variant = "default", className = "" }: C
             )`,
           }}
         />
-
-        {/* Content wrapper with backdrop */}
+        
         <div className="relative h-full z-10 bg-white/60 dark:bg-black/10 backdrop-blur-[2px] group-hover:bg-purple-50/30 dark:group-hover:bg-black/20 transition-colors duration-500">
           {children}
         </div>

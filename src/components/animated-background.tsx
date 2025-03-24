@@ -48,7 +48,7 @@ export function AnimatedBackground() {
 
     const generateBlobs = () => {
       const newBlobs: Blob[] = [];
-      const count = 8; // Increased number of blobs
+      const count = 8;
 
       for (let i = 0; i < count; i++) {
         newBlobs.push({
@@ -67,7 +67,6 @@ export function AnimatedBackground() {
 
     generateBlobs();
 
-    // Regenerate blobs occasionally
     const intervalId = setInterval(generateBlobs, 180000); // Every 3 minutes
 
     return () => clearInterval(intervalId);
@@ -90,14 +89,16 @@ export function AnimatedBackground() {
           initial={{
             x: `${blob.x}%`,
             y: `${blob.y}%`,
+            opacity: 0,
           }}
           animate={{
             x: [`${blob.x}%`, `${Math.random() * 100}%`, `${Math.random() * 100}%`, `${blob.x}%`],
             y: [`${blob.y}%`, `${Math.random() * 100}%`, `${Math.random() * 100}%`, `${blob.y}%`],
+            opacity: [0.4, 0.5, 0.4, 0.3],
           }}
           transition={{
             duration: blob.duration,
-            ease: "linear",
+            ease: "easeInOut",
             repeat: Infinity,
             delay: blob.delay,
           }}

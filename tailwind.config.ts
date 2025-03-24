@@ -81,12 +81,55 @@ const config: Config = {
           "0%": { opacity: "0", transform: "scale(0.9)" },
           "100%": { opacity: "1", transform: "scale(1)" },
         },
+        "slide-in-right": {
+          "0%": { transform: "translateX(-10px)", opacity: "0" },
+          "100%": { transform: "translateX(0)", opacity: "1" },
+        },
+        "slide-in-left": {
+          "0%": { transform: "translateX(10px)", opacity: "0" },
+          "100%": { transform: "translateX(0)", opacity: "1" },
+        },
+        "pulse-soft": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.8" },
+        },
+        "float": {
+          "0%": { 
+            transform: "translateY(0px) rotate(0deg) scale(1)",
+            filter: "brightness(1)",
+          },
+          "50%": { 
+            transform: "translateY(-5px) rotate(2deg) scale(1.05)",
+            filter: "brightness(1.1)",
+          },
+          "100%": { 
+            transform: "translateY(0px) rotate(0deg) scale(1)",
+            filter: "brightness(1)",
+          }
+        },
+        "logo-appear": {
+          "0%": { 
+            transform: "scale(0.8) rotate(-10deg)",
+            opacity: "0",
+            filter: "blur(10px)",
+          },
+          "100%": { 
+            transform: "scale(1) rotate(0deg)",
+            opacity: "1",
+            filter: "blur(0px)",
+          }
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "fade-in": "fade-in 0.5s ease-out forwards",
         "fade-in-scale": "fade-in-scale 0.5s ease-out forwards",
+        "slide-in-right": "slide-in-right 0.3s ease-out forwards",
+        "slide-in-left": "slide-in-left 0.3s ease-out forwards",
+        "pulse-soft": "pulse-soft 2s ease-in-out infinite",
+        "float": "float 3s ease-in-out infinite",
+        "logo-appear": "logo-appear 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards",
       },
       letterSpacing: {
         'tighter': '-0.05em',

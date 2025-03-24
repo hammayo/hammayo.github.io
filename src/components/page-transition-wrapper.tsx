@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { usePathname } from "next/navigation";
+import { motion } from "framer-motion";
 
 interface PageTransitionWrapperProps {
   children: React.ReactNode;
@@ -9,29 +10,20 @@ interface PageTransitionWrapperProps {
 
 export function PageTransitionWrapper({ children }: PageTransitionWrapperProps) {
   const pathname = usePathname();
-  const [isTransitioning, setIsTransitioning] = useState(false);
-
-  // Reset transition state on pathname change
-  useEffect(() => {
-    setIsTransitioning(true);
-
-    const timer = setTimeout(() => {
-      setIsTransitioning(false);
-    }, 10); // Very short timeout to ensure we get past any initial page load transitions
-
-    return () => clearTimeout(timer);
-  }, [pathname]);
 
   return (
-    <div
+    <motion.div
+      key={pathname}
       className="min-h-screen pt-28 pb-20"
-      style={{
-        // Use opacity for elements other than page headings
-        transition: "opacity 0.3s ease",
-        opacity: isTransitioning ? 0.99 : 1, // Use 0.99 to avoid triggering some browser optimizations
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{
+        duration: 0.3,
+        ease: "easeInOut"
       }}
     >
       {children}
-    </div>
+    </motion.div>
   );
 }
