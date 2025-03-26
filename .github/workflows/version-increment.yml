@@ -1,4 +1,4 @@
-name: Auto Increment Version
+name: CI/CD Pipeline -> Versioning
 
 on:
   pull_request:
@@ -62,3 +62,4 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+	  

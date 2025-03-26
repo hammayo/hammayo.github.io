@@ -1,12 +1,11 @@
-[![Build](https://github.com/hammayo/www-portfolio/actions/workflows/deploy.yml/badge.svg)](https://github.com/hammayo/www-portfolio/actions/workflows/deploy.yml) [![Version](https://img.shields.io/github/package-json/v/hammayo/www-portfolio)](https://github.com/hammayo/www-portfolio/releases) [![Updated](https://img.shields.io/github/last-commit/hammayo/www-portfolio?logo=github&label=last%20update)](https://github.com/hammayo/www-portfolio/commits)
+[![Build](https://github.com/hammayo/hammayo.github.io/actions/workflows/deploy.yml/badge.svg)](https://github.com/hammayo/hammayo.github.io/actions/workflows/deploy.yml) [![Version](https://img.shields.io/github/package-json/v/hammayo/hammayo.github.io)](https://github.com/hammayo/hammayo.github.io/releases) [![Updated](https://img.shields.io/github/last-commit/hammayo/hammayo.github.io?logo=github&label=last%20update)](https://github.com/hammayo/hammayo.github.io/commits)
 
 # Hammayo
 
 >
 > A modern, responsive portfolio website built with Next.js, TypeScript, and Tailwind CSS.
 >
-> *NOTE:* This repo will move to hammayo.github.io repo once all features are completed.
-> https://hammayo.github.io/www-portfolio/ 
+> https://hammayo.github.io/ 
 >
 
 ## Features
@@ -34,8 +33,8 @@
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/hammayo/www-portfolio.git
-cd www-portfolio
+git clone https://github.com/hammayo/hammayo.github.io.git
+cd hammayo.github.io
 ```
 
 2. Install dependencies:
@@ -115,8 +114,8 @@ For deployment to Vercel, connect your GitHub repository to Vercel for automatic
 ## 📂 Project Structure
 
 ```
-www-portfolio/
-├── .github/            # GitHub Actions workflows
+hammayo.github.io/
+├── .github/           # GitHub Actions workflows
 ├── .vscode/           # VS Code configuration
 │   └── launch.json    # Debugging configuration
 ├── public/            # Static assets
@@ -290,3 +289,4 @@ Edit the following files to customize portfolio:
 - [shadcn/ui](https://ui.shadcn.com/)
 - [Tailwind CSS](https://tailwindcss.com/)
 - [Framer Motion](https://www.framer.com/motion/)
+
