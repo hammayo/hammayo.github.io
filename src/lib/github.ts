@@ -106,7 +106,7 @@ export async function fetchGitHubOverview(username?: string): Promise<GitHubOver
   }
 }
 
-// Fetch first 2pinned repositories using GraphQL API with caching
+// Fetch first 2 pinned repositories using GraphQL API with caching
 export async function fetchPinnedRepositories(username?: string): Promise<GitHubRepository[]> {
   const githubUser = username || env.GITHUB_USERNAME;
   if (!githubUser || !env.GITHUB_TOKEN) {
@@ -203,7 +203,8 @@ export async function fetchPinnedRepositories(username?: string): Promise<GitHub
   }
 }
 
-// Fetch all repositories with options
+// Fetch all repositories with options 
+// TODO: Use env config instead of hardcoded values
 export async function fetchAllRepositories({
   username,
   sort = 'updated',
