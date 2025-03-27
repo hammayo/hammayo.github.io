@@ -57,23 +57,43 @@ const GRADIENT_STYLE = {
   willChange: "opacity, background-position",
 };
 
-// Loading state component
-const LoadingState = () => (
-  <div className="max-w-6xl mx-auto">
-    <CardEffects variant="featured" className="rounded-2xl overflow-hidden">
-      <div className="px-8 md:px-16 py-10 md:py-14 relative">
-        <h1 className="text-center">
-          <span className="block text-2xl md:text-4xl mb-4 text-zinc-700 dark:text-zinc-200">
-            Hello, I am
-          </span>
-          <span className="block text-4xl md:text-8xl font-bold">
-            <span className="md:hidden">HAMMY</span>
-            <span className="hidden md:inline">HAMMAYO</span>
-          </span>
-        </h1>
-        <div className="mt-6 h-1.5 w-40 md:w-64 mx-auto rounded-full" />
+interface TitleContentProps {
+  isLoading?: boolean;
+  scheme?: typeof COLOR_SCHEMES[number];
+  currentGlow?: string;
+}
+
+const TitleContent: React.FC<TitleContentProps> = ({ isLoading, scheme, currentGlow }) => (
+  <div className="px-8 md:px-16 py-10 md:py-14 relative">
+    {!isLoading && (
+      <div className="absolute inset-0">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={scheme?.id}
+            className={`absolute inset-0 bg-gradient-to-r ${scheme?.background}`}
+            {...GRADIENT_ANIMATION}
+            style={GRADIENT_STYLE}
+          />
+        </AnimatePresence>
       </div>
-    </CardEffects>
+    )}
+    
+    <h1 className="text-center">
+      <span className="block text-2xl md:text-4xl mb-4 text-zinc-700 dark:text-zinc-200">
+        Hello, I am
+      </span>
+      <span 
+        className={`block text-4xl md:text-8xl font-bold ${!isLoading ? `text-transparent bg-clip-text bg-gradient-to-r ${scheme?.text}` : ''}`}
+      >
+        <span className="md:hidden">HAMMY</span>
+        <span className="hidden md:inline">HAMMAYO</span>
+      </span>
+    </h1>
+
+    <div 
+      className={`mt-6 h-1.5 w-40 md:w-64 mx-auto rounded-full ${!isLoading ? `bg-gradient-to-r ${scheme?.text}` : ''}`}
+      style={!isLoading ? { boxShadow: `0 0 15px ${currentGlow}` } : undefined}
+    />
   </div>
 );
 
@@ -90,8 +110,6 @@ export function HeroTitle() {
     return () => clearInterval(interval);
   }, []);
 
-  if (!mounted) return <LoadingState />;
-
   const scheme = COLOR_SCHEMES[currentScheme];
   const glowOpacity = resolvedTheme === 'dark' ? '0.3' : '0.15';
   const currentGlow = scheme.glow.replace('0.15', glowOpacity);
@@ -99,35 +117,11 @@ export function HeroTitle() {
   return (
     <div className="max-w-6xl mx-auto">
       <CardEffects variant="featured" className="rounded-2xl overflow-hidden">
-        <div className="absolute inset-0">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={scheme.id}
-              className={`absolute inset-0 bg-gradient-to-r ${scheme.background}`}
-              {...GRADIENT_ANIMATION}
-              style={GRADIENT_STYLE}
-            />
-          </AnimatePresence>
-        </div>
-
-        <div className="px-8 md:px-16 py-10 md:py-14 relative">
-          <h1 className="text-center">
-            <span className="block text-2xl md:text-4xl mb-4 text-zinc-700 dark:text-zinc-200">
-              Hello, I am
-            </span>
-            <span 
-              className={`block text-4xl md:text-8xl font-bold text-transparent bg-clip-text bg-gradient-to-r ${scheme.text}`}
-            >
-              <span className="md:hidden">HAMMY</span>
-              <span className="hidden md:inline">HAMMAYO</span>
-            </span>
-          </h1>
-
-          <div 
-            className={`mt-6 h-1.5 w-40 md:w-64 mx-auto rounded-full bg-gradient-to-r ${scheme.text}`}
-            style={{ boxShadow: `0 0 15px ${currentGlow}` }}
-          />
-        </div>
+        <TitleContent 
+          isLoading={!mounted}
+          scheme={mounted ? scheme : undefined}
+          currentGlow={mounted ? currentGlow : undefined}
+        />
       </CardEffects>
     </div>
   );
