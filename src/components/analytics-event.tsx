@@ -13,6 +13,9 @@ export function PageViewEvent({ page }: PageViewEventProps) {
       action: 'page_view',
       category: 'navigation',
       label: page,
+      page_title: page,
+      page_location: window.location.href,
+      page_path: window.location.pathname,
     });
   }, [page]);
 
