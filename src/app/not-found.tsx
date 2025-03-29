@@ -1,62 +1,53 @@
 "use client";
 
 import { Container } from "@/components/container";
-import Link from "next/link";
-import { PageTransitionWrapper } from "@/components/page-transition-wrapper";
 import { Suspense } from "react";
+import Link from "next/link";
 
-// Separate the content into a client component
-const NotFoundContent = () => {
+function NotFoundContent() {
   return (
     <Container className="flex flex-col items-center justify-center text-center min-h-[calc(100vh-144px)]">
       <div className="mb-8 relative">
-        <div className="text-9xl font-bold opacity-10 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-transparent bg-clip-text bg-gradient-to-r from-purple-800 via-cyan-800 to-green-800 select-none" style={{ fontSize: "240px" }}>
+        <div 
+          className="text-9xl font-bold opacity-10 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-transparent bg-clip-text bg-gradient-to-r from-purple-800 via-cyan-800 to-green-800 select-none" 
+          style={{ fontSize: "240px" }}
+        >
           404
         </div>
-
-        <div className="mb-12 relative z-10">
-          <h1 className="text-4xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-purple-500 via-cyan-500 to-green-500 tracking-tight opacity-100 transition-none pointer-events-auto">
-            Page Not Found
-          </h1>
-          <p className="text-muted-foreground tracking-tight opacity-100 transition-none pointer-events-auto">
-            Sorry, the page you're looking for doesn't exist or has been moved.
-          </p>
-        </div>
-      </div>
-
-      <div className="relative mx-auto max-w-2xl p-6 rounded-2xl backdrop-blur-lg border dark:border-zinc-800/30 border-zinc-200/30 dark:bg-black/10 bg-white/10 group hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-500 mb-10">
-        <div className="absolute inset-0 bg-gradient-to-br opacity-0 from-purple-500/10 via-cyan-500/5 transition-opacity duration-700 group-hover:opacity-100 rounded-2xl -z-10" />
-
-        <p className="text-lg text-muted-foreground leading-relaxed tracking-tight mb-6">
-          It seems like you've ventured into uncharted territory. Don't worry, you can easily navigate back to explore my portfolio.
-        </p>
-
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Link
-            href="/"
-            className="px-6 py-3 text-sm font-medium text-white rounded-md bg-gradient-to-r from-purple-500 via-cyan-500 to-green-500 hover:from-purple-600 hover:via-cyan-600 hover:to-green-600 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/20 tracking-tight"
-          >
-            Return Home
-          </Link>
-          <Link
-            href="/contact"
-            className="px-6 py-3 text-sm font-medium text-white rounded-md bg-gradient-to-r from-purple-500 via-cyan-400 to-green-400 hover:from-purple-600 hover:via-cyan-600 hover:to-green-600 transition-all duration-300 backdrop-blur-md tracking-tight hover:shadow-lg hover:shadow-purple-500/20 tracking-tight"
-          >
-            Contact Me
-          </Link>
+        <div>
+          <h2 className="text-4xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-purple-500 via-cyan-500 to-green-500 tracking-tight">
+            Captain&apos;s Log, Supplement - Stardate 40400.0
+          </h2>
+          <div className="space-y-6">
+            <p className="text-lg text-muted-foreground leading-relaxed tracking-tight">
+              Alert: You&apos;ve entered an uncharted sector of the codebase.
+            </p>
+            <p className="text-lg text-muted-foreground leading-relaxed tracking-tight">
+              Sensors indicate this spatial anomaly corresponds to a 404 Error — no quantum signature detected.
+            </p>
+            <p className="text-lg text-muted-foreground leading-relaxed tracking-tight">
+              Starfleet Command is standing by to assist.
+            </p>
+          </div>
+          <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
+            <Link 
+              href="/"
+              replace
+              className="px-6 py-3 text-sm font-medium text-white rounded-md bg-gradient-to-r from-purple-500 via-cyan-500 to-green-500 hover:from-purple-600 hover:via-cyan-600 hover:to-green-600 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/20 tracking-tight z-50 relative"
+            >
+              Return to Main Bridge
+            </Link>
+          </div>
         </div>
       </div>
     </Container>
   );
-};
+}
 
-// Main component with Suspense wrapper
-export default function NotFoundPage() {
+export default function NotFound() {
   return (
-    <PageTransitionWrapper>
-      <Suspense fallback={null}>
-        <NotFoundContent />
-      </Suspense>
-    </PageTransitionWrapper>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+      <NotFoundContent />
+    </Suspense>
   );
 }

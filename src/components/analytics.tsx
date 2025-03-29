@@ -1,25 +1,74 @@
 'use client';
 
+import { usePathname, useSearchParams } from 'next/navigation';
+import Script from 'next/script';
+import { Suspense, useEffect } from 'react';
 import { env } from '@/lib/env';
-import { logger } from '@/lib/logger';
 
-// Analytics event types
-type AnalyticsEvent = {
+// Analytics event interface
+interface AnalyticsEvent {
   action: string;
-  category: string;
+  category?: string;
   label?: string;
   value?: number;
-};
+  [key: string]: any;
+}
 
-// Send a custom event to Google Analytics
-export const sendAnalyticsEvent = ({ action, category, label, value }: AnalyticsEvent) => {
-  if (typeof window !== 'undefined' && typeof window.gtag !== 'undefined' && env.GA_MEASUREMENT_ID) {
+// Analytics utility function
+export function sendAnalyticsEvent({ action, category, label, value, ...rest }: AnalyticsEvent) {
+  if (env.GA_MEASUREMENT_ID && window.gtag) {
     window.gtag('event', action, {
       event_category: category,
       event_label: label,
-      value: value,
-      send_to: env.GA_MEASUREMENT_ID,
+      value,
+      ...rest,
     });
-    logger.debug(`📊 Event sent: ${action} - ${category}${label ? ` - ${label}` : ''}`);
   }
-};
+}
+
+function AnalyticsTracking() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (!env.GA_MEASUREMENT_ID || !window.gtag || !pathname) return;
+
+    const search = searchParams?.toString();
+    const fullPath = search ? `${pathname}?${search}` : pathname;
+    
+    window.gtag('config', env.GA_MEASUREMENT_ID, {
+      page_path: fullPath,
+    });
+  }, [pathname, searchParams]);
+
+  return null;
+}
+
+export function Analytics() {
+  if (!env.GA_MEASUREMENT_ID) {
+    return null;
+  }
+
+  return (
+    <>
+      <Script
+        src={`https://www.googletagmanager.com/gtag/js?id=${env.GA_MEASUREMENT_ID}`}
+        strategy="afterInteractive"
+      />
+      <Script id="google-analytics" strategy="afterInteractive">
+        {`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){window.dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', '${env.GA_MEASUREMENT_ID}', {
+            page_path: window.location.pathname,
+            send_page_view: true
+          });
+        `}
+      </Script>
+      <Suspense fallback={null}>
+        <AnalyticsTracking />
+      </Suspense>
+    </>
+  );
+}
