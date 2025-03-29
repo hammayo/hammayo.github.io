@@ -4,15 +4,17 @@ import { PageTransitionWrapper } from "@/components/page-transition-wrapper";
 import { ContactCard } from "@/components/contact-card";
 import { SOCIAL } from "@/lib/constants";
 import type { Metadata } from "next";
+import { PageViewEvent } from "@/components/analytics-event";
 
 export const metadata: Metadata = {
   title: "Contact | Hammayo's Portfolio",
-  description: "Get in touch with me through various channels.",
+  description: "Get in touch with me",
 };
 
 export default function ContactPage() {
   return (
     <PageTransitionWrapper>
+      <PageViewEvent page="contact" />
       <Container>
         <PageHeading
           title="Contact"

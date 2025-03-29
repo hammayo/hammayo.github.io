@@ -1,8 +1,6 @@
 'use client';
 
 import { env } from '@/lib/env';
-import { usePathname, useSearchParams } from 'next/navigation';
-import { useEffect, Suspense } from 'react';
 import { logger } from '@/lib/logger';
 
 // Analytics event types
@@ -13,36 +11,11 @@ type AnalyticsEvent = {
   value?: number;
 };
 
-// Send a page view to Google Analytics
-const sendPageView = (path: string, search: string) => {
-  const url = path + search;
-  
-  if (typeof window.gtag !== 'undefined') {
-    window.gtag('config', env.GA_MEASUREMENT_ID || '', {
-      page_path: url,
-    });
-    logger.debug(`📊 Page view sent: ${url}`);
-  }
-};
-
-// Send a custom event to Google Analytics
-export const sendAnalyticsEvent = ({ action, category, label, value }: AnalyticsEvent) => {
-  if (typeof window.gtag !== 'undefined') {
-    window.gtag('event', action, {
-      event_category: category,
-      event_label: label,
-      value: value,
-    });
-    logger.debug(`📊 Event sent: ${action} - ${category}${label ? ` - ${label}` : ''}`);
-  }
-};
-
 // Initialize Google Analytics
-function initializeGA() {
+if (typeof window !== 'undefined' && env.GA_MEASUREMENT_ID) {
   const gaId = env.GA_MEASUREMENT_ID;
-  if (!gaId || typeof window === 'undefined') return;
-
-  // Create script elements manually to avoid Next.js preloading
+  
+  // Create script elements
   const gtagScript = document.createElement('script');
   gtagScript.async = true;
   gtagScript.src = `https://www.googletagmanager.com/gtag/js?id=${gaId}`;
@@ -55,6 +28,7 @@ function initializeGA() {
     gtag('config', '${gaId}', {
       page_path: window.location.pathname,
       transport_type: 'beacon',
+      send_page_view: true
     });
   `;
   
@@ -65,39 +39,15 @@ function initializeGA() {
   logger.debug(`📊 Google Analytics initialized for ${gaId}`);
 }
 
-// Page view tracker component that uses the useSearchParams hook
-function PageViewTracker() {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  
-  // Initialize GA on mount
-  useEffect(() => {
-    initializeGA();
-  }, []);
-  
-  // Track page views
-  useEffect(() => {
-    if (env.GA_MEASUREMENT_ID && searchParams instanceof URLSearchParams) {
-      const searchString = searchParams.toString();
-      const search = searchString.length > 0 ? `?${searchString}` : '';
-      if (pathname) {
-        sendPageView(pathname, search);
-      }
-    }
-  }, [pathname, searchParams]);
-  
-  return null;
-}
-
-// Main Analytics component
-export function Analytics() {
-  if (!env.GA_MEASUREMENT_ID) {
-    return null;
+// Send a custom event to Google Analytics
+export const sendAnalyticsEvent = ({ action, category, label, value }: AnalyticsEvent) => {
+  if (typeof window !== 'undefined' && typeof window.gtag !== 'undefined' && env.GA_MEASUREMENT_ID) {
+    window.gtag('event', action, {
+      event_category: category,
+      event_label: label,
+      value: value,
+      send_to: env.GA_MEASUREMENT_ID,
+    });
+    logger.debug(`📊 Event sent: ${action} - ${category}${label ? ` - ${label}` : ''}`);
   }
-  
-  return (
-    <Suspense fallback={null}>
-      <PageViewTracker />
-    </Suspense>
-  );
-}
+};

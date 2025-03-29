@@ -2,8 +2,9 @@ import { Container } from "@/components/container";
 import { PageHeading } from "@/components/page-heading";
 import { PageTransitionWrapper } from "@/components/page-transition-wrapper";
 import { ProjectCard } from "@/components/project-card";
-import type { Metadata } from "next";
 import { fetchGitHubData } from "@/lib/github";
+import type { Metadata } from "next";
+import { PageViewEvent } from "@/components/analytics-event";
 
 export const metadata: Metadata = {
   title: "Projects | Hammayo's Portfolio",
@@ -16,7 +17,7 @@ export const revalidate = 3600;
 export default async function ProjectsPage() {
   const { pinnedRepos, otherRepos } = await fetchGitHubData({
     username: 'hammayo',
-    maxRepos: 10,
+    maxRepos: 5,
     includeForked: true
   });
 
@@ -31,10 +32,11 @@ export default async function ProjectsPage() {
 
   return (
     <PageTransitionWrapper>
+      <PageViewEvent page="projects" />
       <Container>
         <PageHeading 
           title="Projects"
-          description="Explore my latest projects and open source contributions on GitHub."
+          description="Explore my most recent projects and open source contributions."
         />
 
         {pinnedRepos.length === 0 && otherRepos.length === 0 ? (

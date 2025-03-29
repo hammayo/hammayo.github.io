@@ -6,7 +6,6 @@ import { Header } from "@/components/header";
 import { AnimatedBackground } from "@/components/animated-background";
 import { basePath } from "@/lib/env";
 import { SITE, THEME } from "@/lib/constants";
-import { Analytics } from "@/components/analytics";
 import { RouteProgress } from "@/components/route-progress";
 import { Footer } from "@/components/footer";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -88,7 +87,6 @@ export default function RootLayout({
             </div>
           </ErrorBoundary>
         </ThemeProvider>
-        <Analytics />
       </body>
     </html>
   );
