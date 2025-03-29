@@ -1,6 +1,7 @@
 import { Container } from "@/components/container";
 import { HeroTitle } from "@/components/hero-title";
 import { PageTransitionWrapper } from "@/components/page-transition-wrapper";
+import { PageViewEvent } from "@/components/analytics-event";
 
 function generateStardate(): string {
   const now = new Date();
@@ -13,6 +14,7 @@ function generateStardate(): string {
 export default function HomePage() {
   return (
     <PageTransitionWrapper>
+      <PageViewEvent page="home" />
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-144px)]">
         <Container className="text-center">
           <div className="my-8 opacity-0 animate-fade-in animate-delay-500">
