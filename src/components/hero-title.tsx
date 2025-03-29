@@ -85,8 +85,10 @@ const TitleContent: React.FC<TitleContentProps> = ({ isLoading, scheme, currentG
       <span 
         className={`block text-4xl md:text-8xl font-bold ${!isLoading ? `text-transparent bg-clip-text bg-gradient-to-r ${scheme?.text}` : ''}`}
       >
-        <span className="md:hidden">HAMMY</span>
-        <span className="hidden md:inline">HAMMAYO</span>
+        <span className="text-8xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-purple-500 via-cyan-500 to-green-500 tracking-tight">
+          <span className="md:hidden">HAMMY</span>
+          <span className="hidden md:inline">HAMMAYO</span>
+        </span>
       </span>
     </h1>
 

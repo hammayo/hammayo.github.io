@@ -31,8 +31,8 @@ export function Header() {
                 unoptimized
                 className="animate-float"
               />
-              <span className="md:inline hidden opacity-100">hammayo</span>
-              <span className="md:hidden opacity-100">hammy</span>
+              <span className="md:inline hidden opacity-100">Hammayo</span>
+              <span className="md:hidden opacity-100">Hammy</span>
             </Link>
 
             <div className="flex items-center gap-8">
