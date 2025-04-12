@@ -64,7 +64,7 @@ interface TitleContentProps {
 }
 
 const TitleContent: React.FC<TitleContentProps> = ({ isLoading, scheme, currentGlow }) => (
-  <div className="px-8 md:px-16 py-10 md:py-14 relative">
+  <div className="px-0 min-[314px]:px-2 sm:px-8 md:px-16 py-10 md:py-14 relative">
     {!isLoading && (
       <div className="absolute inset-0">
         <AnimatePresence mode="wait">
@@ -79,21 +79,21 @@ const TitleContent: React.FC<TitleContentProps> = ({ isLoading, scheme, currentG
     )}
     
     <h1 className="text-center">
-      <span className="block text-2xl md:text-4xl mb-4 text-zinc-700 dark:text-zinc-200">
+      <span className="block text-xl sm:text-2xl md:text-4xl mb-4 text-zinc-700 dark:text-zinc-200">
         Hello, I am
       </span>
       <span 
         className={`block text-4xl md:text-8xl font-bold ${!isLoading ? `text-transparent bg-clip-text bg-gradient-to-r ${scheme?.text}` : ''}`}
       >
-        <span className="text-8xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-purple-500 via-cyan-500 to-green-500 tracking-tight">
-          <span className="md:hidden">HAMMY</span>
+        <span className="text-8xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-purple-500 via-cyan-500 to-green-500 tracking-tight md:px-4 px-0">
+          <span className="md:hidden text-4xl min-[314px]:text-5xl">HAMMY</span>
           <span className="hidden md:inline">HAMMAYO</span>
         </span>
       </span>
     </h1>
 
     <div 
-      className={`mt-6 h-1.5 w-40 md:w-64 mx-auto rounded-full ${!isLoading ? `bg-gradient-to-r ${scheme?.text}` : ''}`}
+      className={`mt-6 h-1.5 w-32 sm:w-40 md:w-64 mx-auto rounded-full ${!isLoading ? `bg-gradient-to-r ${scheme?.text}` : ''}`}
       style={!isLoading ? { boxShadow: `0 0 15px ${currentGlow}` } : undefined}
     />
   </div>
