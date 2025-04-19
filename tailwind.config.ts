@@ -66,7 +66,12 @@ const keyframesConfig = {
       "background-position": "100% 100%",
       "transform": "rotate(0deg)"
     },
-  }
+  },
+  "animatedgradient": {
+    "0%": { backgroundPosition: "0% 50%" },
+    "50%": { backgroundPosition: "100% 50%" },
+    "100%": { backgroundPosition: "0% 50%" },
+  },
 };
 
 // Animation durations and timings
@@ -80,7 +85,8 @@ const animationsConfig = {
   "pulse-soft": "pulse-soft 2s ease-in-out infinite",
   "float": "float 3s ease-in-out infinite",
   "gradient-x": "gradient-x 15s ease-in-out infinite",
-  "gradient-flow": "gradient-flow 20s ease infinite"
+  "gradient-flow": "gradient-flow 20s ease infinite",
+  "gradient": "animatedgradient 6s ease infinite alternate",
 };
 
 // Theme colors
@@ -159,6 +165,9 @@ const config: Config = {
         'wider': '0.05em',
         'widest': '0.1em',
         'mono-normal': '-0.025em',
+      },
+      backgroundSize: {
+        "300%": "300%",
       },
     },
   },

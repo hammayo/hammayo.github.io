@@ -2,10 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
-import { motion, AnimatePresence } from "framer-motion";
 import { CardEffects } from "@/components/ui/card-effects";
+import TextGradient from "@/components/ui/text-gradient";
 
-// Color scheme configurations
 const COLOR_SCHEMES = [
   {
     id: 1,
@@ -30,72 +29,31 @@ const COLOR_SCHEMES = [
   }
 ] as const;
 
-// Animation configurations
-const GRADIENT_ANIMATION = {
-  initial: { opacity: 0, backgroundPosition: "0% 50%" },
-  animate: { 
-    opacity: 1,
-    backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"]
-  },
-  exit: { opacity: 0 },
-  transition: {
-    opacity: { duration: 0.8, ease: "easeInOut" },
-    backgroundPosition: {
-      duration: 12,
-      ease: "linear",
-      repeat: Infinity,
-      repeatType: "reverse"
-    }
-  }
-};
-
-const GRADIENT_STYLE = {
-  backgroundSize: "200% 100%",
-  transform: "translate3d(0, 0, 0)",
-  backfaceVisibility: "hidden" as const,
-  WebkitBackfaceVisibility: "hidden" as const,
-  willChange: "opacity, background-position",
-};
-
 interface TitleContentProps {
   isLoading?: boolean;
   scheme?: typeof COLOR_SCHEMES[number];
   currentGlow?: string;
+  isDesktop: boolean;
 }
 
-const TitleContent: React.FC<TitleContentProps> = ({ isLoading, scheme, currentGlow }) => (
+const TitleContent: React.FC<TitleContentProps> = ({ isLoading, scheme, currentGlow, isDesktop }) => (
   <div className="px-0 min-[314px]:px-2 sm:px-8 md:px-16 py-10 md:py-14 relative">
-    {!isLoading && (
-      <div className="absolute inset-0">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={scheme?.id}
-            className={`absolute inset-0 bg-gradient-to-r ${scheme?.background}`}
-            {...GRADIENT_ANIMATION}
-            style={GRADIENT_STYLE}
-          />
-        </AnimatePresence>
-      </div>
-    )}
-    
     <h1 className="text-center">
       <span className="block text-xl sm:text-2xl md:text-4xl mb-4 text-zinc-700 dark:text-zinc-200">
         Hello, I am
       </span>
-      <span 
-        className={`block text-4xl md:text-8xl font-bold ${!isLoading ? `text-transparent bg-clip-text bg-gradient-to-r ${scheme?.text}` : ''}`}
-      >
-        <span className="text-8xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-purple-500 via-cyan-500 to-green-500 tracking-tight md:px-4 px-0">
-          <span className="md:hidden text-4xl min-[314px]:text-5xl">HAMMY</span>
-          <span className="hidden md:inline">HAMMAYO</span>
+      <span className={`block text-4xl md:text-8xl font-bold ${!isLoading ? `text-transparent bg-clip-text bg-gradient-to-r ${scheme?.text}` : ''}`}>
+        <span className="text-8xl font-bold mb-4 md:px-4 px-0">
+          <TextGradient
+            text={isDesktop ? "HAMMAYO" : "HAMMY"}
+            className={`${isDesktop ? "hidden md:inline" : "md:hidden text-4xl min-[314px]:text-5xl"}`}
+          />
         </span>
       </span>
     </h1>
 
-    <div 
-      className={`mt-6 h-1.5 w-32 sm:w-40 md:w-64 mx-auto rounded-full ${!isLoading ? `bg-gradient-to-r ${scheme?.text}` : ''}`}
-      style={!isLoading ? { boxShadow: `0 0 15px ${currentGlow}` } : undefined}
-    />
+    <div className={`mt-6 h-1.5 w-32 sm:w-40 md:w-64 mx-auto rounded-full ${!isLoading ? `bg-gradient-to-r ${scheme?.text}` : ''}`}
+         style={!isLoading ? { boxShadow: `0 0 15px ${currentGlow}` } : undefined}/>
   </div>
 );
 
@@ -103,6 +61,7 @@ export function HeroTitle() {
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [currentScheme, setCurrentScheme] = useState(0);
+  const [isDesktop, setIsDesktop] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -112,6 +71,22 @@ export function HeroTitle() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    // Check if we're on desktop (md breakpoint is typically 768px)
+    const checkIfDesktop = () => {
+      setIsDesktop(window.innerWidth >= 768);
+    };
+
+    // Initial check
+    checkIfDesktop();
+
+    // Add event listener for window resize
+    window.addEventListener('resize', checkIfDesktop);
+
+    // Cleanup
+    return () => window.removeEventListener('resize', checkIfDesktop);
+  }, []);
+
   const scheme = COLOR_SCHEMES[currentScheme];
   const glowOpacity = resolvedTheme === 'dark' ? '0.3' : '0.15';
   const currentGlow = scheme.glow.replace('0.15', glowOpacity);
@@ -119,10 +94,11 @@ export function HeroTitle() {
   return (
     <div className="max-w-6xl mx-auto">
       <CardEffects variant="featured" className="rounded-2xl overflow-hidden">
-        <TitleContent 
+        <TitleContent
           isLoading={!mounted}
           scheme={mounted ? scheme : undefined}
           currentGlow={mounted ? currentGlow : undefined}
+          isDesktop={isDesktop}
         />
       </CardEffects>
     </div>
