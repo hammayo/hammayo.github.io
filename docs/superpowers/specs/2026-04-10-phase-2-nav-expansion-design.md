@@ -1,4 +1,4 @@
-ThThe# Phase 2: Nav Expansion & Pages — Design Spec
+ThTheDo # Phase 2: Nav Expansion & Pages — Design Spec
 
 **Date:** 2026-04-10
 **Branch:** `feature/phase-2-nav-expansion` (from `develop`)
@@ -130,7 +130,8 @@ All page content lives in typed TypeScript files under `content/`. Pages are pur
 
 ```ts
 export const about = {
-  name: string,                    // "Hammy Babar"
+  name: string,                    // "Hammayo Babar" — full name, shown on desktop
+  shortName: string,               // "Hammy Babar" — shown on mobile (below md breakpoint)
   tagline: string,                 // "Senior Backend Engineer"
   careerStartYear: number,         // e.g. 2004 — years of experience auto-computed from this
   homepageBioTemplate: string,     // "Captain's log, stardate {stardate}: For last {years} years..."
@@ -215,6 +216,18 @@ All `export const metadata` in page files import from `PAGE_META` — no hardcod
 ### 6.1 `/about`
 
 **Layout:** Compact hero — avatar + name + tagline at top, sector chips below, philosophy as a quoted callout (`border-left` accent).
+
+**Responsive name — CSS-only (same pattern as logo and hero):**
+
+```tsx
+<span className="hidden md:inline">{about.name}</span>
+<span className="md:hidden">{about.shortName}</span>
+```
+
+- Desktop (`md`+): `about.name` — e.g. "Hammayo Babar"
+- Mobile (below `md`): `about.shortName` — e.g. "Hammy Babar"
+
+No JS, no `useEffect`, no hydration flash. Both spans carry the gradient text style. Consistent with the logo and hero title pattern across the site.
 
 **Avatar:** `next/image` with the existing `imageLoader` (required for GitHub Pages static export). `src={about.avatarPath}` with `onError` fallback to `/_hb-logo.png`.
 
