@@ -30,9 +30,85 @@ The master spec (`docs/superpowers/specs/2026-04-10-website-revamp-design.md`) s
 
 ---
 
-## 3. Navigation
+## 3. Design System Constraints & Phase 1 Continuity
 
-### 3.1 Nav items
+Phase 2 builds on top of Phase 1's design system. All new components must honour every constraint below — none are optional.
+
+### 3.1 Colour system
+
+All colours come from `useScheme()` and the CSS custom properties it injects on `:root`:
+
+| CSS var | Use |
+|---|---|
+| `var(--scheme-gradient-from/via/to)` | Gradient text, gradient borders |
+| `var(--scheme-glow)` | `box-shadow` on glow cards |
+| `var(--scheme-accent)` | Accent text colour on tags, links |
+
+Components must not hardcode hex values or Tailwind colour classes for scheme-driven colours. The only exception is structural colours (`zinc-900`, `slate-800`, etc.) that are not scheme-dependent.
+
+### 3.2 Three visual patterns — mapping to Phase 2 components
+
+Every new component maps to exactly one of the three patterns from the master spec:
+
+| Pattern | Phase 2 components |
+|---|---|
+| **Gradient text** | Page headings (`/about`, `/blogs`, `/cv`), `about.name`/`shortName`, CTA heading, active nav link |
+| **Glow card** | `ProjectCard`, `ContactCard`, `/about` avatar frame |
+| **Accent border/tag** | Skills strip tags, about sectors chips |
+
+### 3.3 Animated gradient
+
+The 6-stop animated gradient (`#a855f7 → #818cf8 → #38bdf8 → #34d399 → #f472b6 → #a855f7`, `background-size: 400%`, `animate-gradient` keyframe from `globals.css`) is used for:
+- Hero title (exists)
+- Logo name (exists)
+- About name (`about.name` / `about.shortName` spans)
+- All page headings (gradient text, not animated — static `var(--scheme-gradient-*)` is fine here)
+
+Skills strip tags and sector chips use **static** scheme accent colours, not the animated gradient — the animation is reserved for hero/logo/name prominence only.
+
+### 3.4 `design/variants.ts` — CVA configs
+
+All new component variants must be defined in or extend `src/design/variants.ts`. No ad-hoc Tailwind class strings for reusable patterns. Specifically:
+- Tag/chip variant (skills strip, sectors) — add if not present
+- Glow card variant — add if not present
+- Gradient text variant — add if not present
+- Button variants for CTA row (primary gradient, ghost)
+
+### 3.5 `PageTransitionWrapper`
+
+Every new page shell (`/about`, `/blogs`, `/cv`) must wrap its content in `PageTransitionWrapper` with `flex-1 flex flex-col` — the same pattern used by existing pages. Do not use `min-h-screen`, `h-full`, or set `overflow` on page content — these break the contained scroll layout (`h-dvh overflow-hidden` on root, `overflow-y-auto` on `main`).
+
+### 3.6 Layout constraints (must not regress)
+
+These Phase 1 fixes must not be broken by any Phase 2 change:
+
+| Fix | Constraint |
+|---|---|
+| `h-dvh overflow-hidden` on root | Page content must never set its own height/overflow |
+| `relative z-[1]` on `main` and `footer` | Do not introduce new stacking contexts above `z-[1]` |
+| Header `bg-white/80 dark:bg-zinc-950/80` | Must be preserved when adding mobile nav |
+| Compact header height ~45px | Mobile nav Sheet must account for this; progress bar stays at `top-[45px]` |
+| `PageTransitionWrapper` `flex-1 flex flex-col` | No `pt-*`/`pb-*` padding on the wrapper |
+
+### 3.7 Dark mode
+
+Every new component must include `dark:` Tailwind variants for all background, text, and border colours. Verify in both light and dark mode before marking any task complete.
+
+### 3.8 Reduced motion
+
+No new CSS animations or transitions may be introduced without a `prefers-reduced-motion: reduce` consideration. The `SchemeProvider` already handles scheme transitions. For any new component-level animation (hover effects, entrance animations), either:
+- Use `motion-safe:` Tailwind prefix, or
+- Check `prefers-reduced-motion` via `SchemeProvider` context before animating
+
+### 3.9 Active nav link
+
+The master spec specifies gradient text for the active nav link. Phase 2 is the first time all routes exist, making this implementable. Use `usePathname()` in the header to apply the gradient text class to the matching link. This is a `'use client'` addition to the header — isolate it in a `<NavLinks />` client component rather than making the entire header a client component.
+
+---
+
+## 4. Navigation
+
+### 4.1 Nav items
 
 | Label | Route | Type |
 |---|---|---|
@@ -43,11 +119,11 @@ The master spec (`docs/superpowers/specs/2026-04-10-website-revamp-design.md`) s
 
 No CV link in nav. No Uses page. CV is a standalone placeholder route only (linked from elsewhere if needed).
 
-### 3.2 Desktop nav
+### 4.2 Desktop nav
 
 Existing inline nav in `src/features/shared/header.tsx` — link order updated to: About · Projects · Blogs · Contact. No structural changes.
 
-### 3.3 Logo name — responsive text (preserve from Phase 1)
+### 4.3 Logo name — responsive text (preserve from Phase 1)
 
 The header logo name uses CSS-only responsive text delivered in Phase 1:
 
@@ -61,7 +137,7 @@ The header logo name uses CSS-only responsive text delivered in Phase 1:
 
 Both spans carry the animated gradient — no JS, no `useEffect`, no hydration flash. **Phase 2 header modifications must not break or remove this pattern.**
 
-### 3.4 Mobile nav
+### 4.4 Mobile nav
 
 Below `md` breakpoint: hamburger icon (Lucide `Menu`) replaces inline links. Opens a Radix `Sheet` (already available in `src/features/shared/ui/`) sliding from the right, containing the same 4 links.
 
@@ -72,7 +148,11 @@ Below `md` breakpoint: hamburger icon (Lucide `Menu`) replaces inline links. Ope
 
 No new dependencies required.
 
-### 3.4 `/blogs` as canonical route
+### 4.5 Active nav link
+
+`<NavLinks />` is a `'use client'` component that wraps all nav links and uses `usePathname()` to apply gradient text to the active route. Isolating this as a client component keeps the header shell as a server component. Both desktop and mobile Sheet nav use `<NavLinks />`.
+
+### 4.6 `/blogs` as canonical route
 
 `/blogs` (plural) is the canonical blog entry point — consistent with `/projects` (plural). `src/app/blogs/page.tsx` is rewritten as a styled placeholder (not deleted, not a redirect). There is no `/blog` route.
 
@@ -329,6 +409,9 @@ All `target="_blank"` links (LinkedIn, any external href) must include `rel="noo
 | Action | File | Notes |
 |---|---|---|
 | Modify | `src/features/shared/header.tsx` | Mobile hamburger + Sheet nav, updated link order |
+| Create | `src/features/shared/nav-links.tsx` | Client component — `usePathname()` active link gradient |
+| Modify | `src/design/variants.ts` | Add tag/chip, glow card, gradient text, button CVA variants |
+| Delete | `tailwind.config.ts` | Empty shim deferred from Phase 1 — safe to remove now |
 | Modify | `src/app/page.tsx` | Wire homepage sections |
 | Modify | `src/features/home/hero.tsx` | Unchanged structurally — verify scheme wiring |
 | Create | `src/features/home/homepage-bio.tsx` | Client component — dynamic stardate + years |
