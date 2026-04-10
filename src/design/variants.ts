@@ -55,3 +55,23 @@ export const accentTag = cva(
     },
   }
 );
+
+/**
+ * CTA button variant.
+ * Primary uses the scheme gradient background.
+ * Ghost uses a transparent background with border.
+ */
+export const ctaButton = cva(
+  'inline-flex items-center justify-center rounded-lg px-6 py-3 text-sm font-medium transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+  {
+    variants: {
+      variant: {
+        gradient: 'gradient-bg text-white shadow-sm hover:opacity-90 focus-visible:ring-[var(--scheme-from)]',
+        ghost:    'border border-border text-foreground hover:bg-accent hover:text-accent-foreground focus-visible:ring-border',
+      },
+    },
+    defaultVariants: {
+      variant: 'gradient',
+    },
+  }
+);
