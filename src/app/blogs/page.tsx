@@ -1,25 +1,41 @@
 import { Container } from "@/features/shared/container";
 import { PageTransitionWrapper } from "@/features/shared/page-transition-wrapper";
+import { PAGE_META, SITE_URL } from "@/lib/constants";
+import { gradientText } from "@/design/variants";
+import Link from "next/link";
 import type { Metadata } from "next";
-import { PageViewEvent } from "@/features/shared/analytics-event";
+import { blogs } from "../../../content/blogs";
 
 export const metadata: Metadata = {
-  title: "Blogs",
-  description: "My tech notes",
+  title: PAGE_META.blogs.title,
+  description: PAGE_META.blogs.description,
+  openGraph: {
+    title: PAGE_META.blogs.title,
+    description: PAGE_META.blogs.description,
+    url: `${SITE_URL}/blogs`,
+  },
+  twitter: {
+    title: PAGE_META.blogs.title,
+    description: PAGE_META.blogs.description,
+  },
 };
 
-export default function ContactPage() {
+export default function BlogsPage() {
   return (
     <PageTransitionWrapper>
-      <PageViewEvent page="blogs" />
       <Container>
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-2">Blogs</h1>
-          <p className="text-muted-foreground">Start writing blogs.</p>
-        </div>
-
-        <div className="grid w-full grid-cols-1 gap-6 mx-auto sm:grid-cols-3">
-          Convert MD notes to Blogs WIP - MDX
+        <div className="flex flex-col items-center justify-center text-center space-y-6 py-16">
+          <div className="flex items-center gap-3">
+            <h1 className={gradientText({ size: 'heading' })}>{blogs.placeholderTitle}</h1>
+            <span className="text-xs px-3 py-1 rounded-full border border-[var(--scheme-border)] text-[var(--scheme-accent)]">
+              Coming soon
+            </span>
+          </div>
+          <p className="text-muted-foreground max-w-md">{blogs.placeholderDescription}</p>
+          <p className="text-sm text-muted-foreground">{blogs.comingSoonMessage}</p>
+          <Link href="/" className="text-sm text-[var(--scheme-accent)] hover:underline">
+            {blogs.backLinkText}
+          </Link>
         </div>
       </Container>
     </PageTransitionWrapper>
