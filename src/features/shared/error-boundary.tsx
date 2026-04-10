@@ -7,7 +7,7 @@
 
 "use client";
 
-import React, { Component, ErrorInfo, ReactNode } from "react";
+import { Component, type ComponentType, type ErrorInfo, type ReactNode } from "react";
 import { logger } from "@/lib/logger";
 
 interface ErrorBoundaryProps {
@@ -71,9 +71,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
 // withErrorBoundary is a higher-order component that wraps a component with an ErrorBoundary
 export function withErrorBoundary<P extends object>(
-  Component: React.ComponentType<P>,
+  Component: ComponentType<P>,
   fallback?: ReactNode
-): React.ComponentType<P> {
+): ComponentType<P> {
   const displayName = Component.displayName || Component.name || "Component";
 
   const WithErrorBoundary = (props: P) => (

@@ -1,7 +1,7 @@
 "use client";
 
-import React, { ReactNode } from "react";
-import { CardEffects, cardBaseClasses } from "@/components/ui/card-effects";
+import { type ReactNode } from "react";
+import { CardEffects, cardBaseClasses } from "@/features/shared/ui/card-effects";
 
 interface ContactCardProps {
   icon: ReactNode;

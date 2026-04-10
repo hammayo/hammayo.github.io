@@ -110,7 +110,7 @@ export async function fetchGitHubOverview(username?: string): Promise<GitHubOver
 export async function fetchPinnedRepositories(username?: string): Promise<GitHubRepository[]> {
   const githubUser = username || env.GITHUB_USERNAME;
   if (!githubUser || !env.GITHUB_TOKEN) {
-    logger.error('GitHub username or token not found in environment variables');
+    logger.info('GitHub username or token not configured — skipping pinned repos fetch');
     return [];
   }
 

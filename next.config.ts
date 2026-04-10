@@ -3,6 +3,9 @@ import { env, basePath, assetPrefix } from './src/lib/env';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  turbopack: {
+    root: __dirname,
+  },
   distDir: env.NODE_ENV === "production" ? "out" : ".next",
   output: 'export',
   images: {

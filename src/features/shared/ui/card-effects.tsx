@@ -1,10 +1,10 @@
 "use client";
 
-import React from "react";
+import { type ReactNode, useCallback, type MouseEvent } from "react";
 import { motion, useMotionTemplate, useMotionValue } from "framer-motion";
 
 interface CardEffectsProps {
-  children: React.ReactNode;
+  children: ReactNode;
   variant?: "default" | "featured";
   className?: string;
 }
@@ -13,8 +13,8 @@ export function CardEffects({ children, variant = "default", className = "" }: C
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
 
-  const handleMouseMove = React.useCallback(
-    ({ clientX, clientY, currentTarget }: React.MouseEvent) => {
+  const handleMouseMove = useCallback(
+    ({ clientX, clientY, currentTarget }: MouseEvent) => {
       const { left, top } = currentTarget.getBoundingClientRect();
       mouseX.set(clientX - left);
       mouseY.set(clientY - top);

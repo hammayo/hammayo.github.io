@@ -1,11 +1,11 @@
 "use client";
 
-import React from "react";
+import { type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 
 interface PageTransitionWrapperProps {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 export function PageTransitionWrapper({ children }: PageTransitionWrapperProps) {
@@ -14,13 +14,13 @@ export function PageTransitionWrapper({ children }: PageTransitionWrapperProps) 
   return (
     <motion.div
       key={pathname}
-      className="min-h-screen pt-28 pb-20"
-      initial={{ opacity: 0, y: 20 }}
+      className="flex-1 flex flex-col"
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
+      exit={{ opacity: 0, y: -8 }}
       transition={{
-        duration: 0.3,
-        ease: "easeInOut"
+        duration: 0.2,
+        ease: "easeOut"
       }}
     >
       {children}

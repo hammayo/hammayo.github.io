@@ -5,288 +5,179 @@
 >
 > A modern, responsive portfolio website built with Next.js, TypeScript, and Tailwind CSS.
 >
-> https://hammayo.github.io/ 
+> https://hammayo.co.uk
 >
 
 ## Features
 
-- 🚀 Built with Next.js 15
-- 🔍 SEO optimized
-- 📱 Fully responsive
-- 🎨 Dark and light mode
-- 💨 Fast and lightweight
-- ⚡ Server-side rendering
-- 🧠 Type-safe with TypeScript
-- 🛠️ Error boundary for graceful error handling
-- 📊 Centralized environment variable management
-- 🔄 Clean code architecture
-- 📝 Comprehensive documentation
+- Built with Next.js 16 (static export, App Router)
+- Tailwind CSS v4 — CSS-first config via `@theme {}` in `globals.css`
+- Time-of-day colour scheme system (`SchemeProvider`) — 4 named schemes, smooth crossfades, reduced-motion safe
+- Animated gradient design language across hero, nav, and UI elements
+- Dark and light mode (next-themes)
+- Fully responsive — compact fixed chrome, content scrolls within frame
+- SEO optimised — Open Graph, Twitter Card, structured data (JSON-LD), sitemap, robots.txt
+- Type-safe with TypeScript and Zod v4 environment validation
+- Gitleaks secret scanning in CI — blocks deployment on any detected secret
+- Google Analytics via `next/script` (afterInteractive)
+- Error boundary for graceful error handling
+- Bun as primary package manager and runtime
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
+
 - Git
-- Node.js 18+
-- npm, yarn, or bun
+- [Bun](https://bun.sh) (preferred) or Node.js 18+
 
 ### Installation
 
-1. Clone the repository:
 ```bash
 git clone https://github.com/hammayo/hammayo.github.io.git
 cd hammayo.github.io
-```
-
-2. Install dependencies:
-```bash
-# Using npm
-npm install
-
-# Using yarn
-yarn install
-
-# Using bun
 bun install
 ```
 
-3. Set up environment variables:
-- Copy `.env.local.example` to `.env.local`
-- Fill in the necessary environment variables
+Copy the environment template and fill in your values:
+
+```bash
+cp .env.local.example .env.local
+```
 
 ### Development
 
-Start the development server:
-
 ```bash
-# Using npm
-npm run dev
-
-# Using yarn
-yarn dev
-
-# Using bun
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
+Open [http://localhost:3000](http://localhost:3000).
 
-### Building for Production
-
-Build the application for production:
+### Build
 
 ```bash
-# Using npm
-npx serve build     
-npm run build
-
-# Using yarn
-yarn build
-
-# Using bun
 bun run build
 ```
 
-### Running in Production
+Static output is written to `out/` — this is what GitHub Pages deploys.
 
-Start the production server:
+### Lint / Type-check
 
 ```bash
-# Using npm
-npm run start
-
-# Using yarn
-yarn start
-
-# Using bun
-bun start
+bun run lint
+bun run type-check
 ```
 
-## 🛠️ Deployment
-
-### GitHub Pages
-
-The project is configured for easy deployment to GitHub Pages using GitHub Actions. Simply push to the main branch to trigger a deployment.
-
-### Vercel
-
-For deployment to Vercel, connect your GitHub repository to Vercel for automatic deployment.
-
-## 📂 Project Structure
+## Project Structure
 
 ```
 hammayo.github.io/
-├── .github/           # GitHub Actions workflows
-├── .vscode/           # VS Code configuration
-│   └── launch.json    # Debugging configuration
-├── public/            # Static assets
-│   ├── icons/         # Favicon and app icons
-│   └── screenshots/   # README screenshots
+├── .github/
+│   └── workflows/
+│       ├── deploy.yml           # Build + Gitleaks scan → GitHub Pages
+│       └── version-increment.yml
+├── content/                     # Blog MDX files (future), CV and uses data
+├── docs/
+│   └── superpowers/
+│       ├── specs/               # Design specs
+│       └── plans/               # Implementation plans + completion summaries
+├── public/
+│   ├── icons/                   # Favicon, apple-touch-icon, webmanifest
+│   ├── images/                  # Logo and static images
+│   └── screenshots/             # OG and README screenshots
 ├── src/
-│   ├── app/           # Next.js App Router
-│   │   ├── contact/   # Contact page
-│   │   ├── projects/  # Projects page
-│   │   ├── layout.tsx # Root layout
-│   │   └── page.tsx   # Home page
-│   ├── components/    # React components
-│   │   ├── ui/        # UI components
-│   │   └── project-card.tsx  # Project specific components
-│   ├── lib/           # Utilities
-│   │   ├── constants.ts # App constants
-│   │   ├── env.ts     # Environment variables
-│   │   ├── github.ts  # GitHub API client
-│   │   ├── logger.ts  # Logging utility
-│   │   └── utils.ts   # Utility functions
-│   └── providers/     # React context providers
-├── .env.local         # Local environment variables
-├── .eslintrc.js      # ESLint configuration
-├── .eslintrc.json    # Additional ESLint rules
-├── bun.lock          # Bun lock file
-├── components.json   # shadcn/ui configuration
-├── netlify.toml     # Netlify configuration
-├── next.config.ts   # Next.js configuration
-├── package.json     # Project dependencies
-├── postcss.config.mjs # PostCSS configuration
-├── tailwind.config.ts # Tailwind CSS configuration
-└── tsconfig.json    # TypeScript configuration
+│   ├── app/                     # Next.js App Router — thin route shells
+│   │   ├── page.tsx             # Home
+│   │   ├── projects/page.tsx
+│   │   ├── contact/page.tsx
+│   │   ├── blogs/page.tsx
+│   │   ├── layout.tsx
+│   │   ├── globals.css          # Tailwind v4 @theme, CSS vars, keyframes
+│   │   ├── robots.ts
+│   │   └── sitemap.ts
+│   ├── design/
+│   │   ├── schemes.ts           # Colour scheme registry (4 named schemes)
+│   │   └── variants.ts          # CVA variant configs shared across features
+│   ├── features/
+│   │   ├── home/                # Hero component
+│   │   ├── projects/            # ProjectCard, GitHub fetch
+│   │   ├── contact/             # ContactCard
+│   │   └── shared/              # Header, footer, animated background,
+│   │       │                    # page transitions, route progress, error boundary
+│   │       └── ui/              # shadcn/Radix UI components
+│   ├── lib/
+│   │   ├── constants.ts         # SITE, SOCIAL, THEME, SITE_URL
+│   │   ├── env.ts               # Zod-validated environment variables
+│   │   ├── github.ts            # GitHub API (Octokit v5)
+│   │   ├── logger.ts            # Structured logger
+│   │   └── utils.ts             # cn() and general utilities
+│   └── providers/
+│       ├── theme-provider.tsx   # next-themes dark/light
+│       └── scheme-provider.tsx  # Time-of-day colour scheme + CSS vars
+├── .eslintrc.js
+├── .gitleaks.toml               # Gitleaks allowlist for known false positives
+├── bun.lock
+├── components.json              # shadcn/ui configuration
+├── next.config.ts               # Static export, basePath, image loader
+├── postcss.config.mjs           # @tailwindcss/postcss (Tailwind v4)
+└── tsconfig.json
 ```
 
-## 🔧 Configuration
+## Colour Scheme System
 
-### Environment Variables
+`SchemeProvider` resolves the active scheme from the visitor's local time and injects CSS custom properties on `:root`. All gradient, glow, and accent colours across the site derive from these variables — no colour logic in individual components.
 
-The application uses type-safe environment variables with Zod validation. Create a `.env.local` file with the following variables:
+| Scheme | Active hours | Character |
+|---|---|---|
+| `silver` | 06:00–11:59 | Metallic, refined |
+| `deep-purple` | 12:00–17:59 | Saturated, bold |
+| `glass` | 18:00–21:59 | Airy, cool |
+| `violet-blue` | 22:00–05:59 | Deep, rich (default) |
+
+Scheme cycling is disabled automatically when `prefers-reduced-motion: reduce` is detected (WCAG 2.1 AA).
+
+## Environment Variables
 
 ```bash
-# Next.js
-NODE_ENV=development
+# GitHub Pages routing (set automatically by deploy.yml)
 NEXT_PUBLIC_BASE_PATH=
 
-# GitHub (for GitHub Pages deployment)
-GITHUB_ACTIONS=
-GITHUB_REPOSITORY=
+# GitHub API — for pinned repos on the projects page (optional)
+GITHUB_USERNAME=
+GITHUB_TOKEN=
 
 # Analytics (optional)
 GA_MEASUREMENT_ID=G-xxxxxxxx
 ```
 
-Environment variables are managed in `src/lib/env.ts` with runtime validation:
+`SITE_URL` (`https://hammayo.co.uk`) is hardcoded in `src/lib/constants.ts` — no env var needed.
 
-```typescript
-const envSchema = z.object({
-  // Next.js specific
-  NODE_ENV: z.enum(["development", "production", "test"])
-    .optional()
-    .default("development"),
-  
-  // GitHub specific
-  GITHUB_ACTIONS: z.string().optional(),
-  GITHUB_REPOSITORY: z.string().optional(),
-  
-  // Analytics
-  GA_MEASUREMENT_ID: z.string().optional(),
-});
-```
+## Deployment
 
-*NOTE*: For GitHub Actions deployment, the following environment variables are automatically set in `.github/workflows/deploy.yml`:
-```yaml
-env:
-  NODE_ENV: production
-  NEXT_PUBLIC_BASE_PATH: ${{ github.event.repository.name }}
-```
+Push to `main` triggers the `deploy.yml` workflow:
 
+1. **Gitleaks** secret scan — blocks build if any secret is detected in committed files or git history
+2. **Build** — `bun run build` produces static output in `out/`
+3. **Deploy** — GitHub Actions uploads `out/` to GitHub Pages
 
-### Base Path Configuration
+The site is served via a custom domain (`hammayo.co.uk`) configured in `CNAME`.
 
-The application automatically configures base paths for different environments:
+## Customisation
 
-- **Development**: No base path
-- **GitHub Pages**: Uses repository name as base path
-- **Production**: Configurable via environment variables
-
-Base path logic is handled in `src/lib/env.ts`:
-
-```typescript
-export const isGithubActions = Boolean(env.GITHUB_ACTIONS);
-export const repo = env.GITHUB_REPOSITORY?.replace(/.*?\//, '') || '';
-export const basePath = isGithubActions ? `/${repo}` : '';
-export const assetPrefix = isGithubActions ? `/${repo}/` : '';
-```
-
-### Configuration Files
-
-- **next.config.ts**: Next.js configuration including image optimization and base path settings
-- **tailwind.config.ts**: Tailwind CSS theme and plugin configuration
-- **components.json**: shadcn/ui component configuration
-- **tsconfig.json**: TypeScript compiler options
-- **postcss.config.mjs**: PostCSS plugins configuration
-- **eslintrc.js**: ESLint rules and TypeScript integration
-- **netlify.toml**: Netlify deployment configuration
-
-### Constants
-
-Application-wide constants are centralized in `src/lib/constants.ts`:
-
-```typescript
-export const SITE = {
-  name: "Hammayo's Portfolio",
-  title: "Hammayo's | Backend Software Engineer",
-  description: "Portfolio site showcasing dev projects.",
-  // ...
-};
-
-export const SOCIAL = {
-  github: "https://github.com/hammayo",
-  linkedin: "https://linkedin.com/in/hammayo",
-  email: "hammy@hammayo.co.uk",
-};
-
-export const THEME = {
-  defaultTheme: "dark",
-  lightThemeColor: "#ffffff",
-  darkThemeColor: "#000000",
-};
-```
-
-## 🔧 Best Practices
-
-- **Type Safety**: Comprehensive TypeScript usage for type safety
-- **Environment Variable Management**: Centralized environment variable management with runtime validation
-- **Error Handling**: Comprehensive error boundary implementation
-- **Logging**: Structured logging system
-- **Code Organization**: Clear separation of concerns
-- **Configuration Management**: Centralized constants and configuration
-- **Responsive Design**: Mobile-first approach with Tailwind CSS
-- **SEO Optimization**: Metadata and semantic HTML
-- **Performance Optimization**: Efficient bundle size and loading strategies
-- **Accessibility**: ARIA attributes and semantic HTML
-
-### Personal Information
-
-Edit the following files to customize portfolio:
-
-1. **Home Page**: `/src/app/page.tsx` - Update introduction and hero section
-2. **Projects**: GitHub repositories are automatically fetched and displayed
-3. **Contact Information**: `/src/app/contact/page.tsx` - Update contact details
-4. **Header Links**: `/src/components/header.tsx` - Modify navigation links
-
-### Styling
-
-- **Colors**: Edit the gradient colors in `/src/app/globals.css`
-- **Theme**: Modify the theme variables in `/src/app/globals.css`
-- **Typography**: Change the font in `/src/app/layout.tsx`
-
-## 📷 Screenshots
-
-![Home Page](/public/screenshots/home.png)
-
-![Dark/Light Mode](/public/screenshots/contact.png)
-
+| What | Where |
+|---|---|
+| Name, title, description, social links | `src/lib/constants.ts` |
+| Colour schemes | `src/design/schemes.ts` |
+| Active scheme mode (time-of-day / config / cycle) | `src/design/schemes.ts` → `SCHEME_MODE` |
+| Hero gradient colours | `src/features/home/hero.tsx` |
+| Navigation links | `src/features/shared/header.tsx` |
+| Global CSS, fonts, keyframes | `src/app/globals.css` |
+| Structured data (JSON-LD) | `src/features/shared/structured-data.tsx` |
 
 ## Acknowledgements
 
 - [Next.js](https://nextjs.org/)
-- [TypeScript](https://www.typescriptlang.org/)
-- [shadcn/ui](https://ui.shadcn.com/)
 - [Tailwind CSS](https://tailwindcss.com/)
+- [shadcn/ui](https://ui.shadcn.com/)
 - [Framer Motion](https://www.framer.com/motion/)
-
+- [TypeScript](https://www.typescriptlang.org/)
+- [Bun](https://bun.sh)
