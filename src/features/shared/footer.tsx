@@ -1,7 +1,8 @@
-import { SITE, SOCIAL } from "@/lib/constants";
+import { SITE, SOCIAL, SITE_LAUNCH_YEAR } from "@/lib/constants";
 import { Button } from "@/features/shared/ui/button";
 import { Mail } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
+import { CopyrightYear } from "./copyright-year";
 
 function GithubIcon({ className }: { className?: string }) {
   return (
@@ -25,27 +26,27 @@ export function Footer({ className }: { className?: string }) {
       <div className="container flex items-center justify-between gap-4 py-2">
         <div className="flex items-center">
           <p className="text-xs text-muted-foreground">
-            Built by {" "}
+            Built by{' '}
             <a
-              href={SOCIAL.github + "?"}
+              href={SOCIAL.github}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="font-medium underline underline-offset-4"
             >
               {SITE.author}
-            </a> 
-            &nbsp;&copy; {new Date().getUTCFullYear()}
+            </a>
+            {' '}&copy; <CopyrightYear launchYear={SITE_LAUNCH_YEAR} />
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" asChild>
-            <a href={SOCIAL.github} target="_blank" rel="noreferrer">
+            <a href={SOCIAL.github} target="_blank" rel="noopener noreferrer">
               <GithubIcon className="h-4 w-4" />
               <span className="sr-only">GitHub</span>
             </a>
           </Button>
           <Button variant="ghost" size="icon" asChild>
-            <a href={SOCIAL.linkedin} target="_blank" rel="noreferrer">
+            <a href={SOCIAL.linkedin} target="_blank" rel="noopener noreferrer">
               <LinkedinIcon className="h-4 w-4" />
               <span className="sr-only">LinkedIn</span>
             </a>
@@ -61,6 +62,6 @@ export function Footer({ className }: { className?: string }) {
           </div>
         </div>
       </div>
-    </footer>    
+    </footer>
   );
 }
