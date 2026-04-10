@@ -47,7 +47,21 @@ No CV link in nav. No Uses page. CV is a standalone placeholder route only (link
 
 Existing inline nav in `src/features/shared/header.tsx` — link order updated to: About · Projects · Blogs · Contact. No structural changes.
 
-### 3.3 Mobile nav
+### 3.3 Logo name — responsive text (preserve from Phase 1)
+
+The header logo name uses CSS-only responsive text delivered in Phase 1:
+
+```tsx
+<span className="hidden md:inline">Hammayo</span>
+<span className="md:hidden">Hammy</span>
+```
+
+- Desktop (`md` and above): **Hammayo**
+- Mobile (below `md`): **Hammy**
+
+Both spans carry the animated gradient — no JS, no `useEffect`, no hydration flash. **Phase 2 header modifications must not break or remove this pattern.**
+
+### 3.4 Mobile nav
 
 Below `md` breakpoint: hamburger icon (Lucide `Menu`) replaces inline links. Opens a Radix `Sheet` (already available in `src/features/shared/ui/`) sliding from the right, containing the same 4 links.
 
@@ -68,7 +82,7 @@ No new dependencies required.
 
 Sections in order — all content from data files, no hardcoded strings in the component:
 
-1. **Hero** — exists from Phase 1 (`src/features/home/hero.tsx`)
+1. **Hero** — exists from Phase 1 (`src/features/home/hero.tsx`). Contains CSS-only responsive title text — desktop shows **HAMMAYO**, mobile shows **HAMMY** — same `hidden md:inline` / `md:hidden` pattern as the logo. No JS, no hydration flash. Must be preserved unchanged.
 2. **Bio** — Star Trek bio rendered by `<HomepageBio />` (client component) — see dynamic token spec below
 3. **Skills strip** — `{cv.skills}` from `content/cv.ts` — accent-border tags via `useScheme()`; renders nothing if skills array is empty (no broken layout)
 4. **CTA row** — "View Projects" (gradient button → `/projects`) + "Get in Touch" (ghost button → `/contact`)
