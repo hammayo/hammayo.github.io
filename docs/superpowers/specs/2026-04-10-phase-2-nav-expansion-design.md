@@ -1,4 +1,4 @@
-Th# Phase 2: Nav Expansion & Pages — Design Spec
+ThThe# Phase 2: Nav Expansion & Pages — Design Spec
 
 **Date:** 2026-04-10
 **Branch:** `feature/phase-2-nav-expansion` (from `develop`)
@@ -177,9 +177,11 @@ Phase 3 extends this file with pipeline config (posts-per-page, tag list, etc.).
 
 ### `src/lib/constants.ts` — page metadata config
 
-Per-page SEO metadata added alongside the existing `SITE_URL`:
+Per-page SEO metadata and site-wide constants added alongside the existing `SITE_URL`:
 
 ```ts
+export const SITE_LAUNCH_YEAR = 2024; // Used by footer copyright range
+
 export const PAGE_META = {
   home:     { title: '...', description: '...' },
   about:    { title: '...', description: '...' },
@@ -244,6 +246,33 @@ Same data. `ContactCard` updated to scheme-aware glow card. No data model change
 - `src/features/contact/contact-card.tsx` — glow card treatment
 - `src/app/contact/page.tsx` — `metadata` from `PAGE_META.contact`
 
+### 6.6 Footer — dynamic copyright year
+
+The footer currently has `© 2026` hardcoded. This must update automatically on 1 Jan each year **without a rebuild or redeployment** — i.e. it must be client-side computed.
+
+**Implementation:** A tiny `<CopyrightYear />` client component replaces the hardcoded year. The footer itself remains a server component — only the year span is isolated as a client island.
+
+```tsx
+// src/features/shared/copyright-year.tsx
+'use client'
+export function CopyrightYear({ launchYear }: { launchYear: number }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const current = new Date().getFullYear();
+  if (!mounted) return <span>{launchYear}</span>;
+  return <span>{launchYear === current ? current : `${launchYear}–${current}`}</span>;
+}
+```
+
+Footer renders: `© <CopyrightYear launchYear={SITE_LAUNCH_YEAR} /> Hammy Babar`
+
+- In launch year: `© 2024 Hammy Babar`
+- Subsequent years: `© 2024–2026 Hammy Babar`
+- `SITE_LAUNCH_YEAR` lives in `src/lib/constants.ts` — one edit sets it permanently
+
+**File:** `src/features/shared/copyright-year.tsx` — new, tiny client component
+**Modify:** `src/features/shared/footer.tsx` — swap hardcoded year for `<CopyrightYear />`
+
 ---
 
 ## 7. SEO
@@ -279,7 +308,7 @@ All `target="_blank"` links (LinkedIn, any external href) must include `rel="noo
 | Create | `src/features/home/skills-strip.tsx` | Reads `content/cv.ts`, scheme-aware tags |
 | Create | `src/features/home/cta.tsx` | "View Projects" + "Get in Touch" |
 | Create | `content/cv.ts` | Typed CV data — skills filled, roles scaffolded |
-| Create | `content/about.ts` | Bio, homepageBio, sectors, philosophy, avatarPath, linkedIn |
+| Create | `content/about.ts` | Bio, homepageBioTemplate, careerStartYear, sectors, philosophy, avatarPath |
 | Create | `content/blogs.ts` | Placeholder config |
 | Modify | `src/lib/constants.ts` | Add `PAGE_META` per-page metadata config |
 | Create | `src/app/about/page.tsx` | Thin shell with metadata |
@@ -290,6 +319,9 @@ All `target="_blank"` links (LinkedIn, any external href) must include `rel="noo
 | Modify | `src/app/projects/page.tsx` | Update metadata |
 | Modify | `src/features/contact/contact-card.tsx` | Scheme-aware glow card |
 | Modify | `src/app/contact/page.tsx` | Update metadata |
+| Create | `src/features/shared/copyright-year.tsx` | Client component — dynamic year range |
+| Modify | `src/features/shared/footer.tsx` | Swap hardcoded year for `<CopyrightYear />` |
+| Modify | `src/lib/constants.ts` | Add `SITE_LAUNCH_YEAR` |
 | Modify | `src/app/sitemap.ts` | Add `/about`, `/blogs`, `/cv` |
 | Modify | `docs/superpowers/specs/2026-04-10-website-revamp-design.md` | Update status + phase order |
 
