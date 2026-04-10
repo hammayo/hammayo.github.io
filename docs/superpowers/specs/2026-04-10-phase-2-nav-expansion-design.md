@@ -1,4 +1,4 @@
-# Phase 2: Nav Expansion & Pages — Design Spec
+Th# Phase 2: Nav Expansion & Pages — Design Spec
 
 **Date:** 2026-04-10
 **Branch:** `feature/phase-2-nav-expansion` (from `develop`)
@@ -69,9 +69,40 @@ No new dependencies required.
 Sections in order — all content from data files, no hardcoded strings in the component:
 
 1. **Hero** — exists from Phase 1 (`src/features/home/hero.tsx`)
-2. **Bio** — `{about.homepageBio}` from `content/about.ts` (Star Trek bio)
+2. **Bio** — Star Trek bio rendered by `<HomepageBio />` (client component) — see dynamic token spec below
 3. **Skills strip** — `{cv.skills}` from `content/cv.ts` — accent-border tags via `useScheme()`; renders nothing if skills array is empty (no broken layout)
 4. **CTA row** — "View Projects" (gradient button → `/projects`) + "Get in Touch" (ghost button → `/contact`)
+
+### 4.1 `<HomepageBio />` — dynamic Star Trek bio
+
+The bio contains two client-side dynamic values:
+
+- **Stardate** — computed from `new Date()` on the client, formatted as `YYYYMM.DD` (e.g. `202602.07`). Changes each day automatically.
+- **Years of experience** — `new Date().getFullYear() - about.careerStartYear`. Updates automatically on 1 Jan each year without any content edit.
+
+`content/about.ts` stores the bio as a **template string** with named tokens:
+
+```ts
+homepageBioTemplate: "Captain's log, stardate {stardate}: For last {years} years..."
+```
+
+The `<HomepageBio />` component replaces `{stardate}` and `{years}` at render time. It is a `'use client'` component using the `mounted` guard pattern (same as `SchemeProvider`) to prevent SSR/hydration mismatches — on the server pass, tokens are rendered as empty strings or a neutral fallback; after mount, the real values hydrate in.
+
+```tsx
+// src/features/home/homepage-bio.tsx
+'use client'
+export function HomepageBio({ template, careerStartYear }: Props) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  const stardate = mounted ? formatStardate(new Date()) : '......';
+  const years    = mounted ? new Date().getFullYear() - careerStartYear : '..';
+
+  return <p>{interpolate(template, { stardate, years })}</p>;
+}
+```
+
+`formatStardate` and `interpolate` are pure functions — unit-testable, no side effects.
 
 No blog preview section — deferred to Phase 3 when the content pipeline exists.
 
@@ -85,17 +116,22 @@ All page content lives in typed TypeScript files under `content/`. Pages are pur
 
 ```ts
 export const about = {
-  name: string,               // "Hammy Babar"
-  tagline: string,            // "Senior Backend Engineer · 20 years"
-  homepageBio: string,        // Star Trek bio — shown on homepage
-  bio: string,                // Longer professional bio — shown on /about
-  sectors: string[],          // ["Distributed Systems", "Platform Eng", "FinTech", ...]
-  philosophy: string,         // Quoted philosophy line
-  avatarPath: string,         // "/images/avatar.jpg" — falls back to "/_hb-logo.png" in component
+  name: string,                    // "Hammy Babar"
+  tagline: string,                 // "Senior Backend Engineer"
+  careerStartYear: number,         // e.g. 2004 — years of experience auto-computed from this
+  homepageBioTemplate: string,     // "Captain's log, stardate {stardate}: For last {years} years..."
+                                   // {stardate} = YYYYMM.DD (client-side, updates daily)
+                                   // {years}    = currentYear - careerStartYear (updates each Jan 1)
+  bio: string,                     // Longer professional bio — shown on /about
+  sectors: string[],               // ["Distributed Systems", "Platform Eng", "FinTech", ...]
+  philosophy: string,              // Quoted philosophy line
+  avatarPath: string,              // "/images/avatar.jpg" — falls back to "/_hb-logo.png"
 };
 ```
 
 `linkedIn` is not duplicated here — import from `content/cv.ts` wherever a LinkedIn URL is needed. Single source of truth.
+
+**`tagline` no longer hardcodes years** — e.g. `"Senior Backend Engineer"` not `"Senior Backend Engineer · 20 years"`. The years figure is computed dynamically by `<HomepageBio />` from `careerStartYear`.
 
 Scaffold with clearly marked `// TODO: replace` placeholders so the page renders on first deploy without exposing bare placeholder text publicly. Author replaces before merging to main.
 
@@ -239,6 +275,7 @@ All `target="_blank"` links (LinkedIn, any external href) must include `rel="noo
 | Modify | `src/features/shared/header.tsx` | Mobile hamburger + Sheet nav, updated link order |
 | Modify | `src/app/page.tsx` | Wire homepage sections |
 | Modify | `src/features/home/hero.tsx` | Unchanged structurally — verify scheme wiring |
+| Create | `src/features/home/homepage-bio.tsx` | Client component — dynamic stardate + years |
 | Create | `src/features/home/skills-strip.tsx` | Reads `content/cv.ts`, scheme-aware tags |
 | Create | `src/features/home/cta.tsx` | "View Projects" + "Get in Touch" |
 | Create | `content/cv.ts` | Typed CV data — skills filled, roles scaffolded |
