@@ -1,5 +1,11 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+# Brainstorming session files
+.superpowers/
+
+# Git worktrees
+.worktrees/
+
 # dependencies
 /node_modules
 /.pnp
@@ -41,5 +47,12 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# IDE releted
+.idea/
+.specify/
+.docs/
+.claude/
+
 # Keep screenshots for README.md
 !public/screenshots/
+

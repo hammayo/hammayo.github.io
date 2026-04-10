@@ -1,10 +1,9 @@
-import { Container } from "@/components/container";
-import { PageHeading } from "@/components/page-heading";
-import { PageTransitionWrapper } from "@/components/page-transition-wrapper";
-import { ProjectCard } from "@/components/project-card";
+import { Container } from "@/features/shared/container";
+import { PageTransitionWrapper } from "@/features/shared/page-transition-wrapper";
+import { ProjectCard } from "@/features/projects/project-card";
 import { fetchGitHubData } from "@/lib/github";
 import type { Metadata } from "next";
-import { PageViewEvent } from "@/components/analytics-event";
+import { PageViewEvent } from "@/features/shared/analytics-event";
 
 export const metadata: Metadata = {
   title: "Projects | Hammayo's Portfolio",
@@ -34,10 +33,10 @@ export default async function ProjectsPage() {
     <PageTransitionWrapper>
       <PageViewEvent page="projects" />
       <Container>
-        <PageHeading 
-          title="Projects"
-          description="Explore my most recent projects and open source contributions."
-        />
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold mb-2">Projects</h1>
+          <p className="text-muted-foreground">Explore my most recent projects and open source contributions.</p>
+        </div>
 
         {pinnedRepos.length === 0 && otherRepos.length === 0 ? (
           <div className="text-center p-8">

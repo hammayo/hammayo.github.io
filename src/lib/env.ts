@@ -35,10 +35,7 @@ function parseEnv() {
   });
   
   if (!parsed.success) {
-    console.error(
-      "❌ Invalid environment variables:",
-      parsed.error.flatten().fieldErrors
-    );
+    console.error("Invalid environment variables:", parsed.error.flatten().fieldErrors);
     
     // Return default values instead of throwing
     return {

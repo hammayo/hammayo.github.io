@@ -1,10 +1,9 @@
-import { Container } from "@/components/container";
-import { PageHeading } from "@/components/page-heading";
-import { PageTransitionWrapper } from "@/components/page-transition-wrapper";
-import { ContactCard } from "@/components/contact-card";
+import { Container } from "@/features/shared/container";
+import { PageTransitionWrapper } from "@/features/shared/page-transition-wrapper";
+import { ContactCard } from "@/features/contact/contact-card";
 import { SOCIAL } from "@/lib/constants";
 import type { Metadata } from "next";
-import { PageViewEvent } from "@/components/analytics-event";
+import { PageViewEvent } from "@/features/shared/analytics-event";
 
 export const metadata: Metadata = {
   title: "Contact | Hammayo's Portfolio",
@@ -16,12 +15,12 @@ export default function ContactPage() {
     <PageTransitionWrapper>
       <PageViewEvent page="contact" />
       <Container>
-        <PageHeading
-          title="Contact"
-          description="Feel free to reach out through any of these platforms."
-        />
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold mb-2">Contact</h1>
+          <p className="text-muted-foreground">Feel free to reach out through any of these platforms.</p>
+        </div>
 
-        <div className="grid w-full grid-cols-1 gap-8 mx-auto mt-16 lg:mt-44 sm:grid-cols-3 lg:gap-16">
+        <div className="grid w-full grid-cols-1 gap-6 mx-auto sm:grid-cols-3">
           {/* GitHub */}
           <ContactCard
             icon={

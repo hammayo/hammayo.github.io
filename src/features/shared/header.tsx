@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -13,26 +12,32 @@ export function Header() {
   const logoPath = `${basePath}/images/_hb-logo.png`;
 
   return (
-    <header role="banner" className="fixed top-0 left-0 right-0 z-50 dark:bg-black/10 bg-white/10 backdrop-blur-xl border-b dark:border-zinc-800/20 border-zinc-200/20">
+    <header role="banner" className="fixed top-0 left-0 right-0 z-50 dark:bg-zinc-950/80 bg-white/80 backdrop-blur-xl border-b dark:border-zinc-800/50 border-zinc-200/50">
       <Container>
         <nav role="navigation" aria-label="Main navigation">
-          <div className="flex items-center justify-between py-4">
+          <div className="flex items-center justify-between py-2">
             <Link
               href="/"
               prefetch
-              className="text-xl font-semibold tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-purple-500 via-cyan-500 to-green-500 flex items-center gap-2 transition-transform"
+              className="text-base font-semibold tracking-tighter flex items-center gap-2 transition-transform"
             >
-              <Image 
+              <Image
                 src={logoPath}
                 alt="HB"
-                width={38}
-                height={38}
+                width={28}
+                height={28}
                 priority
                 unoptimized
                 className="animate-float"
               />
-              <span className="md:inline hidden opacity-100">Hammayo</span>
-              <span className="md:hidden opacity-100">Hammy</span>
+              <span
+                className="md:inline hidden animate-gradient text-transparent bg-clip-text"
+                style={{ backgroundImage: 'linear-gradient(to right, #a855f7, #818cf8, #38bdf8, #34d399, #f472b6, #a855f7)', backgroundSize: '400%' }}
+              >Hammayo</span>
+              <span
+                className="md:hidden animate-gradient text-transparent bg-clip-text"
+                style={{ backgroundImage: 'linear-gradient(to right, #a855f7, #818cf8, #38bdf8, #34d399, #f472b6, #a855f7)', backgroundSize: '400%' }}
+              >Hammy</span>
             </Link>
 
             <div className="flex items-center gap-8">

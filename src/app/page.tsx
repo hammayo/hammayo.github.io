@@ -1,7 +1,7 @@
-import { Container } from "@/components/container";
-import { HeroTitle } from "@/components/hero-title";
-import { PageTransitionWrapper } from "@/components/page-transition-wrapper";
-import { PageViewEvent } from "@/components/analytics-event";
+import { Container } from "@/features/shared/container";
+import { Hero } from "@/features/home/hero";
+import { PageTransitionWrapper } from "@/features/shared/page-transition-wrapper";
+import { PageViewEvent } from "@/features/shared/analytics-event";
 
 function generateStardate(): string {
   const now = new Date();
@@ -15,14 +15,13 @@ export default function HomePage() {
   return (
     <PageTransitionWrapper>
       <PageViewEvent page="home" />
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-144px)]">
+      <div className="flex-1 flex flex-col items-center justify-center">
         <Container className="text-center">
-          <div className="my-8 opacity-0 animate-fade-in animate-delay-500">
-            <HeroTitle />
+          <div className="my-4 opacity-0 animate-fade-in animate-delay-500">
+            <Hero />
           </div>
-          <div className="pt-8"></div>
           <div className="opacity-0 animate-fade-in animate-delay-200">
-            <div className="text-lg text-muted-foreground leading-relaxed tracking-tight space-y-6">
+            <div className="text-sm md:text-base text-muted-foreground leading-relaxed tracking-tight space-y-3">
               <p>
                 Captain's log, stardate {generateStardate()}: For last 20 years,
                 I've boldly navigated the digital frontier, charting solutions

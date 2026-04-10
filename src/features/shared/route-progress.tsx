@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense, memo } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import * as Progress from "@radix-ui/react-progress";
-import React from "react";
 
 // Create a separate client component that uses useSearchParams
 const ProgressIndicator = () => {
@@ -20,7 +19,7 @@ const ProgressIndicator = () => {
 
   return (
     <Progress.Root
-      className="fixed top-[64px] left-0 right-0 z-[200] h-[2px] w-full overflow-hidden bg-transparent"
+      className="fixed top-[45px] left-0 right-0 z-[200] h-[2px] w-full overflow-hidden bg-transparent"
       style={{
         opacity: visible ? 1 : 0,
         transition: "opacity 400ms ease-in-out"
@@ -39,7 +38,7 @@ const ProgressIndicator = () => {
 };
 
 // Main component wrapped with Suspense
-export const RouteProgress = React.memo(function RouteProgress() {
+export const RouteProgress = memo(function RouteProgress() {
   return (
     <Suspense fallback={null}>
       <ProgressIndicator />

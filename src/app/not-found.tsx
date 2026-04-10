@@ -1,12 +1,12 @@
 "use client";
 
-import { Container } from "@/components/container";
+import { Container } from "@/features/shared/container";
 import { Suspense } from "react";
 import Link from "next/link";
 
 function NotFoundContent() {
   return (
-    <Container className="flex flex-col items-center justify-center text-center min-h-[calc(100vh-144px)]">
+    <Container className="flex-1 flex flex-col items-center justify-center text-center">
       <div className="mb-8 relative">
         <div 
           className="text-9xl font-bold opacity-10 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-transparent bg-clip-text bg-gradient-to-r from-purple-800 via-cyan-800 to-green-800 select-none" 
