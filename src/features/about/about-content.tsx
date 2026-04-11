@@ -1,3 +1,5 @@
+'use client';
+
 import Image from 'next/image';
 import { gradientText, accentTag } from '@/design/variants';
 import { basePath } from '@/lib/env';
