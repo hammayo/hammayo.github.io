@@ -17,10 +17,8 @@ const NAV_LINKS = [
   { href: "/contact",  label: "Contact"  },
 ] as const;
 
-const gradientClasses =
-  "text-transparent bg-clip-text bg-gradient-to-r from-purple-500 via-cyan-500 to-green-500 font-medium";
-const inactiveClasses =
-  "dark:text-zinc-400 text-zinc-600 hover:text-transparent hover:bg-clip-text hover:bg-gradient-to-r hover:from-purple-500 hover:via-cyan-500 hover:to-green-500";
+const activeClasses  = "gradient-text text-transparent font-semibold";
+const inactiveClasses = "text-foreground/60 hover:text-foreground transition-colors";
 
 function NavLink({ href, label, pathname, onClick }: {
   href: string;
@@ -35,7 +33,7 @@ function NavLink({ href, label, pathname, onClick }: {
       onClick={onClick}
       className={cn(
         "duration-300 transition-all tracking-tight",
-        pathname === href ? gradientClasses : inactiveClasses
+        pathname === href ? activeClasses : inactiveClasses
       )}
     >
       {label}
@@ -51,7 +49,7 @@ export function Header() {
   return (
     <header
       role="banner"
-      className="fixed top-0 left-0 right-0 z-50 dark:bg-zinc-950/80 bg-white/80 backdrop-blur-xl border-b dark:border-zinc-800/50 border-zinc-200/50"
+      className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50"
     >
       <Container>
         <nav role="navigation" aria-label="Main navigation">
