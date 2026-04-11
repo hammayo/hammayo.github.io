@@ -23,14 +23,16 @@ export default function CVPage() {
   return (
     <PageTransitionWrapper>
       <Container>
-        <div className="flex flex-col items-center justify-center text-center space-y-6 py-16">
+        <div className="mb-6">
           <div className="flex items-center gap-3">
             <h1 className={gradientText({ size: 'heading' })}>CV</h1>
             <span className="text-xs px-3 py-1 rounded-full border border-[var(--scheme-border)] text-[var(--scheme-accent)]">
               Coming soon
             </span>
           </div>
-          <p className="text-muted-foreground max-w-md">{cv.placeholderText}</p>
+          <p className="text-muted-foreground">{cv.placeholderText}</p>
+        </div>
+        <div>
           <a
             href={cv.linkedIn}
             target="_blank"
