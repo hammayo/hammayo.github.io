@@ -4,13 +4,14 @@ import Image from 'next/image';
 import { accentTag } from '@/design/variants';
 import imageLoader from '@/lib/imageLoader';
 import type { about as AboutType } from '../../../content/about';
+import {basePath} from "@/lib/env";
 
 interface AboutContentProps {
   about: typeof AboutType;
 }
 
 export function AboutContent({ about }: AboutContentProps) {
-  const fallbackSrc = '/_hb-logo.png';
+  const fallbackSrc = `${basePath}/images/_hb-logo.png`;
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
