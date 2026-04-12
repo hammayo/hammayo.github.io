@@ -17,26 +17,38 @@ const NAV_LINKS = [
   { href: "/contact",  label: "Contact"  },
 ] as const;
 
-const activeClasses  = "gradient-text text-transparent font-semibold";
-const inactiveClasses = "text-foreground/60 hover:text-foreground transition-colors";
-
 function NavLink({ href, label, pathname, onClick }: {
   href: string;
   label: string;
   pathname: string;
   onClick?: () => void;
 }) {
+  // Strip trailing slash before comparing (Next.js can return either form)
+  const isActive = pathname.replace(/\/$/, '') === href;
+
   return (
     <Link
       href={href}
       prefetch
       onClick={onClick}
       className={cn(
-        "duration-300 transition-all tracking-tight",
-        pathname === href ? activeClasses : inactiveClasses
+        "tracking-tight transition-all duration-300 font-medium",
+        isActive
+          ? "font-semibold"
+          : "text-muted-foreground hover:text-foreground"
       )}
     >
-      {label}
+      {isActive ? (
+        <span
+          className="text-transparent bg-clip-text"
+          style={{
+            backgroundImage: 'linear-gradient(to right, #a855f7, #818cf8, #38bdf8, #34d399, #f472b6, #a855f7)',
+            backgroundSize: '300%',
+          }}
+        >
+          {label}
+        </span>
+      ) : label}
     </Link>
   );
 }
@@ -49,7 +61,7 @@ export function Header() {
   return (
     <header
       role="banner"
-      className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50"
+      className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-b border-border/50"
     >
       <Container>
         <nav role="navigation" aria-label="Main navigation">
