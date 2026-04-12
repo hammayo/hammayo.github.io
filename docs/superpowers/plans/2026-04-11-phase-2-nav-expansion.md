@@ -10,6 +10,57 @@
 
 ---
 
+## ✅ Phase 2 Complete — Implementation Summary
+
+**Branch:** `feature/phase-2-nav-expansion`  
+**Completed:** 2026-04-12
+
+All 10 plan tasks delivered. Post-implementation polish applied in the same branch. See deviations from spec noted below.
+
+### Delivered (plan tasks)
+
+| Task | Description | Status |
+|---|---|---|
+| 1 | Foundation — `PAGE_META`, `SITE_LAUNCH_YEAR`, `ctaButton` CVA, delete tailwind shim | ✅ |
+| 2 | Content data files — `content/about.ts`, `content/blogs.ts`, `content/cv.ts` | ✅ |
+| 3 | Mobile sheet nav, active link gradient, dynamic copyright year (`CopyrightYear`) | ✅ |
+| 4 | Homepage expansion — `HomepageBio`, skills strip, CTA row | ✅ |
+| 5 | `/about` page — avatar, bio, sectors, philosophy | ✅ |
+| 6 | `/blogs` placeholder — data-driven, styled | ✅ |
+| 7 | `/cv` placeholder — LinkedIn link, data-driven | ✅ |
+| 8 | `/projects` redesign — scheme-aware topic tags, gradient heading, metadata | ✅ |
+| 9 | `/contact` redesign — `ContactCard` components, gradient heading, metadata | ✅ |
+| 10 | Sitemap updated with all Phase 2 routes using `SITE_URL` | ✅ |
+
+### Post-implementation polish (same branch)
+
+| Fix | File(s) affected |
+|---|---|
+| Page layouts — About/Blogs/CV aligned with Contact/Projects (`mb-6` header block) | `src/app/about/page.tsx`, `src/app/blogs/page.tsx`, `src/app/cv/page.tsx` |
+| Nav dark mode — header `bg-background/95 backdrop-blur-md` (was `/80 backdrop-blur-xl`, bled through) | `src/features/shared/header.tsx` |
+| Active nav link — trailing-slash-safe compare (`pathname.replace(/\/$/, '')`) + inline gradient span | `src/features/shared/header.tsx` |
+| Gradient text contrast in light mode — `brightness(0.65) saturate(1.3)` filter | `src/app/globals.css` |
+| Font — switched body font to JetBrains Mono (single font, terminal aesthetic) | `src/app/layout.tsx` |
+| CTA buttons — hardcoded `violet-600 → purple-600 → indigo-600` gradient; scheme vars (`gradient-bg`) were too light | `src/design/variants.ts` |
+| Contact card buttons — use `ctaButton` variant for visual consistency with home page CTA | `src/features/contact/contact-card.tsx` |
+| Theme toggle — dropdown opens `side="top"` (no footer overlap); menu border `zinc-200/zinc-700` (visible in light mode) | `src/features/shared/theme-toggle.tsx`, `src/features/shared/ui/dropdown-menu.tsx` |
+| Footer — inner container aligned to header using `px-4 mx-auto max-w-7xl` | `src/features/shared/footer.tsx` |
+| Mobile sheet — solid background `bg-white dark:bg-zinc-800`; `bg-background` bled through fixed animated background | `src/features/shared/ui/sheet.tsx` |
+| Accessibility — `<SheetTitle className="sr-only">` added to satisfy Radix Dialog requirement | `src/features/shared/header.tsx` |
+| Route progress bar — moved inside `<Header>` as `absolute bottom-0`; double-rAF fix so animation actually runs | `src/features/shared/route-progress.tsx`, `src/features/shared/header.tsx` |
+| Page transitions — removed `y` translate (caused reflow/jank); opacity-only fade 150ms | `src/features/shared/page-transition-wrapper.tsx` |
+
+### Deviations from spec
+
+| Spec said | What was built | Reason |
+|---|---|---|
+| `ctaButton` uses `gradient-bg` (scheme CSS vars) | Hardcoded `from-violet-600 via-purple-600 to-indigo-600` | Scheme vars produced washed-out colours in morning/silver scheme |
+| Progress bar at `top-[45px]` (fixed) | `absolute bottom-0` inside `<Header>` | Hardcoded value misaligned on mobile; inside-header approach is layout-agnostic |
+| `<NavLinks>` as isolated client component | Header updated directly (already `'use client'`) | Header was already a client component; isolation provided no benefit |
+| Sheet uses `bg-background` | `bg-white dark:bg-zinc-800` | `bg-background` not reliably opaque over fixed animated background |
+
+---
+
 ## Codebase Facts (read before starting)
 
 - CSS scheme vars: `--scheme-from`, `--scheme-via`, `--scheme-to`, `--scheme-glow`, `--scheme-accent`, `--scheme-border`

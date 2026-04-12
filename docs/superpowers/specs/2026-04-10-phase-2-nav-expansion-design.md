@@ -2,7 +2,7 @@ ThTheDo # Phase 2: Nav Expansion & Pages — Design Spec
 
 **Date:** 2026-04-10
 **Branch:** `feature/phase-2-nav-expansion` (from `develop`)
-**Status:** Spec approved — implementation plan pending
+**Status:** ✅ Implementation complete — see `docs/superpowers/plans/2026-04-11-phase-2-nav-expansion.md` for full delivery summary and deviations
 **Phase order:** Phase 2 of 3 — Pages & Navigation (was Plan 3 in original spec; swapped with Blog pipeline to deliver visible pages sooner)
 **Depends on:** Phase 1 complete (`feature/phase-1-foundation-upgrade` merged to `develop`)
 
@@ -87,7 +87,7 @@ These Phase 1 fixes must not be broken by any Phase 2 change:
 | `h-dvh overflow-hidden` on root | Page content must never set its own height/overflow |
 | `relative z-[1]` on `main` and `footer` | Do not introduce new stacking contexts above `z-[1]` |
 | Header `bg-white/80 dark:bg-zinc-950/80` | Must be preserved when adding mobile nav |
-| Compact header height ~45px | Mobile nav Sheet must account for this; progress bar stays at `top-[45px]` |
+| Compact header height ~45px | Mobile nav Sheet must account for this; ~~progress bar stays at `top-[45px]`~~ **→ progress bar moved inside `<Header>` as `absolute bottom-0` (layout-agnostic, implemented in Phase 2 polish)** |
 | `PageTransitionWrapper` `flex-1 flex flex-col` | No `pt-*`/`pb-*` padding on the wrapper |
 
 ### 3.7 Dark mode
