@@ -66,8 +66,8 @@ export const ctaButton = cva(
   {
     variants: {
       variant: {
-        gradient: 'gradient-bg text-white shadow-sm hover:opacity-90 focus-visible:ring-[var(--scheme-from)]',
-        ghost:    'border border-border text-foreground hover:bg-accent hover:text-accent-foreground focus-visible:ring-border',
+        gradient: 'gradient-bg text-white font-semibold shadow-lg ring-1 ring-white/20 hover:opacity-90 focus-visible:ring-[var(--scheme-from)]',
+        ghost:    'border-2 border-foreground/30 text-foreground font-semibold hover:border-foreground/60 hover:bg-foreground/10 focus-visible:ring-border',
       },
     },
     defaultVariants: {
