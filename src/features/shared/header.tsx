@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Menu } from "lucide-react";
 import { Container } from "./container";
-import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "./ui/sheet";
 import { cn } from "@/lib/utils";
 import { basePath } from "@/lib/env";
 
@@ -110,6 +110,7 @@ export function Header() {
                   </button>
                 </SheetTrigger>
                 <SheetContent side="right" className="w-64 pt-12">
+                  <SheetTitle className="sr-only">Navigation</SheetTitle>
                   <nav aria-label="Mobile navigation" className="flex flex-col gap-6 mt-4">
                     {NAV_LINKS.map(({ href, label }) => (
                       <NavLink
