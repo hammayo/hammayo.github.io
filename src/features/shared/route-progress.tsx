@@ -19,7 +19,7 @@ const ProgressIndicator = () => {
 
   return (
     <Progress.Root
-      className="fixed top-[45px] left-0 right-0 z-[200] h-[2px] w-full overflow-hidden bg-transparent"
+      className="absolute bottom-0 left-0 right-0 z-[200] h-[2px] w-full overflow-hidden bg-transparent"
       style={{
         opacity: visible ? 1 : 0,
         transition: "opacity 400ms ease-in-out"

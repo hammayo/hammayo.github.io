@@ -7,7 +7,6 @@ import { Header } from '@/features/shared/header';
 import { AnimatedBackgroundClient } from '@/features/shared/animated-background-client';
 import { basePath } from '@/lib/env';
 import { SITE, THEME, SITE_URL } from '@/lib/constants';
-import { RouteProgress } from '@/features/shared/route-progress';
 import { Footer } from '@/features/shared/footer';
 import { ErrorBoundary } from '@/features/shared/error-boundary';
 import { Analytics } from '@/features/shared/analytics';
@@ -118,7 +117,6 @@ export default function RootLayout({
               <div className="h-dvh bg-background text-foreground relative flex flex-col overflow-hidden">
                 <AnimatedBackgroundClient />
                 <Header />
-                <RouteProgress />
                 <main className="flex-1 flex flex-col overflow-y-auto pt-16 pb-4 relative z-[1]">
                   {children}
                 </main>

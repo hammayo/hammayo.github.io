@@ -7,6 +7,7 @@ import { useState } from "react";
 import { Menu } from "lucide-react";
 import { Container } from "./container";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "./ui/sheet";
+import { RouteProgress } from "./route-progress";
 import { cn } from "@/lib/utils";
 import { basePath } from "@/lib/env";
 
@@ -61,7 +62,7 @@ export function Header() {
   return (
     <header
       role="banner"
-      className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-b border-border/50"
+      className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-b border-border/50 overflow-hidden"
     >
       <Container>
         <nav role="navigation" aria-label="Main navigation">
@@ -128,6 +129,7 @@ export function Header() {
           </div>
         </nav>
       </Container>
+      <RouteProgress />
     </header>
   );
 }
