@@ -1,7 +1,8 @@
 "use client";
 
 import { type ReactNode } from "react";
-import { CardEffects, cardBaseClasses } from "@/features/shared/ui/card-effects";
+import { CardEffects } from "@/features/shared/ui/card-effects";
+import { ctaButton } from "@/design/variants";
 
 interface ContactCardProps {
   icon:     ReactNode;
@@ -24,7 +25,7 @@ export function ContactCard({ icon, title, subtitle, link, linkText }: ContactCa
           <h3 className="gradient-text text-xl font-medium tracking-tight transition-all duration-300 opacity-80 group-hover:opacity-100">
             {title}
           </h3>
-          <span className={`mt-4 text-sm text-center ${cardBaseClasses.description}`}>
+          <span className="mt-4 text-sm text-center text-zinc-600 dark:text-zinc-400 group-hover:text-purple-900/90 dark:group-hover:text-zinc-300 transition-colors">
             {subtitle}
           </span>
         </div>
@@ -32,7 +33,7 @@ export function ContactCard({ icon, title, subtitle, link, linkText }: ContactCa
           href={link}
           target={isExternal ? "_blank" : undefined}
           rel={isExternal ? "noopener noreferrer" : undefined}
-          className={`${cardBaseClasses.button} gradient-bg mt-6 text-white`}
+          className={`${ctaButton({ variant: 'gradient' })} mt-6`}
         >
           {linkText}
         </a>
