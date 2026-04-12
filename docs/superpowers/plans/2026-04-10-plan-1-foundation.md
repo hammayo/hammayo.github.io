@@ -1,6 +1,8 @@
 # Plan 1: Foundation — Dependency Upgrades + Architecture + Design System
 
-> **Status: COMPLETE** — branch `feature/plan-1-foundation`, completed 2026-04-10. See `2026-04-10-plan-1-completion.md` for full summary including deviations and QA fixes.
+> **Status: ✅ COMPLETE** — branch `feature/plan-1-foundation`, merged to `main` via PR #12 on 2026-04-10.  
+> **Consolidated summary (deviations, QA fixes, phase progression):** `docs/superpowers/plans/2026-04-10-plan-1-completion.md`  
+> This file contains the original step-by-step task breakdown for reference only.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
