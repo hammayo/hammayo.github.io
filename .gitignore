@@ -50,6 +50,9 @@ next-env.d.ts
 # IDE releted
 .idea/
 .specify/
+.superpowers/
+.playwright-mcp/
+.obsidian/
 .docs/
 .claude/
 
