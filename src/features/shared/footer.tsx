@@ -23,7 +23,7 @@ function LinkedinIcon({ className }: { className?: string }) {
 export function Footer({ className }: { className?: string }) {
   return (
     <footer className={`w-full border-t border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60${className ? ` ${className}` : ''}`}>
-      <div className="container flex items-center justify-between gap-4 py-2">
+      <div className="container px-4 mx-auto max-w-7xl flex items-center justify-between gap-4 py-2">
         <div className="flex items-center">
           <p className="text-xs text-muted-foreground">
             Built by{' '}
