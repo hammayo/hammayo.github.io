@@ -1,6 +1,6 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
-import { Inter, JetBrains_Mono } from 'next/font/google';
+import { JetBrains_Mono } from 'next/font/google';
 import { ThemeProvider } from '@/providers/theme-provider';
 import { SchemeProvider } from '@/providers/scheme-provider';
 import { Header } from '@/features/shared/header';
@@ -14,15 +14,9 @@ import { Analytics } from '@/features/shared/analytics';
 import { StructuredData } from '@/features/shared/structured-data';
 import Script from 'next/script';
 
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-});
-
 const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],
-  variable: '--font-jetbrains-mono',
+  variable: '--font-inter',
   display: 'swap',
 });
 
@@ -112,7 +106,7 @@ export default function RootLayout({
           `}
         </Script>
       </head>
-      <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased overflow-x-hidden`}>
+      <body className={`${jetbrainsMono.variable} font-sans antialiased overflow-x-hidden`}>
         <ThemeProvider
           attribute="class"
           defaultTheme={THEME.defaultTheme}
