@@ -1,7 +1,8 @@
 # Website Revamp Design Spec
 
 **Date:** 2026-04-10  
-**Status:** Plan 1 complete (branch `feature/plan-1-foundation`) — Plans 2 & 3 pending  
+**Status:** Phase 1 complete (merged to `develop`) — Phase 2 complete (`feature/phase-2-nav-expansion`) — Phase 3 pending
+**Phase order (revised 2026-04-10):** Phase 2 = Pages & Navigation | Phase 3 = Blog & MDX pipeline (swapped from original Plan 2/3 order)  
 **Site:** hammayo.co.uk (GitHub Pages, Next.js static export)
 
 ---

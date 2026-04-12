@@ -1,28 +1,21 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
-import { Inter, JetBrains_Mono } from 'next/font/google';
+import { JetBrains_Mono } from 'next/font/google';
 import { ThemeProvider } from '@/providers/theme-provider';
 import { SchemeProvider } from '@/providers/scheme-provider';
 import { Header } from '@/features/shared/header';
 import { AnimatedBackgroundClient } from '@/features/shared/animated-background-client';
 import { basePath } from '@/lib/env';
 import { SITE, THEME, SITE_URL } from '@/lib/constants';
-import { RouteProgress } from '@/features/shared/route-progress';
 import { Footer } from '@/features/shared/footer';
 import { ErrorBoundary } from '@/features/shared/error-boundary';
 import { Analytics } from '@/features/shared/analytics';
 import { StructuredData } from '@/features/shared/structured-data';
 import Script from 'next/script';
 
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-});
-
 const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],
-  variable: '--font-jetbrains-mono',
+  variable: '--font-inter',
   display: 'swap',
 });
 
@@ -112,7 +105,7 @@ export default function RootLayout({
           `}
         </Script>
       </head>
-      <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased overflow-x-hidden`}>
+      <body className={`${jetbrainsMono.variable} font-sans antialiased overflow-x-hidden`}>
         <ThemeProvider
           attribute="class"
           defaultTheme={THEME.defaultTheme}
@@ -124,7 +117,6 @@ export default function RootLayout({
               <div className="h-dvh bg-background text-foreground relative flex flex-col overflow-hidden">
                 <AnimatedBackgroundClient />
                 <Header />
-                <RouteProgress />
                 <main className="flex-1 flex flex-col overflow-y-auto pt-16 pb-4 relative z-[1]">
                   {children}
                 </main>

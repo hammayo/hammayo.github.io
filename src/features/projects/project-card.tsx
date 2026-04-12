@@ -3,6 +3,10 @@
 import { CardContent } from "@/features/shared/ui/card";
 import type { GitHubRepository } from "@/lib/github";
 import { Star, GitFork, ExternalLink } from "lucide-react";
+import { CardEffects, cardBaseClasses } from "@/features/shared/ui/card-effects";
+import { Button } from "@/features/shared/ui/button";
+import { accentTag } from "@/design/variants";
+import { format } from "date-fns";
 
 function GithubIcon({ className }: { className?: string }) {
   return (
@@ -11,9 +15,6 @@ function GithubIcon({ className }: { className?: string }) {
     </svg>
   );
 }
-import { CardEffects, cardBaseClasses } from "@/features/shared/ui/card-effects";
-import { Button } from "@/features/shared/ui/button";
-import { format } from "date-fns";
 
 interface ProjectCardProps {
   repo: GitHubRepository;
@@ -23,7 +24,7 @@ interface ProjectCardProps {
 
 export function ProjectCard({ repo, index, featured = false }: ProjectCardProps) {
   return (
-    <CardEffects 
+    <CardEffects
       variant={featured ? "featured" : "default"}
       className={`animate-in fade-in-50 duration-500 delay-${index * 100}`}
     >
@@ -57,14 +58,11 @@ export function ProjectCard({ repo, index, featured = false }: ProjectCardProps)
           {/* Description */}
           <p className="text-sm text-muted-foreground mb-4">{repo.description}</p>
 
-          {/* Topics */}
+          {/* Topics — scheme-aware accent tags */}
           {repo.topics.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-4">
               {repo.topics.map((topic) => (
-                <span
-                  key={topic}
-                  className="px-2 py-1 text-xs rounded-full bg-primary/10 text-primary"
-                >
+                <span key={topic} className={accentTag()}>
                   {topic}
                 </span>
               ))}
@@ -75,9 +73,7 @@ export function ProjectCard({ repo, index, featured = false }: ProjectCardProps)
           <div className="mt-auto flex items-center justify-between">
             <div className="flex items-center gap-2">
               {repo.language && (
-                <span className="text-sm text-muted-foreground">
-                  {repo.language}
-                </span>
+                <span className="text-sm text-muted-foreground">{repo.language}</span>
               )}
               <span className="text-sm text-muted-foreground">
                 Updated {format(new Date(repo.updated_at), 'MMM d, yyyy')}
@@ -85,14 +81,14 @@ export function ProjectCard({ repo, index, featured = false }: ProjectCardProps)
             </div>
             <div className="flex gap-2">
               <Button variant="ghost" size="sm" asChild>
-                <a href={repo.html_url} target="_blank" rel="noreferrer">
+                <a href={repo.html_url} target="_blank" rel="noopener noreferrer">
                   <GithubIcon className="w-4 h-4 mr-1" />
                   Code
                 </a>
               </Button>
               {repo.homepage && (
                 <Button variant="ghost" size="sm" asChild>
-                  <a href={repo.homepage} target="_blank" rel="noreferrer">
+                  <a href={repo.homepage} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="w-4 h-4 mr-1" />
                     Demo
                   </a>

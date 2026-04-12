@@ -4,10 +4,21 @@ import { ProjectCard } from "@/features/projects/project-card";
 import { fetchGitHubData } from "@/lib/github";
 import type { Metadata } from "next";
 import { PageViewEvent } from "@/features/shared/analytics-event";
+import { PAGE_META, SITE_URL } from "@/lib/constants";
+import { gradientText } from "@/design/variants";
 
 export const metadata: Metadata = {
-  title: "Projects | Hammayo's Portfolio",
-  description: "Explore my latest projects and open source contributions on GitHub.",
+  title: PAGE_META.projects.title,
+  description: PAGE_META.projects.description,
+  openGraph: {
+    title: PAGE_META.projects.title,
+    description: PAGE_META.projects.description,
+    url: `${SITE_URL}/projects`,
+  },
+  twitter: {
+    title: PAGE_META.projects.title,
+    description: PAGE_META.projects.description,
+  },
 };
 
 // This ensures the page revalidates every 1 hour
@@ -34,7 +45,7 @@ export default async function ProjectsPage() {
       <PageViewEvent page="projects" />
       <Container>
         <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-2">Projects</h1>
+          <h1 className={gradientText({ size: 'heading' })}>Projects</h1>
           <p className="text-muted-foreground">Explore my most recent projects and open source contributions.</p>
         </div>
 

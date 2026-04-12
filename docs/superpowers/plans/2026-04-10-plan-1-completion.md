@@ -1,10 +1,12 @@
-# Plan 1 Completion Summary — Foundation
+# Phase 1: Foundation — Consolidated Summary
 
-**Branch:** `feature/plan-1-foundation`  
+**Branch:** `feature/plan-1-foundation` → merged to `develop` → merged to `main` via PR #12  
 **Date completed:** 2026-04-10  
-**Status:** Complete — branch pushed, worktree preserved, PR pending  
-**Based on:** `docs/superpowers/plans/2026-04-10-plan-1-foundation.md`  
+**Status:** ✅ Complete and merged  
+**Detailed plan steps:** `docs/superpowers/plans/2026-04-10-plan-1-foundation.md`  
 **Design spec:** `docs/superpowers/specs/2026-04-10-website-revamp-design.md`
+
+> This is the single reference document for all Phase 1 changes. The foundation plan file (`plan-1-foundation.md`) contains the step-by-step task breakdown; this doc summarises what was actually delivered, deviations, and the commit log.
 
 ---
 
@@ -112,10 +114,20 @@ c525fac style: richer animated gradient on hero HAMMAYO title
 
 ---
 
-## Next Steps
+## Phase Progression
 
-- **Plan 2 — Blog & MDX pipeline** (`docs/superpowers/plans/` — to be written)
-  - MDX content pipeline, `/blog`, `/blog/[slug]`, OG images, RSS feed, sitemap extension, tag filtering
-- **Plan 3 — Pages & Navigation** (`docs/superpowers/plans/` — to be written)
-  - Homepage expansion, `/about`, `/cv`, `/uses`, mobile sheet nav, `/blogs` redirect, contact/projects redesign
-- Merge `feature/plan-1-foundation` → `develop` when Plans 2 & 3 are ready, or create PR now for review
+| Phase | Description | Status |
+|---|---|---|
+| **Phase 1** | Foundation — this document | ✅ Merged to `main` (PR #12) |
+| **Phase 2** | Pages & Navigation | ✅ Complete — `feature/phase-2-nav-expansion` |
+| **Phase 3** | Blog & MDX pipeline | ⏳ Pending |
+
+Phase 2 summary: `docs/superpowers/plans/2026-04-11-phase-2-nav-expansion.md`
+
+### Phase 1 constraints superseded by Phase 2
+
+| Original Phase 1 value | Replaced in Phase 2 | Why |
+|---|---|---|
+| Header `bg-white/80 dark:bg-zinc-950/80` | `bg-background/95 backdrop-blur-md` | Better contrast; `/80` let animated bg bleed through |
+| Progress bar at `top-[45px]` (fixed) | `absolute bottom-0` inside `<Header>` | Hardcoded value misaligned on mobile |
+| `ctaButton` using `gradient-bg` scheme vars | Hardcoded `from-violet-600 via-purple-600 to-indigo-600` | Scheme vars produced washed-out colours in morning/silver scheme |

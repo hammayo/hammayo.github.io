@@ -139,6 +139,11 @@
     background-clip: text;
   }
 
+  /* Darken gradient text in light mode — vivid scheme colours are too faint on white */
+  html:not(.dark) .gradient-text {
+    filter: brightness(0.65) saturate(1.3);
+  }
+
   .gradient-bg {
     background: linear-gradient(to right, var(--scheme-from), var(--scheme-via), var(--scheme-to));
   }

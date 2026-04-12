@@ -1,13 +1,23 @@
 import { Container } from "@/features/shared/container";
 import { PageTransitionWrapper } from "@/features/shared/page-transition-wrapper";
 import { ContactCard } from "@/features/contact/contact-card";
-import { SOCIAL } from "@/lib/constants";
+import { SOCIAL, PAGE_META, SITE_URL } from "@/lib/constants";
 import type { Metadata } from "next";
 import { PageViewEvent } from "@/features/shared/analytics-event";
+import { gradientText } from "@/design/variants";
 
 export const metadata: Metadata = {
-  title: "Contact | Hammayo's Portfolio",
-  description: "Get in touch with me",
+  title: PAGE_META.contact.title,
+  description: PAGE_META.contact.description,
+  openGraph: {
+    title: PAGE_META.contact.title,
+    description: PAGE_META.contact.description,
+    url: `${SITE_URL}/contact`,
+  },
+  twitter: {
+    title: PAGE_META.contact.title,
+    description: PAGE_META.contact.description,
+  },
 };
 
 export default function ContactPage() {
@@ -16,7 +26,7 @@ export default function ContactPage() {
       <PageViewEvent page="contact" />
       <Container>
         <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-2">Contact</h1>
+          <h1 className={gradientText({ size: 'heading' })}>Contact</h1>
           <p className="text-muted-foreground">Feel free to reach out through any of these platforms.</p>
         </div>
 
@@ -38,7 +48,6 @@ export default function ContactPage() {
             subtitle="GitHub"
             link={SOCIAL.github}
             linkText="View Profile"
-            variant="github"
           />
 
           {/* LinkedIn */}
@@ -55,7 +64,6 @@ export default function ContactPage() {
             subtitle="LinkedIn"
             link={SOCIAL.linkedin}
             linkText="View Profile"
-            variant="linkedin"
           />
 
           {/* Email */}
@@ -72,7 +80,6 @@ export default function ContactPage() {
             subtitle="Email"
             link={`mailto:${SOCIAL.email}`}
             linkText="Send Email"
-            variant="email"
           />
         </div>
       </Container>
