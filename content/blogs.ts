@@ -1,10 +1,9 @@
 // content/blogs.ts
-// Phase 2: placeholder config only.
-// Phase 3 adds posts-per-page, tag config, and the MDX pipeline.
+export const blogsConfig = {
+  // Reserved for future pagination — not used in phase 3 (show-all)
+  postsPerPage: 10,
 
-export const blogs = {
-  placeholderTitle:       'Blogs',
-  placeholderDescription: 'Technical writing on backend systems, architecture, and engineering craft.',
-  comingSoonMessage:      'Posts coming soon — check back later.',
-  backLinkText:           '← Back to home',
+  // Tags listed here appear first in the filter chips, in this order.
+  // All other tags appear alphabetically after these.
+  pinnedTags: ['architecture', 'next.js', '.net', 'azure', 'docker'],
 };
