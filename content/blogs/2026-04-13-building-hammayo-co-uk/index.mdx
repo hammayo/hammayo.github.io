@@ -1,0 +1,71 @@
+---
+title: "Building hammayo.co.uk: Next.js 16, MDX, and 20 years of opinions"
+date: "2026-04-13"
+summary: "Why I rebuilt my portfolio from scratch, the tech decisions I made, and what I'd do differently."
+tags: ["next.js", "mdx", "portfolio", "architecture"]
+published: true
+---
+
+After 20 years of building backend systems in finance, justice, and public service,
+I finally sat down and rebuilt my portfolio site properly. Here's what I learned.
+
+## Why rebuild?
+
+The old site was a static HTML file from 2019. It listed my name, a few technologies,
+and a GitHub link. It got the job done, but it didn't reflect how I think about engineering.
+
+A portfolio site for a senior engineer should do what good software does: have clear
+boundaries, be easy to change, and tell a coherent story.
+
+## Technology choices
+
+### Next.js 16 with static export
+
+The site has no server requirements. Everything is pre-rendered at build time and
+deployed to GitHub Pages behind a custom domain.
+
+```ts
+// next.config.ts — the key constraint
+const nextConfig: NextConfig = {
+  output: 'export',
+  distDir: env.NODE_ENV === 'production' ? 'out' : '.next',
+  trailingSlash: true,
+};
+```
+
+Static export means no API routes, no server components with runtime data fetching,
+and no middleware. Every constraint simplified another decision.
+
+### MDX for the blog
+
+I wanted to write posts in my editor, commit them to git, and have them appear on
+the site after a deploy. No CMS, no external service, no API keys to rotate.
+
+MDX gives me Markdown with optional React components. A post can be as simple as
+plain prose or as rich as an interactive diagram — the same pipeline handles both.
+
+### Pagefind for search
+
+[Pagefind](https://pagefind.app) runs after the build, crawls the static HTML, and
+generates a pre-built full-text search index. The search palette on the blog list
+page loads this index client-side — no server, no Algolia account, no round trips.
+
+The killer feature: search results include highlighted excerpts showing the exact
+sentence where your query appears *inside the post body*, not just the title.
+
+## What I'd do differently
+
+**Start with the content model.** I spent three days on animations before I'd
+written a single blog post. The pipeline should have come first.
+
+**Don't fight the static export constraint.** Every time I wanted a feature that
+required a server, I found a static equivalent that was actually simpler. The
+constraint is a feature.
+
+## What's next
+
+The blog pipeline is live. Next up: `/uses` (tools and setup), an interactive
+CV timeline, and wiring the homepage to surface the latest post.
+
+The code is on [GitHub](https://github.com/hammayo/hammayo.github.io) if you want
+to see how any of this is built.
