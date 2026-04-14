@@ -1,9 +1,7 @@
 import Image from 'next/image';
-import { existsSync } from 'fs';
+import { existsSync, readdirSync } from 'fs';
 import { join } from 'path';
-import { readdirSync } from 'fs';
 import { format } from 'date-fns';
-import imageLoader from '@/lib/imageLoader';
 import { accentTag } from '@/design/variants';
 import type { PostMeta } from './schema';
 
@@ -40,7 +38,6 @@ export function PostHeader({ post }: PostHeaderProps) {
           src={heroPath}
           alt={post.title}
           fill
-          loader={imageLoader}
           className="object-cover"
           priority
         />

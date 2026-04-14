@@ -58,7 +58,7 @@ export function SearchPalette({ open, onOpenChange }: SearchPaletteProps) {
       const pf = await import(
         /* webpackIgnore: true */
         // @ts-expect-error Pagefind is generated post-build
-        '/_pagefind/pagefind.js'
+        '/pagefind/pagefind.js'
       );
       await (pf as { init: () => Promise<void> }).init();
       pagefindRef.current = pf as Record<string, unknown>;

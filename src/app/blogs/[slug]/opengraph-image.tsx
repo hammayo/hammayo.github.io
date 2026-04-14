@@ -13,9 +13,10 @@ export default async function OgImage({ params }: { params: Promise<{ slug: stri
   const posts    = getAllPostsMeta();
   const post     = posts.find(p => p.slug === slug);
 
-  const title   = post?.title   ?? 'Blog post';
-  const summary = post?.summary ?? '';
-  const date    = post?.date    ?? '';
+  const title          = post?.title   ?? 'Blog post';
+  const summaryRaw     = post?.summary ?? '';
+  const summary        = summaryRaw.length > 120 ? summaryRaw.slice(0, 120) + '…' : summaryRaw;
+  const date           = post?.date    ?? '';
 
   return new ImageResponse(
     (
@@ -38,13 +39,13 @@ export default async function OgImage({ params }: { params: Promise<{ slug: stri
           <div style={{ fontSize: '48px', fontWeight: 700, color: '#e2d9f3', lineHeight: 1.2, maxWidth: '900px' }}>
             {title}
           </div>
-          {summary && (
+          {summary ? (
             <div style={{ fontSize: '20px', color: '#888', maxWidth: '800px', lineHeight: 1.5 }}>
-              {summary.slice(0, 120)}{summary.length > 120 ? '…' : ''}
+              {summary}
             </div>
-          )}
+          ) : null}
           <div style={{ fontSize: '14px', color: '#555' }}>
-            {date} · Hammayo Babar
+            {`${date} · Hammayo Babar`}
           </div>
         </div>
       </div>
