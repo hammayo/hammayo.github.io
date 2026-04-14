@@ -2,138 +2,46 @@
 
 # Hammayo
 
->
-> A modern, responsive portfolio website built with Next.js, TypeScript, and Tailwind CSS.
+> A portfolio site for a backend software engineer. Next.js 16, MDX blog, static export, GitHub Pages.
 >
 > https://hammayo.co.uk
->
 
 ## Features
 
-- Built with Next.js 16 (static export, App Router)
-- Tailwind CSS v4 — CSS-first config via `@theme {}` in `globals.css`
-- Time-of-day colour scheme system (`SchemeProvider`) — 4 named schemes, smooth crossfades, reduced-motion safe
-- Animated gradient design language across hero, nav, and UI elements
-- Dark and light mode (next-themes)
-- Fully responsive — compact fixed chrome, content scrolls within frame
-- SEO optimised — Open Graph, Twitter Card, structured data (JSON-LD), sitemap, robots.txt
-- Type-safe with TypeScript and Zod v4 environment validation
-- Gitleaks secret scanning in CI — blocks deployment on any detected secret
-- Google Analytics via `next/script` (afterInteractive)
-- Error boundary for graceful error handling
-- Bun as primary package manager and runtime
+- **Next.js 16** — static export (`output: 'export'`), App Router, deployed to GitHub Pages
+- **Blog** — MDX files in-repo, Zod-validated frontmatter, full-text search (Pagefind ⌘K), tag filtering, RSS feed (`/feed.xml`), per-post OG images
+- **Colour scheme system** — 4 named schemes driven by time of day, CSS custom properties, smooth crossfades
+- **Dark / light mode** — next-themes
+- **Syntax highlighting** — rehype-pretty-code + Shiki (tokyo-night), copy-to-clipboard on hover
+- **Tailwind CSS v4** — CSS-first config in `globals.css`
+- **Type-safe** — TypeScript strict, Zod v4 validation, zero `any`
+- **CI/CD** — Gitleaks secret scan, build + Pagefind index, deploy to GitHub Pages
 
 ## Getting Started
-
-### Prerequisites
-
-- Git
-- [Bun](https://bun.sh) (preferred) or Node.js 18+
-
-### Installation
 
 ```bash
 git clone https://github.com/hammayo/hammayo.github.io.git
 cd hammayo.github.io
 bun install
-```
-
-Copy the environment template and fill in your values:
-
-```bash
 cp .env.local.example .env.local
-```
-
-### Development
-
-```bash
-bun dev
+bun run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
 
-### Build
+> **Note:** The blog search (⌘K) requires a built Pagefind index and won't work in `bun run dev`. Run `bun run build && bun run serve` to test search locally.
+
+## Build
 
 ```bash
 bun run build
 ```
 
-Static output is written to `out/` — this is what GitHub Pages deploys.
+Runs three steps in sequence:
 
-### Lint / Type-check
-
-```bash
-bun run lint
-bun run type-check
-```
-
-## Project Structure
-
-```
-hammayo.github.io/
-├── .github/
-│   └── workflows/
-│       ├── deploy.yml           # Build + Gitleaks scan → GitHub Pages
-│       └── version-increment.yml
-├── content/                     # Blog MDX files (future), CV and uses data
-├── docs/
-│   └── superpowers/
-│       ├── specs/               # Design specs
-│       └── plans/               # Implementation plans + completion summaries
-├── public/
-│   ├── icons/                   # Favicon, apple-touch-icon, webmanifest
-│   ├── images/                  # Logo and static images
-│   └── screenshots/             # OG and README screenshots
-├── src/
-│   ├── app/                     # Next.js App Router — thin route shells
-│   │   ├── page.tsx             # Home
-│   │   ├── projects/page.tsx
-│   │   ├── contact/page.tsx
-│   │   ├── blogs/page.tsx
-│   │   ├── layout.tsx
-│   │   ├── globals.css          # Tailwind v4 @theme, CSS vars, keyframes
-│   │   ├── robots.ts
-│   │   └── sitemap.ts
-│   ├── design/
-│   │   ├── schemes.ts           # Colour scheme registry (4 named schemes)
-│   │   └── variants.ts          # CVA variant configs shared across features
-│   ├── features/
-│   │   ├── home/                # Hero component
-│   │   ├── projects/            # ProjectCard, GitHub fetch
-│   │   ├── contact/             # ContactCard
-│   │   └── shared/              # Header, footer, animated background,
-│   │       │                    # page transitions, route progress, error boundary
-│   │       └── ui/              # shadcn/Radix UI components
-│   ├── lib/
-│   │   ├── constants.ts         # SITE, SOCIAL, THEME, SITE_URL
-│   │   ├── env.ts               # Zod-validated environment variables
-│   │   ├── github.ts            # GitHub API (Octokit v5)
-│   │   ├── logger.ts            # Structured logger
-│   │   └── utils.ts             # cn() and general utilities
-│   └── providers/
-│       ├── theme-provider.tsx   # next-themes dark/light
-│       └── scheme-provider.tsx  # Time-of-day colour scheme + CSS vars
-├── .eslintrc.js
-├── .gitleaks.toml               # Gitleaks allowlist for known false positives
-├── bun.lock
-├── components.json              # shadcn/ui configuration
-├── next.config.ts               # Static export, basePath, image loader
-├── postcss.config.mjs           # @tailwindcss/postcss (Tailwind v4)
-└── tsconfig.json
-```
-
-## Colour Scheme System
-
-`SchemeProvider` resolves the active scheme from the visitor's local time and injects CSS custom properties on `:root`. All gradient, glow, and accent colours across the site derive from these variables — no colour logic in individual components.
-
-| Scheme | Active hours | Character |
-|---|---|---|
-| `silver` | 06:00–11:59 | Metallic, refined |
-| `deep-purple` | 12:00–17:59 | Saturated, bold |
-| `glass` | 18:00–21:59 | Airy, cool |
-| `violet-blue` | 22:00–05:59 | Deep, rich (default) |
-
-Scheme cycling is disabled automatically when `prefers-reduced-motion: reduce` is detected (WCAG 2.1 AA).
+1. `node scripts/copy-blog-assets.mjs` — copies post images/media to `public/blog-assets/`
+2. `next build` — static export to `out/`
+3. `pagefind --site out` — generates full-text search index into `out/pagefind/`
 
 ## Environment Variables
 
@@ -141,7 +49,7 @@ Scheme cycling is disabled automatically when `prefers-reduced-motion: reduce` i
 # GitHub Pages routing (set automatically by deploy.yml)
 NEXT_PUBLIC_BASE_PATH=
 
-# GitHub API — for pinned repos on the projects page (optional)
+# GitHub API — pinned repos on the projects page (optional)
 GITHUB_USERNAME=
 GITHUB_TOKEN=
 
@@ -149,35 +57,151 @@ GITHUB_TOKEN=
 GA_MEASUREMENT_ID=G-xxxxxxxx
 ```
 
-`SITE_URL` (`https://hammayo.co.uk`) is hardcoded in `src/lib/constants.ts` — no env var needed.
+`SITE_URL` (`https://hammayo.co.uk`) is hardcoded in `src/lib/constants.ts`.
+
+## Project Structure
+
+```
+hammayo.github.io/
+├── content/
+│   ├── blogs/                       # Blog posts
+│   │   └── YYYY-MM-DD-slug/
+│   │       ├── index.mdx            # Post content + frontmatter
+│   │       └── assets/              # Images, PDFs, media (optional)
+│   ├── about.ts / cv.ts / blogs.ts  # Page content data
+├── scripts/
+│   └── copy-blog-assets.mjs         # Prebuild: copies assets to public/
+├── src/
+│   ├── app/                         # Route shells
+│   │   ├── blogs/
+│   │   │   ├── page.tsx             # Blog list page
+│   │   │   └── [slug]/page.tsx      # Individual post page
+│   │   ├── feed.xml/route.ts        # RSS 2.0 feed
+│   │   └── sitemap.ts               # Auto-includes blog slugs
+│   ├── design/
+│   │   ├── schemes.ts               # Colour scheme registry
+│   │   └── variants.ts              # CVA variants (gradientText, accentTag, etc.)
+│   ├── features/
+│   │   ├── blogs/                   # BlogCard, BlogList, SearchPalette,
+│   │   │                            # PostHeader, PostBody, PostNav, ScrollProgress,
+│   │   │                            # mdx-components, pipeline, schema
+│   │   └── shared/                  # Header, footer, layout primitives, Radix UI
+│   └── lib/
+│       ├── constants.ts             # SITE, SOCIAL, SITE_URL
+│       ├── env.ts                   # Zod-validated env
+│       └── imageLoader.ts           # GitHub Pages basePath image loader
+└── .github/workflows/deploy.yml     # CI: gitleaks → copy assets → build → pagefind → deploy
+```
+
+## Colour Scheme System
+
+`SchemeProvider` resolves the active scheme from the visitor's local time and injects CSS custom properties on `:root`. No colour logic lives in individual components.
+
+| Scheme | Hours | Character |
+|---|---|---|
+| `silver` | 06:00–11:59 | Metallic, refined |
+| `deep-purple` | 12:00–17:59 | Saturated, bold |
+| `glass` | 18:00–21:59 | Airy, cool |
+| `violet-blue` | 22:00–05:59 | Deep, rich |
+
+## Writing a Blog Post
+
+### 1. Create the post folder
+
+Folder name format: `YYYY-MM-DD-your-slug`
+
+```bash
+mkdir -p content/blogs/2026-05-01-my-post-title/assets
+```
+
+### 2. Create `index.mdx`
+
+```markdown
+---
+title: "Your post title"
+date: "2026-05-01"
+summary: "One sentence shown in the post card and RSS feed."
+tags: ["architecture", "next.js"]
+published: true
+---
+
+Your post body in Markdown. MDX is supported — you can use React components inline.
+
+## A section heading
+
+Regular paragraph text. **Bold**, _italic_, `inline code`.
+
+```ts
+// Code blocks are syntax-highlighted with a copy button
+const example = true;
+` ``
+
+![Alt text](./assets/my-image.png)
+```
+
+**Frontmatter fields:**
+
+| Field | Required | Notes |
+|---|---|---|
+| `title` | Yes | Post title |
+| `date` | Yes | `YYYY-MM-DD` format |
+| `summary` | Yes | Shown on list card and in RSS |
+| `tags` | No | Lowercase array, e.g. `["next.js", "docker"]` |
+| `published` | No | Defaults to `true`. Set `false` to draft |
+| `readingTime` | No | Auto-calculated if omitted (200 wpm) |
+
+### 3. Add images or media (optional)
+
+Place files in the `assets/` subfolder. Reference them with relative paths in MDX:
+
+```markdown
+![Diagram](./assets/diagram.png)
+[Download spec](./assets/spec.pdf)
+```
+
+Assets are automatically copied to `public/blog-assets/your-slug/` at build time.
+
+### 4. Preview locally
+
+```bash
+bun run dev
+```
+
+Open `http://localhost:3000/blogs` — your post appears in the list. The search palette will show "unavailable in development" (expected).
+
+> To preview with full search: `bun run build && bun run serve`
+
+### 5. Publish
+
+```bash
+git add content/blogs/2026-05-01-my-post-title/
+git commit -m "content: add post — my post title"
+git push origin main
+```
+
+GitHub Actions picks up the push, runs the full build pipeline, and deploys to `hammayo.co.uk`. The post goes live in ~2 minutes.
+
+### Drafts
+
+Set `published: false` to keep a post out of production builds, the sitemap, and the RSS feed. It still appears when running `bun run dev` locally.
 
 ## Deployment
 
-Push to `main` triggers the `deploy.yml` workflow:
+Push to `main` triggers `deploy.yml`:
 
-1. **Gitleaks** secret scan — blocks build if any secret is detected in committed files or git history
-2. **Build** — `bun run build` produces static output in `out/`
-3. **Deploy** — GitHub Actions uploads `out/` to GitHub Pages
-
-The site is served via a custom domain (`hammayo.co.uk`) configured in `CNAME`.
+1. **Gitleaks** — secret scan; blocks deploy if any credential is found in committed files or git history
+2. **Copy assets** — `node scripts/copy-blog-assets.mjs`
+3. **Build** — `bunx --bun next build` → static output in `out/`
+4. **Index** — `bunx pagefind --site out` → search index in `out/pagefind/`
+5. **Deploy** — `out/` uploaded to GitHub Pages, served at `hammayo.co.uk`
 
 ## Customisation
 
 | What | Where |
 |---|---|
-| Name, title, description, social links | `src/lib/constants.ts` |
+| Name, title, social links | `src/lib/constants.ts` |
 | Colour schemes | `src/design/schemes.ts` |
-| Active scheme mode (time-of-day / config / cycle) | `src/design/schemes.ts` → `SCHEME_MODE` |
-| Hero gradient colours | `src/features/home/hero.tsx` |
+| Blog tag order | `content/blogs.ts` → `pinnedTags` |
 | Navigation links | `src/features/shared/header.tsx` |
-| Global CSS, fonts, keyframes | `src/app/globals.css` |
-| Structured data (JSON-LD) | `src/features/shared/structured-data.tsx` |
-
-## Acknowledgements
-
-- [Next.js](https://nextjs.org/)
-- [Tailwind CSS](https://tailwindcss.com/)
-- [shadcn/ui](https://ui.shadcn.com/)
-- [Framer Motion](https://www.framer.com/motion/)
-- [TypeScript](https://www.typescriptlang.org/)
-- [Bun](https://bun.sh)
+| Global CSS, fonts | `src/app/globals.css` |
+| MDX element overrides | `src/features/blogs/mdx-components.tsx` |
