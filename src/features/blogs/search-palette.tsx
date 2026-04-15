@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
@@ -25,23 +24,6 @@ export function SearchPalette({ open, onOpenChange }: SearchPaletteProps) {
   const [loading, setLoading] = useState(false);
   const pagefindRef           = useRef<Record<string, unknown> | null>(null);
   const inputRef              = useRef<HTMLInputElement>(null);
-  const { resolvedTheme }     = useTheme();
-
-  // Explicit colours applied via inline style — bypasses CSS-var resolution
-  // issues that make bg-white/dark:bg-zinc-900 unreliable in Radix portals
-  const isDark = resolvedTheme === 'dark';
-  const palette = {
-    bg:           isDark ? 'rgb(24 24 27)'    : 'rgb(255 255 255)',
-    border:       isDark ? 'rgb(63 63 70)'    : 'rgb(228 228 231)',
-    divider:      isDark ? 'rgb(63 63 70)'    : 'rgb(228 228 231)',
-    inputText:    isDark ? 'rgb(244 244 245)' : 'rgb(24 24 27)',
-    placeholder:  isDark ? 'rgb(113 113 122)' : 'rgb(161 161 170)',
-    bodyText:     isDark ? 'rgb(161 161 170)' : 'rgb(113 113 122)',
-    titleText:    isDark ? 'rgb(244 244 245)' : 'rgb(24 24 27)',
-    hoverBg:      isDark ? 'rgb(39 39 42)'    : 'rgb(244 244 245)',
-    codeBg:       isDark ? 'rgb(39 39 42)'    : 'rgb(244 244 245)',
-    codeText:     isDark ? 'rgb(212 212 216)' : 'rgb(82 82 91)',
-  };
 
   // Register ⌘K / Ctrl+K
   useEffect(() => {
@@ -109,24 +91,20 @@ export function SearchPalette({ open, onOpenChange }: SearchPaletteProps) {
 
   // Normalise Pagefind URL to Next.js route
   function toRoute(url: string): string {
-    // Pagefind returns paths like /blogs/my-slug/ — strip trailing slash
     return url.replace(/\/$/, '') || '/';
   }
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        {/* Overlay — slightly lighter than the default shadcn black/80 */}
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
 
-        {/* Content — colours set via inline style (theme-resolved, not CSS-var) */}
         <DialogPrimitive.Content
-          style={{ backgroundColor: palette.bg, borderColor: palette.border }}
           className={cn(
             'fixed left-1/2 z-50 -translate-x-1/2',
             'top-20 w-[calc(100%-2rem)]',
             'sm:top-1/2 sm:-translate-y-1/2 sm:max-w-[600px]',
-            'border rounded-xl shadow-2xl',
+            'bg-background border border-border rounded-xl shadow-2xl',
             'flex flex-col overflow-hidden',
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
@@ -136,13 +114,9 @@ export function SearchPalette({ open, onOpenChange }: SearchPaletteProps) {
           <DialogPrimitive.Title className="sr-only">Search posts</DialogPrimitive.Title>
 
           {/* Input row */}
-          <div
-            className="flex items-center gap-3 px-4 py-3"
-            style={{ borderBottom: `1px solid ${palette.divider}` }}
-          >
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
             <svg
-              className="w-4 h-4 shrink-0"
-              style={{ color: palette.placeholder }}
+              className="w-4 h-4 shrink-0 text-muted-foreground"
               fill="none" stroke="currentColor" viewBox="0 0 24 24"
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -153,14 +127,12 @@ export function SearchPalette({ open, onOpenChange }: SearchPaletteProps) {
               onChange={e => setQuery(e.target.value)}
               placeholder={IS_DEV ? 'Search unavailable in development' : 'Search posts…'}
               disabled={IS_DEV}
-              style={{ color: palette.inputText }}
-              className="flex-1 bg-transparent text-sm outline-none disabled:opacity-50"
+              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none disabled:opacity-50"
             />
             {query && (
               <button
                 onClick={() => setQuery('')}
-                style={{ color: palette.placeholder }}
-                className="p-1 transition-opacity hover:opacity-70"
+                className="p-1 text-muted-foreground transition-opacity hover:opacity-70"
                 aria-label="Clear search"
               >
                 ✕
@@ -171,13 +143,10 @@ export function SearchPalette({ open, onOpenChange }: SearchPaletteProps) {
           {/* Results */}
           <div className="max-h-[40dvh] sm:max-h-[400px] overflow-y-auto">
             {IS_DEV && (
-              <p className="px-4 py-6 text-center text-sm" style={{ color: palette.bodyText }}>
+              <p className="px-4 py-6 text-center text-sm text-muted-foreground">
                 Search is unavailable in development.<br />
                 Run{' '}
-                <code
-                  className="font-mono text-xs px-1.5 py-0.5 rounded"
-                  style={{ backgroundColor: palette.codeBg, color: palette.codeText }}
-                >
+                <code className="font-mono text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                   bun run build
                 </code>{' '}
                 to generate the Pagefind index.
@@ -185,17 +154,17 @@ export function SearchPalette({ open, onOpenChange }: SearchPaletteProps) {
             )}
 
             {!IS_DEV && !query && (
-              <p className="px-4 py-6 text-center text-sm" style={{ color: palette.bodyText }}>
+              <p className="px-4 py-6 text-center text-sm text-muted-foreground">
                 Start typing to search all posts…
               </p>
             )}
 
             {!IS_DEV && query && loading && (
-              <p className="px-4 py-4 text-center text-sm" style={{ color: palette.bodyText }}>Searching…</p>
+              <p className="px-4 py-4 text-center text-sm text-muted-foreground">Searching…</p>
             )}
 
             {!IS_DEV && query && !loading && results.length === 0 && (
-              <p className="px-4 py-4 text-center text-sm" style={{ color: palette.bodyText }}>
+              <p className="px-4 py-4 text-center text-sm text-muted-foreground">
                 No results for &ldquo;{query}&rdquo;
               </p>
             )}
@@ -207,24 +176,17 @@ export function SearchPalette({ open, onOpenChange }: SearchPaletteProps) {
                     <Link
                       href={toRoute(result.url)}
                       onClick={() => onOpenChange(false)}
-                      className="group block rounded-lg px-3 py-3 transition-colors"
-                      style={{ ['--hover-bg' as string]: palette.hoverBg }}
-                      onMouseEnter={e => (e.currentTarget.style.backgroundColor = palette.hoverBg)}
-                      onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+                      className="group block rounded-lg px-3 py-3 transition-colors hover:bg-muted"
                     >
-                      <p
-                        className="text-sm font-semibold mb-1 transition-colors group-hover:text-[var(--scheme-accent)]"
-                        style={{ color: palette.titleText }}
-                      >
+                      <p className="text-sm font-semibold mb-1 text-foreground transition-colors group-hover:text-[var(--scheme-accent)]">
                         {result.meta.title ?? 'Untitled'}
                       </p>
                       <p
                         className={cn(
-                          'text-xs line-clamp-2',
+                          'text-xs line-clamp-2 text-muted-foreground',
                           '[&_mark]:bg-[var(--scheme-accent)]/20 [&_mark]:text-[var(--scheme-accent)]',
                           '[&_mark]:font-semibold [&_mark]:not-italic [&_mark]:rounded-sm [&_mark]:px-0.5',
                         )}
-                        style={{ color: palette.bodyText }}
                         dangerouslySetInnerHTML={{ __html: result.excerpt }}
                       />
                     </Link>
@@ -235,10 +197,7 @@ export function SearchPalette({ open, onOpenChange }: SearchPaletteProps) {
           </div>
 
           {/* Footer */}
-          <div
-            className="px-4 py-2 flex items-center gap-3 text-[10px]"
-            style={{ borderTop: `1px solid ${palette.divider}`, color: palette.bodyText }}
-          >
+          <div className="px-4 py-2 flex items-center gap-3 text-[10px] text-muted-foreground border-t border-border">
             <span className="hidden sm:inline"><kbd className="font-mono">↵</kbd> select</span>
             <span className="hidden sm:inline"><kbd className="font-mono">ESC</kbd> close</span>
             <span className="sm:ml-auto">powered by Pagefind</span>
