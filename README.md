@@ -31,6 +31,15 @@ Open [http://localhost:3000](http://localhost:3000).
 
 > **Note:** The blog search (⌘K) requires a built Pagefind index and won't work in `bun run dev`. Run `bun run build && bun run serve` to test search locally.
 
+### Local Testing Modes
+
+| Mode | Command | Navigation | Search | Use Case |
+|---|---|---|---|---|
+| **Dev** | `bun dev` | ✅ Full client-side routing | ❌ Unavailable | Development, testing features |
+| **Static export** | `bun run serve` | ⚠️ Direct URLs only* | ✅ Works | Testing search, pre-deployment |
+
+\* In `bun run serve`, clicking links doesn't navigate (limitation of static export). However, direct URL access works fine (`/about/` loads the About page). **This doesn't affect GitHub Pages** — production uses direct URL access.
+
 ## Build
 
 ```bash

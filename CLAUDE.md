@@ -11,8 +11,12 @@ bun run lint              # eslint src (warnings allowed)
 bun run lint:strict       # eslint src --max-warnings=0
 bun run lint:fix          # eslint + prettier fix
 bun run type-check        # tsc --noEmit
-bun run serve             # serve out/ locally after build
+bun run serve             # serve out/ locally after build (no client-side nav*)
 ```
+
+**Dev vs Serve:**
+- `bun dev` — full client-side navigation, dev features, but search unavailable
+- `bun run serve` — search works, but link clicks don't navigate (use direct URLs like `/about/`). This is a static export limitation; GitHub Pages deployment unaffected.
 
 There are no automated tests — `bun run type-check` and `bun run lint:strict` are the quality gates.
 
@@ -30,6 +34,10 @@ The build runs three steps in order:
 `next.config.ts` sets `output: 'export'` always. `distDir` is `out` in production and `.next` in dev. `trailingSlash: true`. No server-side rendering — everything is pre-rendered at build time.
 
 `basePath` is set from `NEXT_PUBLIC_BASE_PATH` locally or `/${GITHUB_REPOSITORY}` in CI. All image `src` paths must go through the global image loader (`src/lib/imageLoader.ts`), which is registered in `next.config.ts` as `loaderFile`. **Never pass a `loader` prop directly to `<Image>` inside a Server Component** — it crosses the RSC serialisation boundary and throws.
+
+**Why client-side navigation doesn't work in `bun run serve`:**
+
+Static exports create pre-rendered HTML files + RSC payload files (`.txt` files in `out/`). Client-side navigation requires the Next.js server to handle RSC requests (`/about/?_rsc=...`). A static file server like `serve` just serves files — it can't transform or stream RSC payloads. This is expected behavior, not a bug. It doesn't affect GitHub Pages because users access pages via direct URLs (`/about/` → loads prerendered HTML), not client-side link clicks.
 
 ### Colour scheme system
 
