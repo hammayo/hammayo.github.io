@@ -97,14 +97,14 @@ export function SearchPalette({ open, onOpenChange }: SearchPaletteProps) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
 
         <DialogPrimitive.Content
           className={cn(
             'fixed left-1/2 z-50 -translate-x-1/2',
             'top-20 w-[calc(100%-2rem)]',
             'sm:top-1/2 sm:-translate-y-1/2 sm:max-w-[600px]',
-            'bg-background border border-border rounded-xl shadow-2xl',
+            'bg-background/90 backdrop-blur-2xl border border-border/50 rounded-xl shadow-2xl',
             'flex flex-col overflow-hidden',
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
@@ -114,7 +114,7 @@ export function SearchPalette({ open, onOpenChange }: SearchPaletteProps) {
           <DialogPrimitive.Title className="sr-only">Search posts</DialogPrimitive.Title>
 
           {/* Input row */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-border/50">
             <svg
               className="w-4 h-4 shrink-0 text-muted-foreground"
               fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -197,7 +197,7 @@ export function SearchPalette({ open, onOpenChange }: SearchPaletteProps) {
           </div>
 
           {/* Footer */}
-          <div className="px-4 py-2 flex items-center gap-3 text-[10px] text-muted-foreground border-t border-border">
+          <div className="px-4 py-2 flex items-center gap-3 text-[10px] text-muted-foreground border-t border-border/50">
             <span className="hidden sm:inline"><kbd className="font-mono">↵</kbd> select</span>
             <span className="hidden sm:inline"><kbd className="font-mono">ESC</kbd> close</span>
             <span className="sm:ml-auto">powered by Pagefind</span>
