@@ -6,7 +6,7 @@
     "dev": "next dev -H 0.0.0.0 --turbopack",
     "build": "node scripts/copy-blog-assets.mjs && next build && bunx pagefind --site out",
     "start": "next start",
-    "serve": "npx serve out -c serve.json",
+    "serve": "npx serve out -c $(pwd)/serve.json",
     "lint": "eslint src",
     "lint:strict": "eslint --max-warnings=0 src",
     "lint:fix": "eslint src --fix && prettier --write src",
