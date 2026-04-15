@@ -4,6 +4,7 @@ import { join } from 'path';
 import { format } from 'date-fns';
 import { accentTag } from '@/design/variants';
 import { cn } from '@/lib/utils';
+import { HeroFallbackBackground } from './hero-fallback-background';
 import type { PostMeta } from './schema';
 
 interface PostHeaderProps {
@@ -43,15 +44,14 @@ export function PostHeader({ post }: PostHeaderProps) {
           priority
         />
       ) : (
-        <div className="absolute inset-0 bg-gradient-to-br from-white via-zinc-50/50 to-zinc-100/30 dark:from-zinc-900/60 dark:via-zinc-900/40 dark:to-zinc-800/50" />
+        <HeroFallbackBackground />
       )}
 
-      {/* Overlay for text readability */}
+      {/* Darkens bottom for text readability */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10" />
 
       {/* Content overlaid at bottom */}
       <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8">
-        {/* Tags */}
         {post.tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-3">
             {post.tags.map(tag => (
@@ -62,12 +62,10 @@ export function PostHeader({ post }: PostHeaderProps) {
           </div>
         )}
 
-        {/* Title */}
         <h1 className="text-2xl md:text-4xl font-bold text-white leading-tight mb-2">
           {post.title}
         </h1>
 
-        {/* Meta */}
         <div className="flex items-center gap-3 text-sm text-white/70">
           <span>{format(new Date(post.date), 'MMMM d, yyyy')}</span>
           <span>·</span>

@@ -22,9 +22,7 @@ export default async function OgImage({ params }: { params: Promise<{ slug: stri
     (
       <div
         style={{
-          background: 'linear-gradient(to right, #a855f7, #818cf8, #38bdf8, #34d399, #f472b6, #a855f7)',
-          backgroundSize: '400% 100%',
-          backgroundPosition: '0% 0%',
+          background: 'linear-gradient(135deg, #0a0918 0%, #1a0533 100%)',
           width: '100%',
           height: '100%',
           display: 'flex',

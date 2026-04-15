@@ -3,6 +3,7 @@
 import { type ReactNode, useCallback, type MouseEvent } from 'react';
 import { motion, useMotionTemplate, useMotionValue } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { cardBgBase, cardBgOverlay1, cardBgOverlay2 } from './card-background-classes';
 
 interface CardEffectsProps {
   children: ReactNode;
@@ -44,11 +45,11 @@ export function CardEffects({ children, variant = 'default', className = '', del
         'group-hover:border-purple-300/50 dark:group-hover:border-purple-500/20',
         variant === 'featured'
           ? 'bg-gradient-to-br from-white via-purple-50/40 to-cyan-50/30 dark:from-zinc-900/60 dark:via-purple-900/30 dark:to-blue-900/40 ring-1 ring-purple-300/40 dark:ring-purple-500/10'
-          : 'bg-gradient-to-br from-white via-zinc-50/50 to-zinc-100/30 dark:from-zinc-900/60 dark:via-zinc-900/40 dark:to-zinc-800/50',
+          : cardBgBase,
       )}>
         <div className="absolute inset-0 transition-opacity duration-700 opacity-0 group-hover:opacity-100">
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-200/20 via-cyan-200/15 to-pink-200/20 dark:from-purple-500/[0.05] dark:via-cyan-500/[0.05] dark:to-pink-500/[0.05]" />
-          <div className="absolute inset-0 bg-gradient-to-tl from-green-200/15 via-blue-200/15 to-purple-200/20 dark:from-green-500/[0.03] dark:via-blue-500/[0.04] dark:to-purple-500/[0.05]" />
+          <div className={`absolute inset-0 ${cardBgOverlay1}`} />
+          <div className={`absolute inset-0 ${cardBgOverlay2}`} />
         </div>
         <motion.div
           className="pointer-events-none absolute -inset-px opacity-0 group-hover:opacity-100 transition-opacity duration-700"
