@@ -26,7 +26,7 @@ function NavLink({ href, label, pathname, onClick }: {
   onClick?: () => void;
 }) {
   // Strip trailing slash before comparing (Next.js can return either form)
-  const isActive = pathname.replace(/\/$/, '') === href;
+  const isActive = pathname.replace(/\/$/, '').startsWith(href);
 
   return (
     <Link
