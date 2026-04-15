@@ -50,6 +50,9 @@ function applyScheme(
   root.style.setProperty('--scheme-from', from);
   root.style.setProperty('--scheme-via', via);
   root.style.setProperty('--scheme-to', to);
+  root.style.setProperty('--scheme-button-from', scheme.buttonFrom);
+  root.style.setProperty('--scheme-button-via', scheme.buttonVia);
+  root.style.setProperty('--scheme-button-to', scheme.buttonTo);
   root.style.setProperty('--scheme-glow', isDark ? scheme.glow : scheme.glow.replace('0.25', '0.15'));
   root.style.setProperty('--scheme-accent', scheme.accent);
   root.style.setProperty('--scheme-border', scheme.border);
