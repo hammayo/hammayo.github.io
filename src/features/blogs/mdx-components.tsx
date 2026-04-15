@@ -14,7 +14,7 @@ function CopyButton({ code }: { code: string }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       }}
-      className="absolute right-3 top-3 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-white/60 hover:bg-white/10 hover:text-white/90 transition-all"
+      className="absolute right-3 top-3 rounded-md border border-border bg-muted/50 px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
       aria-label="Copy code"
     >
       {copied ? 'Copied!' : 'Copy'}
@@ -29,7 +29,7 @@ function CodeBlock({ children, ...props }: React.HTMLAttributes<HTMLPreElement>)
     <div className="relative my-6 group">
       <pre
         {...props}
-        className="overflow-x-auto rounded-xl border border-white/[0.06] bg-zinc-950 p-4 text-sm leading-relaxed"
+        className="overflow-x-auto rounded-xl border border-border bg-zinc-950 p-4 text-sm leading-relaxed"
       >
         {children}
       </pre>
@@ -54,7 +54,7 @@ export const mdxComponents: MDXComponents = {
         alt={alt ?? ''}
         width={800}
         height={450}
-        className="rounded-xl w-full h-auto border border-white/[0.06]"
+        className="rounded-xl w-full h-auto border border-border"
         {...(props as object)}
       />
     </span>
@@ -71,7 +71,7 @@ export const mdxComponents: MDXComponents = {
           href={href}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 rounded-full border border-[var(--scheme-border)] px-3 py-0.5 text-xs font-medium text-[var(--scheme-accent)] hover:bg-[var(--scheme-accent)]/10 transition-colors no-underline"
+          className="inline-flex items-center gap-1.5 rounded-full border scheme-border px-3 py-0.5 text-xs font-medium text-[var(--scheme-accent)] hover:bg-[var(--scheme-accent)]/10 transition-colors no-underline"
           {...props}
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
