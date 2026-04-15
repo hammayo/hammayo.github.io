@@ -156,6 +156,25 @@
     background: linear-gradient(to right, var(--scheme-button-from), var(--scheme-button-via), var(--scheme-button-to));
   }
 
+  /* Scheme-tinted decorative overlay layers — used on cards and hero backgrounds */
+  .scheme-overlay-1 {
+    background: linear-gradient(
+      to bottom right,
+      color-mix(in srgb, var(--scheme-from) 15%, transparent),
+      color-mix(in srgb, var(--scheme-via) 10%, transparent),
+      color-mix(in srgb, var(--scheme-to) 15%, transparent)
+    );
+  }
+
+  .scheme-overlay-2 {
+    background: linear-gradient(
+      to top left,
+      color-mix(in srgb, var(--scheme-from) 10%, transparent),
+      color-mix(in srgb, var(--scheme-via) 10%, transparent),
+      color-mix(in srgb, var(--scheme-to) 15%, transparent)
+    );
+  }
+
   .scheme-glow {
     box-shadow: 0 0 20px var(--scheme-glow);
   }
