@@ -2,7 +2,7 @@ import Image from 'next/image';
 import { existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { format } from 'date-fns';
-import { accentTag, GRADIENT_GLASS } from '@/design/variants';
+import { accentTag } from '@/design/variants';
 import { cn } from '@/lib/utils';
 import type { PostMeta } from './schema';
 
@@ -43,10 +43,7 @@ export function PostHeader({ post }: PostHeaderProps) {
           priority
         />
       ) : (
-        <div
-          className="absolute inset-0 animate-gradient"
-          style={{ backgroundImage: GRADIENT_GLASS, backgroundSize: '400%' }}
-        />
+        <div className="absolute inset-0 bg-gradient-to-br from-white via-zinc-50/50 to-zinc-100/30 dark:from-zinc-900/60 dark:via-zinc-900/40 dark:to-zinc-800/50" />
       )}
 
       {/* Overlay for text readability */}
