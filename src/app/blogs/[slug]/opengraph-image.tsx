@@ -22,7 +22,7 @@ export default async function OgImage({ params }: { params: Promise<{ slug: stri
     (
       <div
         style={{
-          background: 'linear-gradient(to right bottom, #18181b, #27272a, #27272a, #1f2937)',
+          background: 'linear-gradient(to right, #a855f7, #818cf8, #38bdf8, #34d399, #f472b6, #a855f7)',
           width: '100%',
           height: '100%',
           display: 'flex',
@@ -33,18 +33,18 @@ export default async function OgImage({ params }: { params: Promise<{ slug: stri
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ fontSize: '14px', color: '#7c3aed', letterSpacing: '2px' }}>
+          <div style={{ fontSize: '14px', color: '#ffffff', letterSpacing: '2px', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
             HAMMAYO.CO.UK / WRITING
           </div>
-          <div style={{ fontSize: '48px', fontWeight: 700, color: '#e2d9f3', lineHeight: 1.2, maxWidth: '900px' }}>
+          <div style={{ fontSize: '48px', fontWeight: 700, color: '#ffffff', lineHeight: 1.2, maxWidth: '900px', textShadow: '0 2px 8px rgba(0,0,0,0.4)' }}>
             {title}
           </div>
           {summary ? (
-            <div style={{ fontSize: '20px', color: '#888', maxWidth: '800px', lineHeight: 1.5 }}>
+            <div style={{ fontSize: '20px', color: '#f0f0f0', maxWidth: '800px', lineHeight: 1.5, textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>
               {summary}
             </div>
           ) : null}
-          <div style={{ fontSize: '14px', color: '#555' }}>
+          <div style={{ fontSize: '14px', color: '#ffffff', textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>
             {`${date} · Hammayo Babar`}
           </div>
         </div>
