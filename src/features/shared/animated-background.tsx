@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
-import { useTheme } from "next-themes";
+import { useEffect, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
+import { useTheme } from 'next-themes';
 
 interface Blob {
   id: number;
@@ -73,7 +73,7 @@ export function AnimatedBackground() {
   }, [theme, resolvedTheme]);
 
   if (!mounted) {
-    return <div className="fixed inset-0" />;
+    return <div className="fixed inset-0 pointer-events-none" />;
   }
 
   return (

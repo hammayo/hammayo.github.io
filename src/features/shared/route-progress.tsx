@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useEffect, useState, Suspense, memo, useRef } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
-import * as Progress from "@radix-ui/react-progress";
+import { useEffect, useState, Suspense, memo, useRef } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
+import * as Progress from '@radix-ui/react-progress';
 
 const ProgressIndicator = () => {
   const [progress, setProgress] = useState(0);

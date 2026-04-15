@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { CardContent } from '@/features/shared/ui/card';
 import { CardEffects, cardBaseClasses } from '@/features/shared/ui/card-effects';
 import { gradientText, accentTag } from '@/design/variants';
+import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import type { PostMeta } from './schema';
 
@@ -13,10 +14,8 @@ interface BlogCardProps {
 export function BlogCard({ post, index }: BlogCardProps) {
   return (
     <Link href={`/blogs/${post.slug}`} className="block h-full">
-      <CardEffects
-        className={`animate-in fade-in-50 duration-500 delay-${Math.min(index * 100, 500)}`}
-      >
-        <CardContent className={`${cardBaseClasses.contentWrapper} min-h-[14rem] flex flex-col`}>
+      <CardEffects delay={Math.min(index * 0.1, 0.5)}>
+        <CardContent className={cn(cardBaseClasses.contentWrapper, 'min-h-[14rem] flex flex-col')}>
           <div className="flex-1 flex flex-col">
             {/* Date + reading time */}
             <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
@@ -26,7 +25,7 @@ export function BlogCard({ post, index }: BlogCardProps) {
             </div>
 
             {/* Title */}
-            <h2 className={gradientText({ size: 'body' }) + ' text-lg font-semibold mb-2 line-clamp-2'}>
+            <h2 className={cn(gradientText({ size: 'body' }), 'text-lg font-semibold mb-2 line-clamp-2')}>
               {post.title}
             </h2>
 

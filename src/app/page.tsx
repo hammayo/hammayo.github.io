@@ -1,12 +1,12 @@
-import { Container } from "@/features/shared/container";
-import { Hero } from "@/features/home/hero";
-import { HomepageBio } from "@/features/home/homepage-bio";
-import { SkillsStrip } from "@/features/home/skills-strip";
-import { CTARow } from "@/features/home/cta";
-import { PageTransitionWrapper } from "@/features/shared/page-transition-wrapper";
-import { PageViewEvent } from "@/features/shared/analytics-event";
-import { about } from "../../content/about";
-import { cv } from "../../content/cv";
+import { Container } from '@/features/shared/container';
+import { Hero } from '@/features/home/hero';
+import { HomepageBio } from '@/features/home/homepage-bio';
+import { SkillsStrip } from '@/features/home/skills-strip';
+import { CTARow } from '@/features/home/cta';
+import { PageTransitionWrapper } from '@/features/shared/page-transition-wrapper';
+import { PageViewEvent } from '@/features/shared/analytics-event';
+import { about } from '../../content/about';
+import { cv } from '../../content/cv';
 
 export default function HomePage() {
   return (

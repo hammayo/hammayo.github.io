@@ -1,34 +1,20 @@
-import { Container } from "@/features/shared/container";
-import { PageTransitionWrapper } from "@/features/shared/page-transition-wrapper";
-import { ContactCard } from "@/features/contact/contact-card";
-import { SOCIAL, PAGE_META, SITE_URL } from "@/lib/constants";
-import type { Metadata } from "next";
-import { PageViewEvent } from "@/features/shared/analytics-event";
-import { gradientText } from "@/design/variants";
+import type { Metadata } from 'next';
+import { Container } from '@/features/shared/container';
+import { PageTransitionWrapper } from '@/features/shared/page-transition-wrapper';
+import { PageHeader } from '@/features/shared/page-header';
+import { ContactCard } from '@/features/contact/contact-card';
+import { PageViewEvent } from '@/features/shared/analytics-event';
+import { SOCIAL } from '@/lib/constants';
+import { createPageMetadata } from '@/lib/metadata';
 
-export const metadata: Metadata = {
-  title: PAGE_META.contact.title,
-  description: PAGE_META.contact.description,
-  openGraph: {
-    title: PAGE_META.contact.title,
-    description: PAGE_META.contact.description,
-    url: `${SITE_URL}/contact`,
-  },
-  twitter: {
-    title: PAGE_META.contact.title,
-    description: PAGE_META.contact.description,
-  },
-};
+export const metadata: Metadata = createPageMetadata('contact', '/contact');
 
 export default function ContactPage() {
   return (
     <PageTransitionWrapper>
       <PageViewEvent page="contact" />
       <Container>
-        <div className="mb-6">
-          <h1 className={gradientText({ size: 'heading' })}>Contact</h1>
-          <p className="text-muted-foreground">Feel free to reach out through any of these platforms.</p>
-        </div>
+        <PageHeader title="Contact" subtitle="Feel free to reach out through any of these platforms." />
 
         <div className="grid w-full grid-cols-1 gap-6 mx-auto sm:grid-cols-3">
           {/* GitHub */}

@@ -5,10 +5,10 @@
  * logs those errors, and displays a fallback UI instead of crashing the component tree.
  */
 
-"use client";
+'use client';
 
-import { Component, type ComponentType, type ErrorInfo, type ReactNode } from "react";
-import { logger } from "@/lib/logger";
+import { Component, type ComponentType, type ErrorInfo, type ReactNode } from 'react';
+import { logger } from '@/lib/logger';
 
 interface ErrorBoundaryProps {
   children: ReactNode;

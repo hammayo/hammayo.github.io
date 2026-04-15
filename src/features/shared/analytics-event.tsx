@@ -3,8 +3,10 @@
 import { useEffect } from 'react';
 import { sendAnalyticsEvent } from './analytics';
 
+type PageName = 'home' | 'about' | 'projects' | 'blogs' | 'contact' | 'blog-post';
+
 type PageViewEventProps = {
-  page: string;
+  page: PageName;
 };
 
 export function PageViewEvent({ page }: PageViewEventProps) {

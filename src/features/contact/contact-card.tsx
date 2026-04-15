@@ -1,8 +1,9 @@
-"use client";
+'use client';
 
-import { type ReactNode } from "react";
-import { CardEffects } from "@/features/shared/ui/card-effects";
-import { ctaButton } from "@/design/variants";
+import { type ReactNode } from 'react';
+import { CardEffects } from '@/features/shared/ui/card-effects';
+import { ctaButton } from '@/design/variants';
+import { cn } from '@/lib/utils';
 
 interface ContactCardProps {
   icon:     ReactNode;
@@ -13,7 +14,7 @@ interface ContactCardProps {
 }
 
 export function ContactCard({ icon, title, subtitle, link, linkText }: ContactCardProps) {
-  const isExternal = !link.startsWith("mailto:");
+  const isExternal = !link.startsWith('mailto:');
 
   return (
     <CardEffects>
@@ -33,7 +34,7 @@ export function ContactCard({ icon, title, subtitle, link, linkText }: ContactCa
           href={link}
           target={isExternal ? "_blank" : undefined}
           rel={isExternal ? "noopener noreferrer" : undefined}
-          className={`${ctaButton({ variant: 'gradient' })} mt-6`}
+          className={cn(ctaButton({ variant: 'gradient' }), 'mt-6')}
         >
           {linkText}
         </a>

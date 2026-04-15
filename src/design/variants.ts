@@ -1,5 +1,8 @@
 import { cva } from 'class-variance-authority';
 
+/** Shared glass-rainbow gradient — used for animated name/logo text and fallback backgrounds. */
+export const GRADIENT_GLASS = 'linear-gradient(to right, #a855f7, #818cf8, #38bdf8, #34d399, #f472b6, #a855f7)';
+
 /**
  * Gradient text variant.
  * Uses CSS custom properties set by SchemeProvider.

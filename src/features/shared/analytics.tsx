@@ -35,7 +35,6 @@ function AnalyticsTracking() {
 
     const search = searchParams?.toString();
     const fullPath = search ? `${pathname}?${search}` : pathname;
-    
     window.gtag('config', env.GA_MEASUREMENT_ID, {
       page_path: fullPath,
     });

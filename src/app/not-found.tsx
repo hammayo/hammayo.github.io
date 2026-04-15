@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { Container } from "@/features/shared/container";
-import { Suspense } from "react";
-import Link from "next/link";
+import { Container } from '@/features/shared/container';
+import { Suspense } from 'react';
+import Link from 'next/link';
 
 function NotFoundContent() {
   return (
@@ -10,7 +10,7 @@ function NotFoundContent() {
       <div className="mb-8 relative">
         <div 
           className="text-9xl font-bold opacity-10 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-transparent bg-clip-text bg-gradient-to-r from-purple-800 via-cyan-800 to-green-800 select-none" 
-          style={{ fontSize: "240px" }}
+          style={{ fontSize: '240px' }}
         >
           404
         </div>

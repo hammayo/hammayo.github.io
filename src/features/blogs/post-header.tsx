@@ -2,7 +2,8 @@ import Image from 'next/image';
 import { existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { format } from 'date-fns';
-import { accentTag } from '@/design/variants';
+import { accentTag, GRADIENT_GLASS } from '@/design/variants';
+import { cn } from '@/lib/utils';
 import type { PostMeta } from './schema';
 
 interface PostHeaderProps {
@@ -42,7 +43,10 @@ export function PostHeader({ post }: PostHeaderProps) {
           priority
         />
       ) : (
-        <div className="absolute inset-0 gradient-bg" />
+        <div
+          className="absolute inset-0 animate-gradient"
+          style={{ backgroundImage: GRADIENT_GLASS, backgroundSize: '400%' }}
+        />
       )}
 
       {/* Overlay for text readability */}
@@ -54,7 +58,7 @@ export function PostHeader({ post }: PostHeaderProps) {
         {post.tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-3">
             {post.tags.map(tag => (
-              <span key={tag} className={accentTag() + ' bg-black/40 backdrop-blur-sm'}>
+              <span key={tag} className={cn(accentTag(), 'bg-black/40 backdrop-blur-sm')}>
                 {tag}
               </span>
             ))}

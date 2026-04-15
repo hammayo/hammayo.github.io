@@ -3,7 +3,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
-import imageLoader from '@/lib/imageLoader';
 import type { MDXComponents } from 'mdx/types';
 
 function CopyButton({ code }: { code: string }) {
@@ -47,7 +46,7 @@ export const mdxComponents: MDXComponents = {
   // Code blocks — rehype-pretty-code wraps in <pre><code>
   pre: CodeBlock,
 
-  // Images — go through imageLoader for basePath compatibility
+  // Images — global imageLoader in next.config.ts handles basePath automatically
   img: ({ src, alt, ...props }) => (
     <span className="block my-6">
       <Image
@@ -55,17 +54,17 @@ export const mdxComponents: MDXComponents = {
         alt={alt ?? ''}
         width={800}
         height={450}
-        loader={imageLoader}
         className="rounded-xl w-full h-auto border border-white/[0.06]"
         {...(props as object)}
       />
     </span>
   ),
 
-  // Links — accent colour, external links open in new tab
+  // Links — accent colour, external links open in new tab, PDFs as download pill
   a: ({ href, children, ...props }) => {
     const isExternal = href?.startsWith('http');
-    const isPdf = href?.endsWith('.pdf');
+    const isPdf      = href?.endsWith('.pdf');
+
     if (isPdf) {
       return (
         <a
@@ -82,6 +81,7 @@ export const mdxComponents: MDXComponents = {
         </a>
       );
     }
+
     if (isExternal) {
       return (
         <a
@@ -95,26 +95,30 @@ export const mdxComponents: MDXComponents = {
         </a>
       );
     }
+
     return (
-      <Link href={href ?? '/'} className="text-[var(--scheme-accent)] underline underline-offset-2 hover:no-underline" {...props}>
+      <Link
+        href={href ?? '/'}
+        className="text-[var(--scheme-accent)] underline underline-offset-2 hover:no-underline"
+        {...props}
+      >
         {children}
       </Link>
     );
   },
 
-  // Headings
   h2: ({ children, ...props }) => (
     <h2 className="mt-10 mb-4 text-xl font-semibold text-foreground border-b border-border pb-2" {...props}>
       {children}
     </h2>
   ),
+
   h3: ({ children, ...props }) => (
     <h3 className="mt-8 mb-3 text-lg font-semibold text-foreground" {...props}>
       {children}
     </h3>
   ),
 
-  // Blockquote
   blockquote: ({ children, ...props }) => (
     <blockquote
       className="my-6 border-l-2 border-[var(--scheme-accent)] pl-4 text-muted-foreground italic"

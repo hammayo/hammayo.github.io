@@ -1,10 +1,10 @@
 'use client';
 
 import Image from 'next/image';
-import { accentTag } from '@/design/variants';
+import { accentTag, GRADIENT_GLASS } from '@/design/variants';
 import imageLoader from '@/lib/imageLoader';
 import type { about as AboutType } from '../../../content/about';
-import {basePath} from "@/lib/env";
+import { basePath } from '@/lib/env';
 
 interface AboutContentProps {
   about: typeof AboutType;
@@ -35,11 +35,11 @@ export function AboutContent({ about }: AboutContentProps) {
           <p className="text-lg font-semibold">
             <span
               className="hidden md:inline animate-gradient text-transparent bg-clip-text"
-              style={{ backgroundImage: 'linear-gradient(to right, #a855f7, #818cf8, #38bdf8, #34d399, #f472b6, #a855f7)', backgroundSize: '400%' }}
+              style={{ backgroundImage: GRADIENT_GLASS, backgroundSize: '400%' }}
             >{about.name}</span>
             <span
               className="md:hidden animate-gradient text-transparent bg-clip-text"
-              style={{ backgroundImage: 'linear-gradient(to right, #a855f7, #818cf8, #38bdf8, #34d399, #f472b6, #a855f7)', backgroundSize: '400%' }}
+              style={{ backgroundImage: GRADIENT_GLASS, backgroundSize: '400%' }}
             >{about.shortName}</span>
           </p>
         </div>

@@ -1,11 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from '@/features/shared/ui/dialog';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
@@ -28,6 +25,23 @@ export function SearchPalette({ open, onOpenChange }: SearchPaletteProps) {
   const [loading, setLoading] = useState(false);
   const pagefindRef           = useRef<Record<string, unknown> | null>(null);
   const inputRef              = useRef<HTMLInputElement>(null);
+  const { resolvedTheme }     = useTheme();
+
+  // Explicit colours applied via inline style — bypasses CSS-var resolution
+  // issues that make bg-white/dark:bg-zinc-900 unreliable in Radix portals
+  const isDark = resolvedTheme === 'dark';
+  const palette = {
+    bg:           isDark ? 'rgb(24 24 27)'    : 'rgb(255 255 255)',
+    border:       isDark ? 'rgb(63 63 70)'    : 'rgb(228 228 231)',
+    divider:      isDark ? 'rgb(63 63 70)'    : 'rgb(228 228 231)',
+    inputText:    isDark ? 'rgb(244 244 245)' : 'rgb(24 24 27)',
+    placeholder:  isDark ? 'rgb(113 113 122)' : 'rgb(161 161 170)',
+    bodyText:     isDark ? 'rgb(161 161 170)' : 'rgb(113 113 122)',
+    titleText:    isDark ? 'rgb(244 244 245)' : 'rgb(24 24 27)',
+    hoverBg:      isDark ? 'rgb(39 39 42)'    : 'rgb(244 244 245)',
+    codeBg:       isDark ? 'rgb(39 39 42)'    : 'rgb(244 244 245)',
+    codeText:     isDark ? 'rgb(212 212 216)' : 'rgb(82 82 91)',
+  };
 
   // Register ⌘K / Ctrl+K
   useEffect(() => {
@@ -100,83 +114,137 @@ export function SearchPalette({ open, onOpenChange }: SearchPaletteProps) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] p-0 gap-0 border-[var(--scheme-border)] bg-background/95 backdrop-blur-md">
-        <DialogTitle className="sr-only">Search posts</DialogTitle>
+    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+      <DialogPrimitive.Portal>
+        {/* Overlay — slightly lighter than the default shadcn black/80 */}
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
 
-        {/* Input */}
-        <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-          <svg className="w-4 h-4 text-muted-foreground shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder={IS_DEV ? 'Search unavailable in development' : 'Search posts…'}
-            disabled={IS_DEV}
-            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:opacity-50"
-          />
-          {query && (
-            <button onClick={() => setQuery('')} className="text-muted-foreground hover:text-foreground">
-              ✕
-            </button>
+        {/* Content — colours set via inline style (theme-resolved, not CSS-var) */}
+        <DialogPrimitive.Content
+          style={{ backgroundColor: palette.bg, borderColor: palette.border }}
+          className={cn(
+            'fixed left-1/2 z-50 -translate-x-1/2',
+            'top-20 w-[calc(100%-2rem)]',
+            'sm:top-1/2 sm:-translate-y-1/2 sm:max-w-[600px]',
+            'border rounded-xl shadow-2xl',
+            'flex flex-col overflow-hidden',
+            'data-[state=open]:animate-in data-[state=closed]:animate-out',
+            'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+            'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
           )}
-        </div>
+        >
+          <DialogPrimitive.Title className="sr-only">Search posts</DialogPrimitive.Title>
 
-        {/* Results */}
-        <div className="max-h-[400px] overflow-y-auto p-2">
-          {IS_DEV && (
-            <p className="px-3 py-6 text-center text-sm text-muted-foreground">
-              Search is unavailable in development.<br />
-              Run <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">bun run build</code> to generate the Pagefind index.
-            </p>
-          )}
-
-          {!IS_DEV && !query && (
-            <p className="px-3 py-6 text-center text-sm text-muted-foreground">
-              Start typing to search all posts…
-            </p>
-          )}
-
-          {!IS_DEV && query && loading && (
-            <p className="px-3 py-4 text-center text-sm text-muted-foreground">Searching…</p>
-          )}
-
-          {!IS_DEV && query && !loading && results.length === 0 && (
-            <p className="px-3 py-4 text-center text-sm text-muted-foreground">
-              No results for &ldquo;{query}&rdquo;
-            </p>
-          )}
-
-          {results.map((result, i) => (
-            <Link
-              key={i}
-              href={toRoute(result.url)}
-              onClick={() => onOpenChange(false)}
-              className={cn(
-                'block rounded-lg px-3 py-2.5 hover:bg-[var(--scheme-accent)]/10 transition-colors',
-                'group'
-              )}
+          {/* Input row */}
+          <div
+            className="flex items-center gap-3 px-4 py-3"
+            style={{ borderBottom: `1px solid ${palette.divider}` }}
+          >
+            <svg
+              className="w-4 h-4 shrink-0"
+              style={{ color: palette.placeholder }}
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
             >
-              <p className="text-sm font-medium text-foreground group-hover:text-[var(--scheme-accent)] mb-1">
-                {result.meta.title ?? 'Untitled'}
-              </p>
-              <p
-                className="text-xs text-muted-foreground line-clamp-2 [&_mark]:bg-[var(--scheme-accent)]/20 [&_mark]:text-[var(--scheme-accent)] [&_mark]:rounded-sm [&_mark]:px-0.5"
-                dangerouslySetInnerHTML={{ __html: result.excerpt }}
-              />
-            </Link>
-          ))}
-        </div>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder={IS_DEV ? 'Search unavailable in development' : 'Search posts…'}
+              disabled={IS_DEV}
+              style={{ color: palette.inputText }}
+              className="flex-1 bg-transparent text-sm outline-none disabled:opacity-50"
+            />
+            {query && (
+              <button
+                onClick={() => setQuery('')}
+                style={{ color: palette.placeholder }}
+                className="p-1 transition-opacity hover:opacity-70"
+                aria-label="Clear search"
+              >
+                ✕
+              </button>
+            )}
+          </div>
 
-        {/* Footer */}
-        <div className="border-t border-border px-4 py-2 flex items-center gap-3 text-[10px] text-muted-foreground">
-          <span><kbd className="font-mono">↵</kbd> select</span>
-          <span><kbd className="font-mono">ESC</kbd> close</span>
-          <span className="ml-auto">powered by Pagefind</span>
-        </div>
-      </DialogContent>
-    </Dialog>
+          {/* Results */}
+          <div className="max-h-[40dvh] sm:max-h-[400px] overflow-y-auto">
+            {IS_DEV && (
+              <p className="px-4 py-6 text-center text-sm" style={{ color: palette.bodyText }}>
+                Search is unavailable in development.<br />
+                Run{' '}
+                <code
+                  className="font-mono text-xs px-1.5 py-0.5 rounded"
+                  style={{ backgroundColor: palette.codeBg, color: palette.codeText }}
+                >
+                  bun run build
+                </code>{' '}
+                to generate the Pagefind index.
+              </p>
+            )}
+
+            {!IS_DEV && !query && (
+              <p className="px-4 py-6 text-center text-sm" style={{ color: palette.bodyText }}>
+                Start typing to search all posts…
+              </p>
+            )}
+
+            {!IS_DEV && query && loading && (
+              <p className="px-4 py-4 text-center text-sm" style={{ color: palette.bodyText }}>Searching…</p>
+            )}
+
+            {!IS_DEV && query && !loading && results.length === 0 && (
+              <p className="px-4 py-4 text-center text-sm" style={{ color: palette.bodyText }}>
+                No results for &ldquo;{query}&rdquo;
+              </p>
+            )}
+
+            {results.length > 0 && (
+              <ul className="p-2">
+                {results.map((result, i) => (
+                  <li key={i}>
+                    <Link
+                      href={toRoute(result.url)}
+                      onClick={() => onOpenChange(false)}
+                      className="group block rounded-lg px-3 py-3 transition-colors"
+                      style={{ ['--hover-bg' as string]: palette.hoverBg }}
+                      onMouseEnter={e => (e.currentTarget.style.backgroundColor = palette.hoverBg)}
+                      onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      <p
+                        className="text-sm font-semibold mb-1 transition-colors group-hover:text-[var(--scheme-accent)]"
+                        style={{ color: palette.titleText }}
+                      >
+                        {result.meta.title ?? 'Untitled'}
+                      </p>
+                      <p
+                        className={cn(
+                          'text-xs line-clamp-2',
+                          '[&_mark]:bg-[var(--scheme-accent)]/20 [&_mark]:text-[var(--scheme-accent)]',
+                          '[&_mark]:font-semibold [&_mark]:not-italic [&_mark]:rounded-sm [&_mark]:px-0.5',
+                        )}
+                        style={{ color: palette.bodyText }}
+                        dangerouslySetInnerHTML={{ __html: result.excerpt }}
+                      />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div
+            className="px-4 py-2 flex items-center gap-3 text-[10px]"
+            style={{ borderTop: `1px solid ${palette.divider}`, color: palette.bodyText }}
+          >
+            <span className="hidden sm:inline"><kbd className="font-mono">↵</kbd> select</span>
+            <span className="hidden sm:inline"><kbd className="font-mono">ESC</kbd> close</span>
+            <span className="sm:ml-auto">powered by Pagefind</span>
+          </div>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }

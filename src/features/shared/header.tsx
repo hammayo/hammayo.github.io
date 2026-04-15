@@ -1,21 +1,22 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import Image from "next/image";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
-import { Menu } from "lucide-react";
-import { Container } from "./container";
-import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "./ui/sheet";
-import { RouteProgress } from "./route-progress";
-import { cn } from "@/lib/utils";
-import { basePath } from "@/lib/env";
+import Link from 'next/link';
+import Image from 'next/image';
+import { usePathname } from 'next/navigation';
+import { useState } from 'react';
+import { Menu } from 'lucide-react';
+import { Container } from './container';
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from './ui/sheet';
+import { RouteProgress } from './route-progress';
+import { cn } from '@/lib/utils';
+import { basePath } from '@/lib/env';
+import { GRADIENT_GLASS } from '@/design/variants';
 
 const NAV_LINKS = [
-  { href: "/about",    label: "About"    },
-  { href: "/projects", label: "Projects" },
-  { href: "/blogs",    label: "Blogs"    },
-  { href: "/contact",  label: "Contact"  },
+  { href: '/about',    label: 'About'    },
+  { href: '/projects', label: 'Projects' },
+  { href: '/blogs',    label: 'Blogs'    },
+  { href: '/contact',  label: 'Contact'  },
 ] as const;
 
 function NavLink({ href, label, pathname, onClick }: {
@@ -33,17 +34,17 @@ function NavLink({ href, label, pathname, onClick }: {
       prefetch
       onClick={onClick}
       className={cn(
-        "tracking-tight transition-all duration-300 font-medium",
+        'tracking-tight transition-all duration-300 font-medium',
         isActive
-          ? "font-semibold"
-          : "text-muted-foreground hover:text-foreground"
+          ? 'font-semibold'
+          : 'text-muted-foreground hover:text-foreground'
       )}
     >
       {isActive ? (
         <span
           className="text-transparent bg-clip-text"
           style={{
-            backgroundImage: 'linear-gradient(to right, #a855f7, #818cf8, #38bdf8, #34d399, #f472b6, #a855f7)',
+            backgroundImage: GRADIENT_GLASS,
             backgroundSize: '300%',
           }}
         >
@@ -55,8 +56,8 @@ function NavLink({ href, label, pathname, onClick }: {
 }
 
 export function Header() {
-  const pathname  = usePathname();
-  const logoPath  = `${basePath}/images/_hb-logo.png`;
+  const pathname = usePathname();
+  const logoPath = `${basePath}/images/_hb-logo.png`;
   const [open, setOpen] = useState(false);
 
   return (
@@ -84,11 +85,11 @@ export function Header() {
               />
               <span
                 className="md:inline hidden animate-gradient text-transparent bg-clip-text"
-                style={{ backgroundImage: 'linear-gradient(to right, #a855f7, #818cf8, #38bdf8, #34d399, #f472b6, #a855f7)', backgroundSize: '400%' }}
+                style={{ backgroundImage: GRADIENT_GLASS, backgroundSize: '400%' }}
               >Hammayo</span>
               <span
                 className="md:hidden animate-gradient text-transparent bg-clip-text"
-                style={{ backgroundImage: 'linear-gradient(to right, #a855f7, #818cf8, #38bdf8, #34d399, #f472b6, #a855f7)', backgroundSize: '400%' }}
+                style={{ backgroundImage: GRADIENT_GLASS, backgroundSize: '400%' }}
               >Hammy</span>
             </Link>
 
