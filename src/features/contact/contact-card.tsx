@@ -26,7 +26,7 @@ export function ContactCard({ icon, title, subtitle, link, linkText }: ContactCa
           <h3 className="gradient-text text-xl font-medium tracking-tight transition-all duration-300 opacity-80 group-hover:opacity-100">
             {title}
           </h3>
-          <span className="mt-4 text-sm text-center text-zinc-600 dark:text-zinc-400 group-hover:text-purple-900/90 dark:group-hover:text-zinc-300 transition-colors">
+          <span className="mt-4 text-sm text-center text-zinc-600 dark:text-zinc-400 group-hover:text-[var(--scheme-accent)] transition-colors">
             {subtitle}
           </span>
         </div>

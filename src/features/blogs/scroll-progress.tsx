@@ -25,7 +25,7 @@ export function ScrollProgress() {
       aria-label="Reading progress"
     >
       <Progress.Indicator
-        className="h-full w-full bg-gradient-to-r from-violet-500 via-cyan-400 to-green-400"
+        className="h-full w-full scheme-button-gradient"
         style={{
           transform: `translateX(-${100 - progress}%)`,
           transition: 'transform 100ms linear',
