@@ -14,7 +14,7 @@ interface BlogCardProps {
 export function BlogCard({ post, index }: BlogCardProps) {
   return (
     <Link href={`/blogs/${post.slug}`} className="block h-full">
-      <CardEffects delay={Math.min(index * 0.1, 0.5)}>
+      <CardEffects delay={Math.min(index * 0.1, 0.5)} bordered>
         <CardContent className={cn(cardBaseClasses.contentWrapper, 'min-h-[14rem] flex flex-col')}>
           <div className="flex-1 flex flex-col">
             {/* Date + reading time */}
