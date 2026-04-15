@@ -20,6 +20,12 @@ export type ColorScheme = {
   via: string;
   /** Hex colour for --scheme-to CSS variable */
   to: string;
+  /** Hex colour for --scheme-button-from CSS variable (button gradient start, darker than from) */
+  buttonFrom: string;
+  /** Hex colour for --scheme-button-via CSS variable (button gradient mid) */
+  buttonVia: string;
+  /** Hex colour for --scheme-button-to CSS variable (button gradient end) */
+  buttonTo: string;
   /** Hex colour for --scheme-accent CSS variable */
   accent: string;
   /** rgba string for --scheme-border CSS variable */
@@ -37,6 +43,9 @@ export const SCHEMES = {
     from: '#8b5cf6',
     via: '#a855f7',
     to: '#3b82f6',
+    buttonFrom: '#7c3aed',
+    buttonVia: '#9333ea',
+    buttonTo: '#2563eb',
     accent: '#8b5cf6',
     border: 'rgba(139, 92, 246, 0.3)',
     transitionMs: 2000,
@@ -49,6 +58,9 @@ export const SCHEMES = {
     from: '#c084fc',
     via: '#d946ef',
     to: '#7c3aed',
+    buttonFrom: '#a855f7',
+    buttonVia: '#d946ef',
+    buttonTo: '#7c3aed',
     accent: '#c084fc',
     border: 'rgba(168, 85, 247, 0.3)',
     transitionMs: 2500,
@@ -61,6 +73,9 @@ export const SCHEMES = {
     from: '#a1a1aa',
     via: '#cbd5e1',
     to: '#71717a',
+    buttonFrom: '#71717a',
+    buttonVia: '#64748b',
+    buttonTo: '#52525b',
     accent: '#a1a1aa',
     border: 'rgba(161, 161, 170, 0.3)',
     transitionMs: 3000,
@@ -73,6 +88,9 @@ export const SCHEMES = {
     from: '#5eead4',
     via: '#67e8f9',
     to: '#7dd3fc',
+    buttonFrom: '#0d9488',
+    buttonVia: '#0891b2',
+    buttonTo: '#0284c7',
     accent: '#22d3ee',
     border: 'rgba(34, 211, 238, 0.3)',
     transitionMs: 3000,
