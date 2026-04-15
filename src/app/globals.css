@@ -88,6 +88,9 @@
     --scheme-accent: #8b5cf6;
     --scheme-border: rgba(139, 92, 246, 0.3);
     --scheme-transition: 2000ms;
+    --scheme-button-from: #7c3aed;
+    --scheme-button-via: #9333ea;
+    --scheme-button-to: #2563eb;
   }
 
   .dark {
@@ -147,6 +150,10 @@
 
   .gradient-bg {
     background: linear-gradient(to right, var(--scheme-from), var(--scheme-via), var(--scheme-to));
+  }
+
+  .scheme-button-gradient {
+    background: linear-gradient(to right, var(--scheme-button-from), var(--scheme-button-via), var(--scheme-button-to));
   }
 
   .scheme-glow {
