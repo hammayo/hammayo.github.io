@@ -97,6 +97,7 @@
     --scheme-button-from: #7c3aed;
     --scheme-button-via: #9333ea;
     --scheme-button-to: #2563eb;
+    --gradient-border-width: 1.5px;
   }
 
   .dark {
@@ -198,7 +199,7 @@
     content: '';
     position: absolute;
     inset: 0;
-    padding: 1.5px;
+    padding: var(--gradient-border-width);
     border-radius: inherit;
     background: conic-gradient(
       from var(--border-angle),
