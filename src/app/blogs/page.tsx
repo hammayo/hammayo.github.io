@@ -13,15 +13,19 @@ export const metadata: Metadata = createPageMetadata('blogs', '/blogs');
 export default function BlogsPage() {
   const posts = getAllPostsMeta();
 
-  const subtitle = posts.length > 0
-    ? `${posts.length} post${posts.length === 1 ? '' : 's'} on backend engineering, architecture, and the craft.`
-    : 'Technical writing on backend systems, architecture, and engineering craft.';
+  const authoredSubtitle = 'Practical writing on .NET, Docker, CI/CD, and engineering in regulated environments.';
+  const postCount = posts.length > 0
+    ? `${posts.length} post${posts.length === 1 ? '' : 's'}`
+    : null;
 
   return (
     <PageTransitionWrapper>
       <PageViewEvent page="blogs" />
       <Container>
-        <PageHeader title="Writing" subtitle={subtitle} className="mb-8" />
+        <PageHeader title="Writing" subtitle={authoredSubtitle} className="mb-2" />
+        {postCount && (
+          <p className="text-xs text-muted-foreground mb-8">{postCount}</p>
+        )}
 
         {posts.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8">
