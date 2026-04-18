@@ -6,6 +6,7 @@ import { ProjectCard } from '@/features/projects/project-card';
 import { fetchGitHubData } from '@/lib/github';
 import { PageViewEvent } from '@/features/shared/analytics-event';
 import { createPageMetadata } from '@/lib/metadata';
+import { about } from '../../../content/about';
 
 export const metadata: Metadata = createPageMetadata('projects', '/projects');
 
@@ -36,6 +37,10 @@ export default async function ProjectsPage() {
           title="Projects"
           subtitle="Explore my most recent projects and open source contributions."
         />
+
+        <p className="text-sm md:text-base text-muted-foreground leading-relaxed max-w-2xl">
+          {about.projectsIntro}
+        </p>
 
         {pinnedRepos.length === 0 && otherRepos.length === 0 ? (
           <div className="text-center p-8">
