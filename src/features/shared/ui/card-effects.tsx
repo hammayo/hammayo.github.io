@@ -36,7 +36,7 @@ export function CardEffects({ children, variant = 'default', className = '', del
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       onMouseMove={handleMouseMove}
-      className={cn('group relative h-full', className)}
+      className={cn('group relative h-full gradient-border-hover', className)}
     >
       <div className={cn(
         'relative h-full overflow-hidden transition-all duration-500 rounded-xl',
