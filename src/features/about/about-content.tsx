@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { accentTag, GRADIENT_GLASS } from '@/design/variants';
+import { accentTag } from '@/design/variants';
 import imageLoader from '@/lib/imageLoader';
 import type { about as AboutType } from '../../../content/about';
 import { basePath } from '@/lib/env';
@@ -22,10 +22,7 @@ export function AboutContent({ about }: AboutContentProps) {
         <PageHeader title="About" subtitle={about.tagline} className="mb-0" />
         <div className="flex items-center gap-3 flex-shrink-0">
           <p className="text-sm font-semibold text-right hidden sm:block">
-            <span
-              className="animate-gradient text-transparent bg-clip-text"
-              style={{ backgroundImage: GRADIENT_GLASS, backgroundSize: '400%' }}
-            >{about.name}</span>
+            <span className="animate-gradient gradient-text">{about.name}</span>
           </p>
           <Image
             loader={imageLoader}
