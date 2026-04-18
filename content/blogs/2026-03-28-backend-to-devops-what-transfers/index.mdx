@@ -1,0 +1,52 @@
+---
+title: "From Backend Engineer to DevOps: What Transfers and What Doesn't"
+date: "2026-03-28"
+summary: "After 20 years on the backend, I've spent the last few years moving closer to infrastructure and deployment. Here's what I wish I'd known before starting that shift."
+tags: ["devops", "career", ".net", "docker", "ci-cd"]
+published: false
+---
+
+The job description says "DevOps Engineer." You've spent your career writing C# services, tuning SQL queries, and wiring up message queues. You know Docker well enough, you've touched CI/CD pipelines, and you're tired of waiting for the platform team to deploy your code.
+
+Is the move worth making? What do you actually need to learn?
+
+Here's an honest account from someone mid-transition.
+
+## What Transfers Directly
+
+**Debugging under pressure.** The single most transferable skill. Infrastructure incidents and application bugs require exactly the same approach: what changed, when, what does the evidence say, what's the fastest safe intervention. If you've debugged a production outage in a .NET service, you already know how to think through a failing deployment pipeline.
+
+**Scripting and automation.** Backend engineers write code. DevOps is largely writing code that manages infrastructure. PowerShell, Bash, Python — you probably know one of these well. The patterns (loops, conditionals, error handling, idempotency) are the same. The target is different.
+
+**Reading logs.** You've spent years reading application logs. Infrastructure generates more of them, in more places, with less structure. But the habit of "find the first error, work backwards to the cause" is identical.
+
+**Systems thinking.** Understanding how components interact, where failures cascade, and what the failure modes of a distributed system look like — this is backend engineering. It's also infrastructure engineering. The mental model transfers.
+
+## What Doesn't Transfer (and Costs You Time)
+
+**The infrastructure ownership mindset.** Backend engineers write code and hand it off — to deployment pipelines, to ops teams, to whoever is on call. DevOps engineers own the full path. That means thinking about cost, capacity, availability, and failure before the code is written, not after it breaks.
+
+This isn't a skill gap. It's a perspective shift. You have to genuinely internalise that the thing you built running expensively or unreliably at 3am is your problem, not someone else's.
+
+**Cloud billing.** I was not prepared for how much time infrastructure roles involve reading cost reports and explaining why something costs more than expected. Knowing that an Azure Function is cheaper than a VM for burst workloads is important. Not knowing this costs real money.
+
+**Networking fundamentals.** VNets, subnets, NSGs, private endpoints, DNS, load balancers. Backend engineers use these but rarely configure them. These were the biggest knowledge gap I had. Spend time with the Azure networking documentation before you need it under pressure.
+
+**YAML.** An uncomfortable amount of modern infrastructure is defined in YAML. Pipeline definitions, Kubernetes manifests, Terraform variable files, Helm charts. The format is simple; the specific schemas for each tool are not. Budget time for this.
+
+## The Honest Middle Ground
+
+The "DevOps Engineer" role title is used for at least three different jobs:
+1. **Platform / infrastructure engineer** — builds the platform other teams deploy to
+2. **Release engineer** — owns pipelines and deployment processes
+3. **Backend engineer with infra skills** — writes application code and also manages the deployments
+
+The third is where most backend engineers land when they make this transition. It's a legitimate and valuable role. Being the person on a backend team who actually understands what the pipeline is doing, can write a Dockerfile that works correctly, and knows how to diagnose a failing deployment — that's rare and useful.
+
+You don't have to become a Kubernetes operator to add infrastructure value. Understanding your own deployment path deeply is a good start.
+
+## What I'd Tell Myself Three Years Ago
+
+Get an Azure or AWS account and deploy something real to it. Not a tutorial — something you actually use. Pay the bill. Watch the costs. Break it and fix it.
+
+The gap between knowing the concepts and having operational instincts is practice. The practice has to be real, not sandboxed.
