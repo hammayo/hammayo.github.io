@@ -6,7 +6,7 @@ import { Star, GitFork, ExternalLink } from 'lucide-react';
 import { CardEffects, cardBaseClasses } from '@/features/shared/ui/card-effects';
 import { Button } from '@/features/shared/ui/button';
 import { GithubIcon } from '@/features/shared/icons';
-import { accentTag } from '@/design/variants';
+import { accentTag, gradientText } from '@/design/variants';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
@@ -21,6 +21,7 @@ export function ProjectCard({ repo, index, featured = false }: ProjectCardProps)
     <CardEffects
       variant={featured ? 'featured' : 'default'}
       delay={Math.min(index * 0.1, 0.5)}
+      bordered={!featured}
     >
       <CardContent className={cn(cardBaseClasses.contentWrapper, featured ? 'min-h-[18rem]' : 'min-h-[16rem]', 'flex flex-col')}>
         <div className="flex-1 flex flex-col">
@@ -33,7 +34,7 @@ export function ProjectCard({ repo, index, featured = false }: ProjectCardProps)
                   <span className="text-xs font-medium text-amber-700/70 dark:text-amber-400/60">Featured</span>
                 </div>
               )}
-              <h3 className="text-lg font-semibold">{repo.name}</h3>
+              <h3 className={cn(gradientText({ size: 'body' }), 'text-lg font-semibold')}>{repo.name}</h3>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
@@ -52,7 +53,7 @@ export function ProjectCard({ repo, index, featured = false }: ProjectCardProps)
 
           {/* Topics — scheme-aware accent tags */}
           {repo.topics.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-4">
+            <div className="flex flex-wrap gap-1.5 mb-4">
               {repo.topics.map((topic) => (
                 <span key={topic} className={accentTag()}>
                   {topic}
