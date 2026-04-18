@@ -51,7 +51,7 @@ const ProgressIndicator = () => {
       value={progress}
     >
       <Progress.Indicator
-        className="h-full w-full bg-gradient-to-r from-violet-500 via-cyan-400 to-green-400"
+        className="h-full w-full bg-gradient-to-r from-[var(--scheme-from)] via-[var(--scheme-via)] to-[var(--scheme-to)]"
         style={{
           transform: `translateX(-${100 - progress}%)`,
           transition: "transform 400ms cubic-bezier(0.4, 0, 0.2, 1)",
