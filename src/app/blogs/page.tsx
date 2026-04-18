@@ -21,7 +21,7 @@ export default function BlogsPage() {
   return (
     <PageTransitionWrapper>
       <PageViewEvent page="blogs" />
-      <Container>
+      <Container className="py-8">
         <PageHeader title="Writing" subtitle={authoredSubtitle} className="mb-2" />
         {postCount && (
           <p className="text-xs text-muted-foreground mb-8">{postCount}</p>

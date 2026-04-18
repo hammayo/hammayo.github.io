@@ -6,6 +6,7 @@ import imageLoader from '@/lib/imageLoader';
 import type { about as AboutType } from '../../../content/about';
 import { basePath } from '@/lib/env';
 import { TimelineSection } from './timeline-section';
+import { PageHeader } from '@/features/shared/page-header';
 
 interface AboutContentProps {
   about: typeof AboutType;
@@ -15,34 +16,29 @@ export function AboutContent({ about }: AboutContentProps) {
   const fallbackSrc = `${basePath}/images/_hb-logo.png`;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-8">
-      {/* Avatar + name row */}
-      <div className="flex items-center gap-5">
-        <div className="relative flex-shrink-0">
+    <div className="space-y-8">
+      {/* Page title row: title/tagline left, avatar + name right */}
+      <div className="flex items-start justify-between gap-6">
+        <PageHeader title="About" subtitle={about.tagline} className="mb-0" />
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <p className="text-sm font-semibold text-right hidden sm:block">
+            <span
+              className="animate-gradient text-transparent bg-clip-text"
+              style={{ backgroundImage: GRADIENT_GLASS, backgroundSize: '400%' }}
+            >{about.name}</span>
+          </p>
           <Image
             loader={imageLoader}
             src={about.avatarPath}
             alt={about.name}
-            width={80}
-            height={80}
+            width={72}
+            height={72}
             className="rounded-full ring-2 ring-[var(--scheme-border)]"
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).src = fallbackSrc;
             }}
             unoptimized
           />
-        </div>
-        <div>
-          <p className="text-lg font-semibold">
-            <span
-              className="hidden md:inline animate-gradient text-transparent bg-clip-text"
-              style={{ backgroundImage: GRADIENT_GLASS, backgroundSize: '400%' }}
-            >{about.name}</span>
-            <span
-              className="md:hidden animate-gradient text-transparent bg-clip-text"
-              style={{ backgroundImage: GRADIENT_GLASS, backgroundSize: '400%' }}
-            >{about.shortName}</span>
-          </p>
         </div>
       </div>
 
@@ -56,7 +52,9 @@ export function AboutContent({ about }: AboutContentProps) {
       </div>
 
       {/* Career Timeline */}
-      <TimelineSection timeline={about.careerTimeline} />
+      <div className="max-w-2xl">
+        <TimelineSection timeline={about.careerTimeline} />
+      </div>
 
       {/* Sectors */}
       <div className="space-y-2">

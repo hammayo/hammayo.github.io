@@ -32,14 +32,15 @@ export default async function ProjectsPage() {
   return (
     <PageTransitionWrapper>
       <PageViewEvent page="projects" />
-      <Container>
+      <Container className="py-8">
         <PageHeader
           title="Projects"
           subtitle="Explore my most recent projects and open source contributions."
         />
 
-        <p className="text-sm md:text-base text-muted-foreground leading-relaxed max-w-2xl">
+        <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
           {about.projectsIntro}
+          <br /><br />
         </p>
 
         {pinnedRepos.length === 0 && otherRepos.length === 0 ? (

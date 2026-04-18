@@ -15,13 +15,13 @@ export default function ContactPage() {
   return (
     <PageTransitionWrapper>
       <PageViewEvent page="contact" />
-      <Container>
+      <Container className="py-8">
         <PageHeader title="Contact" subtitle="Let's talk." />
 
         <div className="space-y-8">
           <AvailabilityBanner availability={contact.availability} />
 
-          <div className="space-y-3 max-w-2xl">
+          <div className="space-y-3">
             {contact.copy.map((paragraph, i) => (
               <p key={i} className="text-sm md:text-base text-muted-foreground leading-relaxed">
                 {paragraph}
