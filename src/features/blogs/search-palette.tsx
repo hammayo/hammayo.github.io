@@ -104,7 +104,7 @@ export function SearchPalette({ open, onOpenChange }: SearchPaletteProps) {
             'fixed left-1/2 z-50 -translate-x-1/2',
             'top-20 w-[calc(100%-2rem)]',
             'sm:top-1/2 sm:-translate-y-1/2 sm:max-w-[600px]',
-            'bg-background dark:bg-background/90 dark:backdrop-blur-2xl border border-border/50 rounded-xl shadow-2xl',
+            'bg-white dark:bg-zinc-900/95 dark:backdrop-blur-2xl border border-zinc-200 dark:border-white/10 rounded-xl shadow-[0_8px_40px_-4px_rgba(0,0,0,0.12)] dark:shadow-2xl',
             'flex flex-col overflow-hidden',
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
@@ -114,7 +114,7 @@ export function SearchPalette({ open, onOpenChange }: SearchPaletteProps) {
           <DialogPrimitive.Title className="sr-only">Search posts</DialogPrimitive.Title>
 
           {/* Input row */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-border/50">
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-200 dark:border-white/10">
             <svg
               className="w-4 h-4 shrink-0 text-muted-foreground"
               fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -176,7 +176,7 @@ export function SearchPalette({ open, onOpenChange }: SearchPaletteProps) {
                     <Link
                       href={toRoute(result.url)}
                       onClick={() => onOpenChange(false)}
-                      className="group block rounded-lg px-3 py-3 transition-colors hover:bg-muted"
+                      className="group block rounded-lg px-3 py-3 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800"
                     >
                       <p className="text-sm font-semibold mb-1 text-foreground transition-colors group-hover:text-[var(--scheme-accent-text)]">
                         {result.meta.title ?? 'Untitled'}
