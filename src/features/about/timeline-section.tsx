@@ -18,7 +18,7 @@ export function TimelineSection({ timeline }: TimelineSectionProps) {
             <li key={`${entry.company}-${entry.period}`} className="relative">
               {/* Timeline dot */}
               <div
-                className="absolute -left-6 top-1.5 h-3 w-3 rounded-full border-2 border-[var(--scheme-border)] bg-background"
+                className="absolute -left-6 top-1.5 h-3 w-3 rounded-full gradient-bg"
                 aria-hidden="true"
               />
               <div className="space-y-0.5">
