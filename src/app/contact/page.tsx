@@ -6,6 +6,8 @@ import { ContactCard } from '@/features/contact/contact-card';
 import { PageViewEvent } from '@/features/shared/analytics-event';
 import { SOCIAL } from '@/lib/constants';
 import { createPageMetadata } from '@/lib/metadata';
+import { AvailabilityBanner } from '@/features/contact/availability-banner';
+import { contact } from '../../../content/contact';
 
 export const metadata: Metadata = createPageMetadata('contact', '/contact');
 
@@ -14,9 +16,20 @@ export default function ContactPage() {
     <PageTransitionWrapper>
       <PageViewEvent page="contact" />
       <Container>
-        <PageHeader title="Contact" subtitle="Feel free to reach out through any of these platforms." />
+        <PageHeader title="Contact" subtitle="Let's talk." />
 
-        <div className="grid w-full grid-cols-1 gap-6 mx-auto sm:grid-cols-3">
+        <div className="space-y-8">
+          <AvailabilityBanner availability={contact.availability} />
+
+          <div className="space-y-3 max-w-2xl">
+            {contact.copy.map((paragraph, i) => (
+              <p key={i} className="text-sm md:text-base text-muted-foreground leading-relaxed">
+                {paragraph}
+              </p>
+            ))}
+          </div>
+
+          <div className="grid w-full grid-cols-1 gap-6 mx-auto sm:grid-cols-3">
           {/* GitHub */}
           <ContactCard
             icon={
@@ -67,6 +80,7 @@ export default function ContactPage() {
             link={`mailto:${SOCIAL.email}`}
             linkText="Send Email"
           />
+          </div>
         </div>
       </Container>
     </PageTransitionWrapper>
