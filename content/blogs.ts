@@ -5,5 +5,5 @@ export const blogsConfig = {
 
   // Tags listed here appear first in the filter chips, in this order.
   // All other tags appear alphabetically after these.
-  pinnedTags: ['architecture', 'next.js', '.net', 'azure', 'docker'],
+  pinnedTags: ['architecture', '.net', 'docker', 'devops', 'azure', 'sql', 'ci-cd'],
 };
