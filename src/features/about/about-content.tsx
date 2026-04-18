@@ -5,6 +5,7 @@ import { accentTag, GRADIENT_GLASS } from '@/design/variants';
 import imageLoader from '@/lib/imageLoader';
 import type { about as AboutType } from '../../../content/about';
 import { basePath } from '@/lib/env';
+import { TimelineSection } from './timeline-section';
 
 interface AboutContentProps {
   about: typeof AboutType;
@@ -46,7 +47,16 @@ export function AboutContent({ about }: AboutContentProps) {
       </div>
 
       {/* Bio */}
-      <p className="text-sm md:text-base text-muted-foreground leading-relaxed">{about.bio}</p>
+      <div className="space-y-4">
+        {about.bio.split('\n\n').map((paragraph, i) => (
+          <p key={i} className="text-sm md:text-base text-muted-foreground leading-relaxed">
+            {paragraph}
+          </p>
+        ))}
+      </div>
+
+      {/* Career Timeline */}
+      <TimelineSection timeline={about.careerTimeline} />
 
       {/* Sectors */}
       <div className="space-y-2">
