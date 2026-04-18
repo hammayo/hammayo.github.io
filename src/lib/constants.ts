@@ -44,11 +44,11 @@ export const PAGE_META = {
   },
   about: {
     title: "About | Hammayo's Portfolio",
-    description: 'Senior backend engineer with 20+ years building distributed systems across finance, justice, and public service.',
+    description: 'Backend engineer with 20+ years across finance, justice, and retail. C#, .NET, Azure, Docker, SC cleared.',
   },
   blogs: {
     title: "Blogs | Hammayo's Portfolio",
-    description: 'Technical writing on backend systems, architecture, and engineering craft.',
+    description: 'Practical writing on .NET, Docker, CI/CD, and engineering in regulated environments.',
   },
   cv: {
     title: "CV | Hammayo's Portfolio",
@@ -56,10 +56,10 @@ export const PAGE_META = {
   },
   projects: {
     title: "Projects | Hammayo's Portfolio",
-    description: 'Explore my latest projects and open source contributions on GitHub.',
+    description: "Most of my work lives behind NDAs — prison systems, payment platforms, enterprise integrations. Here's what I can show.",
   },
   contact: {
     title: "Contact | Hammayo's Portfolio",
-    description: 'Get in touch via GitHub, LinkedIn, or email.',
+    description: 'Currently open to backend and DevOps roles. SC cleared. Based in Sutton, open to hybrid and remote across the UK.',
   },
 };
