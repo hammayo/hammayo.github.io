@@ -40,7 +40,7 @@ export function CardEffects({ children, variant = 'default', className = '', del
     >
       <div className={cn(
         'relative h-full overflow-hidden transition-all duration-500 rounded-xl',
-        'backdrop-blur-[1px] hover:backdrop-blur-[2px]',
+        'backdrop-blur-[2px] hover:backdrop-blur-[4px]',
         'shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.4)]',
         'group-hover:shadow-[0_8px_30px_-4px_var(--scheme-glow)] dark:group-hover:shadow-[0_8px_30px_-4px_rgba(0,0,0,0.5)]',
         bordered ? 'border scheme-border' : 'border border-zinc-200/50 dark:border-white/[0.05]',
