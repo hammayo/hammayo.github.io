@@ -151,9 +151,17 @@
     background-clip: text;
   }
 
-  /* Darken gradient text in light mode — vivid scheme colours are too faint on white */
+  /* Darken gradient text in light mode — mix each stop with black to preserve hue */
   html:not(.dark) .gradient-text {
-    filter: brightness(0.65) saturate(1.3);
+    background: linear-gradient(
+      to right,
+      color-mix(in srgb, var(--scheme-from) 70%, #000),
+      color-mix(in srgb, var(--scheme-via) 70%, #000),
+      color-mix(in srgb, var(--scheme-to) 70%, #000)
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
   .gradient-bg {
