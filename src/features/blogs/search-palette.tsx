@@ -97,14 +97,14 @@ export function SearchPalette({ open, onOpenChange }: SearchPaletteProps) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/20 dark:bg-black/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
 
         <DialogPrimitive.Content
           className={cn(
             'fixed left-1/2 z-50 -translate-x-1/2',
             'top-20 w-[calc(100%-2rem)]',
             'sm:top-1/2 sm:-translate-y-1/2 sm:max-w-[600px]',
-            'bg-background/90 backdrop-blur-2xl border border-border/50 rounded-xl shadow-2xl',
+            'bg-background dark:bg-background/90 dark:backdrop-blur-2xl border border-border/50 rounded-xl shadow-2xl',
             'flex flex-col overflow-hidden',
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
