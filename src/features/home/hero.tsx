@@ -27,7 +27,7 @@ const TitleContent = () => (
 export function Hero() {
   return (
     <div className="max-w-6xl mx-auto">
-      <CardEffects variant="featured" className="rounded-2xl overflow-hidden">
+      <CardEffects variant="featured" className="rounded-2xl overflow-hidden gradient-border-hover">
         <TitleContent />
       </CardEffects>
     </div>
