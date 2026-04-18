@@ -12,7 +12,7 @@ export default function BlogNotFound() {
         </p>
         <Link
           href="/blogs"
-          className="text-sm text-[var(--scheme-accent)] hover:underline"
+          className="text-sm text-[var(--scheme-accent-text)] hover:underline"
         >
           ← Back to writing
         </Link>

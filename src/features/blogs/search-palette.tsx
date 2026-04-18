@@ -178,13 +178,13 @@ export function SearchPalette({ open, onOpenChange }: SearchPaletteProps) {
                       onClick={() => onOpenChange(false)}
                       className="group block rounded-lg px-3 py-3 transition-colors hover:bg-muted"
                     >
-                      <p className="text-sm font-semibold mb-1 text-foreground transition-colors group-hover:text-[var(--scheme-accent)]">
+                      <p className="text-sm font-semibold mb-1 text-foreground transition-colors group-hover:text-[var(--scheme-accent-text)]">
                         {result.meta.title ?? 'Untitled'}
                       </p>
                       <p
                         className={cn(
                           'text-xs line-clamp-2 text-muted-foreground',
-                          '[&_mark]:bg-[var(--scheme-accent)]/20 [&_mark]:text-[var(--scheme-accent)]',
+                          '[&_mark]:bg-[var(--scheme-accent)]/20 [&_mark]:text-[var(--scheme-accent-text)]',
                           '[&_mark]:font-semibold [&_mark]:not-italic [&_mark]:rounded-sm [&_mark]:px-0.5',
                         )}
                         dangerouslySetInnerHTML={{ __html: result.excerpt }}

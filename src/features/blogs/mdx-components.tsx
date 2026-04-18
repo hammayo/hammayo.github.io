@@ -71,7 +71,7 @@ export const mdxComponents: MDXComponents = {
           href={href}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 rounded-full border scheme-border px-3 py-0.5 text-xs font-medium text-[var(--scheme-accent)] hover:bg-[var(--scheme-accent)]/10 transition-colors no-underline"
+          className="inline-flex items-center gap-1.5 rounded-full border scheme-border px-3 py-0.5 text-xs font-medium text-[var(--scheme-accent-text)] hover:bg-[var(--scheme-accent)]/10 transition-colors no-underline"
           {...props}
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -88,7 +88,7 @@ export const mdxComponents: MDXComponents = {
           href={href}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-[var(--scheme-accent)] underline underline-offset-2 hover:no-underline"
+          className="text-[var(--scheme-accent-text)] underline underline-offset-2 hover:no-underline"
           {...props}
         >
           {children}
@@ -99,7 +99,7 @@ export const mdxComponents: MDXComponents = {
     return (
       <Link
         href={href ?? '/'}
-        className="text-[var(--scheme-accent)] underline underline-offset-2 hover:no-underline"
+        className="text-[var(--scheme-accent-text)] underline underline-offset-2 hover:no-underline"
         {...props}
       >
         {children}

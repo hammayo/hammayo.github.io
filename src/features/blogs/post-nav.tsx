@@ -18,10 +18,10 @@ export function PostNav({ prev, next }: PostNavProps) {
         {prev && (
           <Link
             href={`/blogs/${prev.slug}`}
-            className="group flex flex-col gap-1 text-left hover:text-[var(--scheme-accent)] transition-colors"
+            className="group flex flex-col gap-1 text-left hover:text-[var(--scheme-accent-text)] transition-colors"
           >
             <span className="text-xs text-muted-foreground">← Previous</span>
-            <span className="text-sm font-medium line-clamp-2 group-hover:text-[var(--scheme-accent)]">
+            <span className="text-sm font-medium line-clamp-2 group-hover:text-[var(--scheme-accent-text)]">
               {prev.title}
             </span>
           </Link>
@@ -31,10 +31,10 @@ export function PostNav({ prev, next }: PostNavProps) {
         {next && (
           <Link
             href={`/blogs/${next.slug}`}
-            className="group flex flex-col gap-1 items-end hover:text-[var(--scheme-accent)] transition-colors"
+            className="group flex flex-col gap-1 items-end hover:text-[var(--scheme-accent-text)] transition-colors"
           >
             <span className="text-xs text-muted-foreground">Next →</span>
-            <span className="text-sm font-medium line-clamp-2 group-hover:text-[var(--scheme-accent)]">
+            <span className="text-sm font-medium line-clamp-2 group-hover:text-[var(--scheme-accent-text)]">
               {next.title}
             </span>
           </Link>

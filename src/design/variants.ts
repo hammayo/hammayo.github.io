@@ -49,7 +49,7 @@ export const accentTag = cva(
   {
     variants: {
       variant: {
-        scheme: 'scheme-border text-[var(--scheme-accent)] bg-[var(--scheme-accent)]/10',
+        scheme: 'scheme-border text-[var(--scheme-accent-text)] bg-[var(--scheme-accent)]/10',
         muted:  'border-border text-muted-foreground bg-muted/50',
       },
     },
@@ -70,7 +70,7 @@ export const ctaButton = cva(
     variants: {
       variant: {
         gradient: 'scheme-button-gradient text-white font-semibold shadow-lg hover:opacity-90 hover:shadow-xl hover:scale-[1.03] active:scale-[0.97] focus-visible:ring-[var(--scheme-accent)]',
-        ghost:    'gradient-border-hover border-2 border-foreground/40 text-foreground font-semibold hover:border-[var(--scheme-accent)] hover:text-[var(--scheme-accent)] hover:bg-[var(--scheme-accent)]/10 hover:scale-[1.03] active:scale-[0.97] focus-visible:ring-border',
+        ghost:    'gradient-border-hover border-2 border-foreground/40 text-foreground font-semibold hover:border-[var(--scheme-accent)] hover:text-[var(--scheme-accent-text)] hover:bg-[var(--scheme-accent)]/10 hover:scale-[1.03] active:scale-[0.97] focus-visible:ring-border',
       },
     },
     defaultVariants: {

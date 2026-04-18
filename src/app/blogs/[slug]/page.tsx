@@ -60,7 +60,7 @@ export default async function PostPage({ params }: Props) {
         {/* Back link */}
         <Link
           href="/blogs"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-[var(--scheme-accent)] transition-colors mb-6"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-[var(--scheme-accent-text)] transition-colors mb-6"
         >
           ← Back to writing
         </Link>

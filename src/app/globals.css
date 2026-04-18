@@ -99,6 +99,8 @@
     --scheme-button-via: #9333ea;
     --scheme-button-to: #2563eb;
     --gradient-border-width: 1.5px;
+    /* Darkened accent for foreground text in light mode — auto-derived, no component logic needed */
+    --scheme-accent-text: color-mix(in srgb, var(--scheme-accent) 60%, #000);
   }
 
   .dark {
@@ -126,6 +128,7 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
+    --scheme-accent-text: var(--scheme-accent);
   }
 }
 
@@ -155,9 +158,9 @@
   html:not(.dark) .gradient-text {
     background: linear-gradient(
       to right,
-      color-mix(in srgb, var(--scheme-from) 55%, #000),
-      color-mix(in srgb, var(--scheme-via) 55%, #000),
-      color-mix(in srgb, var(--scheme-to) 55%, #000)
+      color-mix(in srgb, var(--scheme-from) 65%, #000),
+      color-mix(in srgb, var(--scheme-via) 65%, #000),
+      color-mix(in srgb, var(--scheme-to) 65%, #000)
     );
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;

@@ -26,7 +26,7 @@ export function TimelineSection({ timeline }: TimelineSectionProps) {
                   <span className="text-sm font-semibold text-foreground">{entry.company}</span>
                   <span className="text-xs text-muted-foreground">{entry.period}</span>
                 </div>
-                <p className="text-xs text-[var(--scheme-accent)] font-medium">{entry.role}</p>
+                <p className="text-xs text-[var(--scheme-accent-text)] font-medium">{entry.role}</p>
                 <p className="text-sm text-muted-foreground leading-relaxed">{entry.description}</p>
               </div>
             </li>

@@ -26,7 +26,7 @@ export default function CVPage() {
         <div className="mb-6">
           <div className="flex items-center gap-3">
             <h1 className={gradientText({ size: 'heading' })}>CV</h1>
-            <span className="text-xs px-3 py-1 rounded-full border border-[var(--scheme-border)] text-[var(--scheme-accent)]">
+            <span className="text-xs px-3 py-1 rounded-full border border-[var(--scheme-border)] text-[var(--scheme-accent-text)]">
               Coming soon
             </span>
           </div>
@@ -37,7 +37,7 @@ export default function CVPage() {
             href={cv.linkedIn}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-[var(--scheme-accent)] hover:underline"
+            className="text-sm text-[var(--scheme-accent-text)] hover:underline"
           >
             View LinkedIn Profile →
           </a>
