@@ -23,7 +23,7 @@ export function ProjectCard({ repo, index, featured = false }: ProjectCardProps)
       delay={Math.min(index * 0.1, 0.5)}
       bordered={!featured}
     >
-      <CardContent className={cn(cardBaseClasses.contentWrapper, featured ? 'min-h-[18rem]' : 'min-h-[16rem]', 'flex flex-col')}>
+      <CardContent className={cn(cardBaseClasses.contentWrapper, 'min-h-[14rem] flex flex-col')}>
         <div className="flex-1 flex flex-col">
           {/* Header */}
           <div className="flex justify-between items-start mb-4">
