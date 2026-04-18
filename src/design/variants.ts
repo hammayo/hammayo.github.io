@@ -26,7 +26,7 @@ export const gradientText = cva('gradient-text bg-clip-text text-transparent', {
  * Uses scheme-glow and scheme-border utilities.
  */
 export const glowCard = cva(
-  'rounded-2xl border scheme-border scheme-glow transition-all duration-300',
+  'rounded-2xl border scheme-border scheme-glow transition-all duration-300 gradient-border-hover',
   {
     variants: {
       variant: {
@@ -70,7 +70,7 @@ export const ctaButton = cva(
     variants: {
       variant: {
         gradient: 'scheme-button-gradient text-white font-semibold shadow-lg hover:opacity-90 hover:shadow-xl hover:scale-[1.03] active:scale-[0.97] focus-visible:ring-[var(--scheme-accent)]',
-        ghost:    'border-2 border-foreground/40 text-foreground font-semibold hover:border-[var(--scheme-accent)] hover:text-[var(--scheme-accent)] hover:bg-[var(--scheme-accent)]/10 hover:scale-[1.03] active:scale-[0.97] focus-visible:ring-border',
+        ghost:    'gradient-border-hover border-2 border-foreground/40 text-foreground font-semibold hover:border-[var(--scheme-accent)] hover:text-[var(--scheme-accent)] hover:bg-[var(--scheme-accent)]/10 hover:scale-[1.03] active:scale-[0.97] focus-visible:ring-border',
       },
     },
     defaultVariants: {
