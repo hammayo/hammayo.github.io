@@ -104,7 +104,7 @@ export function SearchPalette({ open, onOpenChange }: SearchPaletteProps) {
             'fixed left-1/2 z-50 -translate-x-1/2',
             'top-20 w-[calc(100%-2rem)]',
             'sm:top-1/2 sm:-translate-y-1/2 sm:max-w-[600px]',
-            'bg-background/95 backdrop-blur-2xl border border-border rounded-xl shadow-[0_8px_40px_-4px_rgba(0,0,0,0.12)] dark:shadow-2xl',
+            'bg-white/95 dark:bg-zinc-900/95 backdrop-blur-2xl border border-border rounded-xl shadow-[0_8px_40px_-4px_rgba(0,0,0,0.12)] dark:shadow-2xl',
             'flex flex-col overflow-hidden',
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
