@@ -183,6 +183,38 @@
     border-color: var(--scheme-border);
   }
 
+  .gradient-border-hover {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .gradient-border-hover::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    padding: 1.5px;
+    border-radius: inherit;
+    background: conic-gradient(
+      from var(--border-angle),
+      var(--scheme-from),
+      var(--scheme-via),
+      var(--scheme-to),
+      var(--scheme-from)
+    );
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+    animation: border-rotate 2.5s linear infinite paused;
+    z-index: 0;
+  }
+
+  .gradient-border-hover:hover::before {
+    opacity: 1;
+    animation-play-state: running;
+  }
+
   /* Animation delay utilities (replaces tailwind.config.ts plugin) */
   .animate-delay-100 { animation-delay: 100ms; }
   .animate-delay-200 { animation-delay: 200ms; }
@@ -192,6 +224,16 @@
   .animate-delay-600 { animation-delay: 600ms; }
   .animate-delay-700 { animation-delay: 700ms; }
   .animate-delay-800 { animation-delay: 800ms; }
+}
+
+@property --border-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes border-rotate {
+  to { --border-angle: 360deg; }
 }
 
 /* Keyframes — migrated from tailwind.config.ts */
