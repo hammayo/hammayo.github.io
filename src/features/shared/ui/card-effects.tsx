@@ -46,7 +46,7 @@ export function CardEffects({ children, variant = 'default', className = '', del
         bordered ? 'border scheme-border' : 'border border-zinc-200/50 dark:border-white/[0.05]',
         'group-hover:border-transparent',
         variant === 'featured'
-          ? 'bg-gradient-to-br from-white via-zinc-50/40 to-sky-50/20 dark:from-zinc-900/60 dark:via-zinc-900/30 dark:to-zinc-800/30 ring-1 ring-[var(--scheme-border)]'
+          ? 'bg-gradient-to-br from-[var(--scheme-accent)]/[0.07] via-zinc-100/60 to-sky-50/30 dark:from-zinc-900/60 dark:via-zinc-900/30 dark:to-zinc-800/30 border border-[var(--scheme-accent)]/40 dark:border-transparent dark:ring-1 dark:ring-[var(--scheme-border)]'
           : cardBgBase,
         variant === 'featured' && 'group-hover:ring-transparent',
       )}>
@@ -76,7 +76,7 @@ export function CardEffects({ children, variant = 'default', className = '', del
           }}
         />
 
-        <div className="relative h-full z-10 bg-white/60 dark:bg-black/10 backdrop-blur-[2px] group-hover:bg-[var(--scheme-accent)]/5 transition-colors duration-500">
+        <div className="relative h-full z-10 bg-white/20 dark:bg-black/10 backdrop-blur-[2px] group-hover:bg-[var(--scheme-accent)]/5 transition-colors duration-500">
           {children}
         </div>
       </div>
