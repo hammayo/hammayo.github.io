@@ -10,7 +10,7 @@ import { GithubIcon, LinkedinIcon } from './icons';
 export function Footer({ className }: { className?: string }) {
   return (
     <footer className={cn(
-      'w-full border-t border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60',
+      'w-full border-t border-[var(--scheme-border)] bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60',
       className
     )}>
       <Container className="flex items-center justify-between gap-4 py-2">
