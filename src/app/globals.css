@@ -56,6 +56,7 @@
   --animate-gradient-x: gradient-x 15s ease-in-out infinite;
   --animate-gradient-flow: gradient-flow 20s ease infinite;
   --animate-gradient: animatedgradient 6s ease infinite alternate;
+  --animate-marquee: marquee 30s linear infinite;
 }
 
 @layer base {
@@ -289,4 +290,9 @@
 .animate-gradient {
   background-size: 300%;
   animation: animatedgradient 6s ease infinite alternate;
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
 }
