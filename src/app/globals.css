@@ -155,9 +155,9 @@
   html:not(.dark) .gradient-text {
     background: linear-gradient(
       to right,
-      color-mix(in srgb, var(--scheme-from) 70%, #000),
-      color-mix(in srgb, var(--scheme-via) 70%, #000),
-      color-mix(in srgb, var(--scheme-to) 70%, #000)
+      color-mix(in srgb, var(--scheme-from) 55%, #000),
+      color-mix(in srgb, var(--scheme-via) 55%, #000),
+      color-mix(in srgb, var(--scheme-to) 55%, #000)
     );
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
