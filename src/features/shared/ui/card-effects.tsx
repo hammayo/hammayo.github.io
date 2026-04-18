@@ -44,7 +44,7 @@ export function CardEffects({ children, variant = 'default', className = '', del
         'shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.4)]',
         'group-hover:shadow-[0_8px_30px_-4px_var(--scheme-glow)] dark:group-hover:shadow-[0_8px_30px_-4px_rgba(0,0,0,0.5)]',
         bordered ? 'border scheme-border' : 'border border-zinc-200/50 dark:border-white/[0.05]',
-        !bordered && 'group-hover:border-transparent',
+        'group-hover:border-transparent',
         variant === 'featured'
           ? 'bg-gradient-to-br from-white via-zinc-50/40 to-sky-50/20 dark:from-zinc-900/60 dark:via-zinc-900/30 dark:to-zinc-800/30 ring-1 ring-[var(--scheme-border)]'
           : cardBgBase,

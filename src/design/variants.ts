@@ -26,7 +26,7 @@ export const gradientText = cva('gradient-text bg-clip-text text-transparent', {
  * Uses scheme-glow and scheme-border utilities.
  */
 export const glowCard = cva(
-  'rounded-2xl border scheme-border scheme-glow transition-all duration-300 gradient-border-hover',
+  'rounded-2xl border scheme-border scheme-glow transition-all duration-300 gradient-border-hover hover:border-transparent',
   {
     variants: {
       variant: {
