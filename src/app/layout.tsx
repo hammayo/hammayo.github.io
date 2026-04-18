@@ -15,7 +15,7 @@ import Script from 'next/script';
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],
-  variable: '--font-inter',
+  variable: '--font-jetbrains-mono',
   display: 'swap',
 });
 

@@ -29,7 +29,7 @@ function CodeBlock({ children, ...props }: React.HTMLAttributes<HTMLPreElement>)
     <div className="relative my-6 group">
       <pre
         {...props}
-        className="overflow-x-auto rounded-xl border border-border bg-zinc-950 p-4 text-sm leading-relaxed"
+        className="overflow-x-auto rounded-xl border border-border bg-zinc-900 dark:bg-zinc-950 p-4 text-sm leading-relaxed"
       >
         {children}
       </pre>
@@ -121,7 +121,7 @@ export const mdxComponents: MDXComponents = {
 
   blockquote: ({ children, ...props }) => (
     <blockquote
-      className="my-6 border-l-2 border-[var(--scheme-accent)] pl-4 text-muted-foreground italic"
+      className="my-6 border-l-2 border-[var(--scheme-border)] pl-4 text-muted-foreground italic"
       {...props}
     >
       {children}

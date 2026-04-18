@@ -10,7 +10,6 @@ import { Sheet, SheetContent, SheetTitle, SheetTrigger } from './ui/sheet';
 import { RouteProgress } from './route-progress';
 import { cn } from '@/lib/utils';
 import { basePath } from '@/lib/env';
-import { GRADIENT_GLASS } from '@/design/variants';
 
 const NAV_LINKS = [
   { href: '/about',    label: 'About'    },
@@ -41,15 +40,7 @@ function NavLink({ href, label, pathname, onClick }: {
       )}
     >
       {isActive ? (
-        <span
-          className="text-transparent bg-clip-text"
-          style={{
-            backgroundImage: GRADIENT_GLASS,
-            backgroundSize: '300%',
-          }}
-        >
-          {label}
-        </span>
+        <span className="gradient-text">{label}</span>
       ) : label}
     </Link>
   );
@@ -83,14 +74,8 @@ export function Header() {
                 unoptimized
                 className="animate-float"
               />
-              <span
-                className="md:inline hidden animate-gradient text-transparent bg-clip-text"
-                style={{ backgroundImage: GRADIENT_GLASS, backgroundSize: '400%' }}
-              >Hammayo</span>
-              <span
-                className="md:hidden animate-gradient text-transparent bg-clip-text"
-                style={{ backgroundImage: GRADIENT_GLASS, backgroundSize: '400%' }}
-              >Hammy</span>
+              <span className="md:inline hidden animate-gradient gradient-text">Hammayo</span>
+              <span className="md:hidden animate-gradient gradient-text">Hammy</span>
             </Link>
 
             {/* Desktop nav */}
