@@ -118,7 +118,7 @@ export const SCHEME_MODE: 'time-of-day' | 'config' | 'cycle' = 'time-of-day';
 export const SCHEME_DEFAULT: SchemeName = 'violet-blue';
 
 /** Used when SCHEME_MODE is 'cycle' */
-export const SCHEME_ORDER: SchemeName[] = ['violet-blue', 'deep-purple', 'silver', 'glass'];
+export const SCHEME_ORDER: SchemeName[] = ['silver', 'glass', 'deep-purple', 'violet-blue'];
 
 /**
  * Cycle speed when SCHEME_MODE is 'cycle'.
