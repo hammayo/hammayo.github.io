@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0 --turbopack",
-    "build": "node scripts/copy-blog-assets.mjs && next build && bunx pagefind --site out",
+    "build": "node scripts/copy-blog-assets.mjs && next build && bunx pagefind --site out --output-subdir pagefind",
     "start": "next start",
     "serve": "npx serve out -c $(pwd)/serve.json",
     "lint": "eslint src",

@@ -1,4 +1,4 @@
-[![Build](https://github.com/hammayo/hammayo.github.io/actions/workflows/deploy.yml/badge.svg)](https://github.com/hammayo/hammayo.github.io/actions/workflows/deploy.yml) [![Version](https://img.shields.io/github/package-json/v/hammayo/hammayo.github.io)](https://github.com/hammayo/hammayo.github.io/releases) [![Updated](https://img.shields.io/github/last-commit/hammayo/hammayo.github.io?logo=github&label=last%20update)](https://github.com/hammayo/hammayo.github.io/commits)
+[![Build](https://github.com/hammayo/hammayo.github.io/actions/workflows/deploy.yml/badge.svg)](https://github.com/hammayo/hammayo.github.io/actions/workflows/deploy.yml) [![Version](https://img.shields.io/github/v/tag/hammayo/hammayo.github.io?label=version)](https://github.com/hammayo/hammayo.github.io/releases) [![Updated](https://img.shields.io/github/last-commit/hammayo/hammayo.github.io?logo=github&label=last%20update)](https://github.com/hammayo/hammayo.github.io/commits)
 
 # Hammayo
 
@@ -50,7 +50,7 @@ Runs three steps in sequence:
 
 1. `node scripts/copy-blog-assets.mjs` — copies post images/media to `public/blog-assets/`
 2. `next build` — static export to `out/`
-3. `pagefind --site out` — generates full-text search index into `out/pagefind/`
+3. `pagefind --site out --output-subdir pagefind` — generates full-text search index into `out/pagefind/`
 
 ## Environment Variables
 
@@ -204,14 +204,16 @@ Two workflows run on `main`:
 1. **Gitleaks** — secret scan; blocks deploy if any credential is found in committed files or git history
 2. **Copy assets** — `node scripts/copy-blog-assets.mjs`
 3. **Build** — `bunx --bun next build` → static output in `out/`
-4. **Index** — `bunx pagefind --site out` → search index in `out/pagefind/`
+4. **Index** — `bunx pagefind --site out --output-subdir pagefind` → search index in `out/pagefind/`
 5. **Deploy** — `out/` uploaded to GitHub Pages, served at `hammayo.co.uk`
 
 **`version-increment.yml`** — triggered when a PR is merged into `main`:
 
-1. Reads the current `version` from `package.json`
-2. Bumps the patch version (`1.0.x → 1.0.x+1`) and commits `[skip ci]`
+1. Reads the latest git tag (e.g. `v.1.0.9`)
+2. Bumps the patch number and pushes a new tag (e.g. `v.1.0.10`) — **no file changes, no commits**
 3. Creates a GitHub Release with auto-generated release notes
+
+> `package.json` version is intentionally static. The authoritative version is the git tag. This avoids CI-to-branch write-back and the merge conflicts it causes.
 
 ## Customisation
 
