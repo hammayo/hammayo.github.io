@@ -70,7 +70,6 @@ export function Header() {
                 alt="HB"
                 width={28}
                 height={28}
-                priority
                 unoptimized
                 className="animate-float"
               />
