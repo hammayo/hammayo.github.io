@@ -10,7 +10,7 @@ export const SITE = {
   name:        "Hammayo's Portfolio",
   title:       "Hammayo's | Backend Software Engineer",
   description: 'Portfolio site showcasing 20 years of backend engineering across finance, justice, and public service.',
-  author:      'Hammayo Babar',
+  author:      'Hammy',
   keywords:    ['backend engineer', 'software developer', '.NET', 'C#', 'Docker', 'Azure', 'microservices', 'HMPPS', 'portfolio', 'hammy', 'HB'],
 };
 

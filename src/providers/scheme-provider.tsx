@@ -21,14 +21,20 @@ import {
   resolveTimeOfDayScheme,
 } from '@/design/schemes';
 
+const SCHEME_PIN_KEY = 'scheme-pin';
+
 interface SchemeContextValue {
   schemeName: SchemeName;
   scheme: ColorScheme;
+  pinnedScheme: SchemeName | null;
+  setPinnedScheme: (name: SchemeName | null) => void;
 }
 
 const SchemeContext = createContext<SchemeContextValue>({
   schemeName: SCHEME_DEFAULT,
   scheme: SCHEMES[SCHEME_DEFAULT],
+  pinnedScheme: null,
+  setPinnedScheme: () => {},
 });
 
 export function useScheme(): SchemeContextValue {
@@ -66,10 +72,29 @@ function applyScheme(
   );
 }
 
+function readPin(): SchemeName | null {
+  try {
+    const stored = localStorage.getItem(SCHEME_PIN_KEY);
+    if (stored && stored in SCHEMES) return stored as SchemeName;
+  } catch {}
+  return null;
+}
+
+function writePin(name: SchemeName | null): void {
+  try {
+    if (name === null) {
+      localStorage.removeItem(SCHEME_PIN_KEY);
+    } else {
+      localStorage.setItem(SCHEME_PIN_KEY, name);
+    }
+  } catch {}
+}
+
 export function SchemeProvider({ children }: { children: ReactNode }) {
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [schemeName, setSchemeName] = useState<SchemeName>(SCHEME_DEFAULT);
+  const [pinnedScheme, setPinnedSchemeState] = useState<SchemeName | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const schemeIndexRef = useRef(0);
 
@@ -80,6 +105,15 @@ export function SchemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setMounted(true);
+
+    // Check for a user-pinned scheme first
+    const pin = readPin();
+    if (pin) {
+      setPinnedSchemeState(pin);
+      setSchemeName(pin);
+      applyScheme(pin, resolvedTheme);
+      return;
+    }
 
     if (prefersReducedMotion) {
       setSchemeName(SCHEME_DEFAULT);
@@ -120,9 +154,27 @@ export function SchemeProvider({ children }: { children: ReactNode }) {
     applyScheme(schemeName, resolvedTheme);
   }, [resolvedTheme, schemeName, mounted]);
 
+  const setPinnedScheme = (name: SchemeName | null) => {
+    writePin(name);
+    setPinnedSchemeState(name);
+    if (name === null) {
+      // Revert to automatic resolution
+      const resolved = SCHEME_MODE === 'time-of-day'
+        ? resolveTimeOfDayScheme()
+        : SCHEME_DEFAULT;
+      setSchemeName(resolved);
+      applyScheme(resolved, resolvedTheme);
+    } else {
+      setSchemeName(name);
+      applyScheme(name, resolvedTheme);
+    }
+  };
+
   const value: SchemeContextValue = {
     schemeName,
     scheme: SCHEMES[schemeName],
+    pinnedScheme,
+    setPinnedScheme,
   };
 
   return (

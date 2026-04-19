@@ -110,8 +110,8 @@ hammayo.github.io/
 | Scheme | Hours | Character |
 |---|---|---|
 | `silver` | 06:00–11:59 | Metallic, refined |
-| `deep-purple` | 12:00–17:59 | Saturated, bold |
-| `glass` | 18:00–21:59 | Airy, cool |
+| `glass` | 12:00–17:59 | Airy, cool |
+| `deep-purple` | 18:00–21:59 | Saturated, bold |
 | `violet-blue` | 22:00–05:59 | Deep, rich |
 
 ## Writing a Blog Post
