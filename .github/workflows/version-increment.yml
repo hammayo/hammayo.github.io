@@ -44,6 +44,13 @@ jobs:
           git commit -m "chore: bump version to ${NEW_VERSION} [skip ci]"
           git push
 
+      - name: Back-merge version bump into develop
+        run: |
+          git fetch origin develop
+          git checkout develop
+          git merge origin/main --no-edit
+          git push origin develop
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
