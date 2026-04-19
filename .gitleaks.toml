@@ -9,11 +9,7 @@ paths = [
   '''.superpowers/''',
   '''docs/superpowers/''',
 ]
-
-[[rules.allowlist]]
-description = "Allow public GitHub API base URL"
-regexes = ['''https://api\.github\.com''']
-
-[[rules.allowlist]]
-description = "Allow Google Analytics gtag pattern"
-regexes = ['''gtag\(''']
+regexes = [
+  '''https://api\.github\.com''',
+  '''gtag\(''',
+]
