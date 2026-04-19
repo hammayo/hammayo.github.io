@@ -4,7 +4,6 @@ import Image from 'next/image';
 import { accentTag } from '@/design/variants';
 import imageLoader from '@/lib/imageLoader';
 import type { about as AboutType } from '../../../content/about';
-import { basePath } from '@/lib/env';
 import { TimelineSection } from './timeline-section';
 import { PageHeader } from '@/features/shared/page-header';
 
@@ -13,8 +12,6 @@ interface AboutContentProps {
 }
 
 export function AboutContent({ about }: AboutContentProps) {
-  const fallbackSrc = `${basePath}/images/_hb-logo.png`;
-
   return (
     <div className="space-y-8">
       {/* Page title row: title/tagline left, avatar + name right */}
@@ -31,9 +28,6 @@ export function AboutContent({ about }: AboutContentProps) {
             width={72}
             height={72}
             className="rounded-full ring-2 ring-[var(--scheme-border)]"
-            onError={(e) => {
-              (e.currentTarget as HTMLImageElement).src = fallbackSrc;
-            }}
             unoptimized
           />
         </div>

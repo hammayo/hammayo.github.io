@@ -105,8 +105,8 @@ export type SchemeName = keyof typeof SCHEMES;
  *
  * 'time-of-day' — resolved from visitor's local hour:
  *   06:00–11:59 → silver (morning)
- *   12:00–17:59 → deep-purple (afternoon)
- *   18:00–21:59 → glass (evening)
+ *   12:00–17:59 → glass (afternoon)
+ *   18:00–21:59 → deep-purple (evening)
  *   22:00–05:59 → violet-blue (night)
  *
  * 'config'      — always uses SCHEME_DEFAULT
@@ -118,7 +118,7 @@ export const SCHEME_MODE: 'time-of-day' | 'config' | 'cycle' = 'time-of-day';
 export const SCHEME_DEFAULT: SchemeName = 'violet-blue';
 
 /** Used when SCHEME_MODE is 'cycle' */
-export const SCHEME_ORDER: SchemeName[] = ['violet-blue', 'deep-purple', 'silver', 'glass'];
+export const SCHEME_ORDER: SchemeName[] = ['silver', 'glass', 'deep-purple', 'violet-blue'];
 
 /**
  * Cycle speed when SCHEME_MODE is 'cycle'.
@@ -135,7 +135,7 @@ export const CYCLE_SPEED_MS: Record<'slow' | 'medium', number> = {
 export function resolveTimeOfDayScheme(): SchemeName {
   const hour = new Date().getHours();
   if (hour >= 6 && hour < 12) return 'silver';
-  if (hour >= 12 && hour < 18) return 'deep-purple';
-  if (hour >= 18 && hour < 22) return 'glass';
+  if (hour >= 12 && hour < 18) return 'glass';
+  if (hour >= 18 && hour < 22) return 'deep-purple';
   return 'violet-blue';
 }
