@@ -1,6 +1,63 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "tw-animate-css";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+@property --border-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --font-sans: var(--font-jetbrains-mono), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+
+  /* Custom animations from old tailwind.config.ts */
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+  --animate-fade-in: fade-in 0.5s ease-out forwards;
+  --animate-fade-in-scale: fade-in-scale 0.5s ease-out forwards;
+  --animate-slide-in-right: slide-in-right 0.3s ease-out forwards;
+  --animate-slide-in-left: slide-in-left 0.3s ease-out forwards;
+  --animate-pulse-soft: pulse-soft 2s ease-in-out infinite;
+  --animate-float: float 3s ease-in-out infinite;
+  --animate-gradient-x: gradient-x 15s ease-in-out infinite;
+  --animate-gradient-flow: gradient-flow 20s ease infinite;
+  --animate-gradient: animatedgradient 6s ease infinite alternate;
+  --animate-marquee: marquee 30s linear infinite;
+}
 
 @layer base {
   :root {
@@ -29,6 +86,21 @@
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
+
+    /* Scheme CSS custom properties — initial values (violet-blue, light mode) */
+    --scheme-from: #8b5cf6;
+    --scheme-via: #a855f7;
+    --scheme-to: #3b82f6;
+    --scheme-glow: rgba(139, 92, 246, 0.15);
+    --scheme-accent: #8b5cf6;
+    --scheme-border: rgba(139, 92, 246, 0.3);
+    --scheme-transition: 2000ms;
+    --scheme-button-from: #7c3aed;
+    --scheme-button-via: #9333ea;
+    --scheme-button-to: #2563eb;
+    --gradient-border-width: 1.5px;
+    /* Darkened accent for foreground text in light mode — auto-derived, no component logic needed */
+    --scheme-accent-text: color-mix(in srgb, var(--scheme-accent) 60%, #000);
   }
 
   .dark {
@@ -56,33 +128,182 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
+    --scheme-accent-text: var(--scheme-accent);
   }
 }
 
 @layer base {
   * {
-    @apply border-border;
+    @apply border-border outline-ring/50;
+  }
+  html {
+    overflow-x: hidden;
   }
   body {
     @apply bg-background text-foreground;
+    overflow-x: hidden;
   }
+}
+
+/* Scheme-aware gradient text utility */
+@layer utilities {
+  .gradient-text {
+    background: linear-gradient(to right, var(--scheme-from), var(--scheme-via), var(--scheme-to));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Darken gradient text in light mode — mix each stop with black to preserve hue */
+  html:not(.dark) .gradient-text {
+    background: linear-gradient(
+      to right,
+      color-mix(in srgb, var(--scheme-from) 65%, #000),
+      color-mix(in srgb, var(--scheme-via) 65%, #000),
+      color-mix(in srgb, var(--scheme-to) 65%, #000)
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .gradient-bg {
+    background: linear-gradient(to right, var(--scheme-from), var(--scheme-via), var(--scheme-to));
+  }
+
+  .scheme-button-gradient {
+    background: linear-gradient(to right, var(--scheme-button-from), var(--scheme-button-via), var(--scheme-button-to));
+  }
+
+  /* Scheme-tinted decorative overlay layers — used on cards and hero backgrounds */
+  .scheme-overlay-1 {
+    background: linear-gradient(
+      to bottom right,
+      color-mix(in srgb, var(--scheme-from) 15%, transparent),
+      color-mix(in srgb, var(--scheme-via) 10%, transparent),
+      color-mix(in srgb, var(--scheme-to) 15%, transparent)
+    );
+  }
+
+  .scheme-overlay-2 {
+    background: linear-gradient(
+      to top left,
+      color-mix(in srgb, var(--scheme-from) 10%, transparent),
+      color-mix(in srgb, var(--scheme-via) 10%, transparent),
+      color-mix(in srgb, var(--scheme-to) 15%, transparent)
+    );
+  }
+
+  .scheme-glow {
+    box-shadow: 0 0 20px var(--scheme-glow);
+  }
+
+  .scheme-border {
+    border-color: var(--scheme-border);
+  }
+
+  .gradient-border-hover {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .gradient-border-hover::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    padding: var(--gradient-border-width);
+    border-radius: inherit;
+    background: conic-gradient(
+      from var(--border-angle),
+      var(--scheme-from),
+      var(--scheme-via),
+      var(--scheme-to),
+      var(--scheme-from)
+    );
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+    animation: border-rotate 2.5s linear infinite paused;
+    z-index: 0;
+  }
+
+  .gradient-border-hover:hover::before {
+    opacity: 1;
+    animation-play-state: running;
+  }
+
+  /* Animation delay utilities (replaces tailwind.config.ts plugin) */
+  .animate-delay-100 { animation-delay: 100ms; }
+  .animate-delay-200 { animation-delay: 200ms; }
+  .animate-delay-300 { animation-delay: 300ms; }
+  .animate-delay-400 { animation-delay: 400ms; }
+  .animate-delay-500 { animation-delay: 500ms; }
+  .animate-delay-600 { animation-delay: 600ms; }
+  .animate-delay-700 { animation-delay: 700ms; }
+  .animate-delay-800 { animation-delay: 800ms; }
+}
+
+@keyframes border-rotate {
+  to { --border-angle: 360deg; }
+}
+
+/* Keyframes — migrated from tailwind.config.ts */
+@keyframes accordion-down {
+  from { height: 0; }
+  to { height: var(--radix-accordion-content-height); }
+}
+@keyframes accordion-up {
+  from { height: var(--radix-accordion-content-height); }
+  to { height: 0; }
+}
+@keyframes fade-in {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in-scale {
+  0% { opacity: 0; transform: scale(0.9); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes slide-in-right {
+  0% { transform: translateX(-10px); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+@keyframes slide-in-left {
+  0% { transform: translateX(10px); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+@keyframes float {
+  0% { transform: translateY(0px) rotate(0deg) scale(1); filter: brightness(1); }
+  50% { transform: translateY(-5px) rotate(2deg) scale(1.05); filter: brightness(1.1); }
+  100% { transform: translateY(0px) rotate(0deg) scale(1); filter: brightness(1); }
+}
+@keyframes gradient-x {
+  0%, 100% { background-position: 200% 0; opacity: 0.5; }
+  50% { background-position: 0% 0; opacity: 0.8; }
+}
+@keyframes gradient-flow {
+  0%, 100% { background-size: 200% 200%; background-position: 0% 0%; }
+  50% { background-size: 200% 200%; background-position: 100% 100%; }
+}
+@keyframes animatedgradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
 .animate-gradient {
   background-size: 300%;
-  -webkit-animation: animatedgradient 6s ease infinite alternate;
-  -moz-animation: animatedgradient 6s ease infinite alternate;
   animation: animatedgradient 6s ease infinite alternate;
 }
 
-@keyframes animatedgradient {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
 }

@@ -1,0 +1,97 @@
+---
+title: "Why I Switched to Rider (And Why I Still Keep Visual Studio Installed)"
+date: "2026-01-29"
+summary: "After 20 years of Visual Studio, I switched to Rider as my daily driver. Here's what made me switch, what Rider gets right, what VS still does better, and whether ReSharper is worth it."
+tags: ["tooling", ".net", "rider"]
+published: true
+---
+
+I used Visual Studio for nearly two decades. It was the only serious option for .NET development for most of that time, and when you've built that much muscle memory, switching feels like learning to write with your other hand. But about two years ago, I started using JetBrains Rider alongside Visual Studio, and then gradually Rider became my daily driver. Here's why — and why the answer isn't as simple as "Rider is better."
+
+## The Problem That Made Me Look
+
+It wasn't one dramatic moment. It was death by a thousand small frustrations.
+
+Visual Studio would take 45 seconds to open a solution that Rider opened in 15. IntelliSense would lag just enough to break my flow when typing in a large solution. The "hang on, Visual Studio is busy" spinner during a simple Find All References in a microservices solution with 30+ projects was costing me minutes every hour.
+
+I'd been using ReSharper inside Visual Studio for years to compensate — and it was brilliant, but it also made Visual Studio heavier. ReSharper's code analysis running on top of Visual Studio's own Roslyn analysis meant my machine was doing double the work. 16GB of RAM wasn't enough. My fans sounded like a jet engine during code reviews.
+
+A colleague at Unilink mentioned Rider and I gave it a trial. Within a week, I understood why people who tried it rarely went back.
+
+## What Rider Gets Right
+
+### Performance, Full Stop
+
+This is the big one. Rider separates its frontend (the UI) from its backend (the code analysis engine). They run in different processes. This means the UI stays responsive even when the analysis engine is chewing through a massive solution. In Visual Studio, these are the same process — when code analysis gets heavy, the entire editor slows down.
+
+Practical difference: I work with solutions that have 20-40 projects. In Visual Studio, navigating between files during a build felt like wading through treacle. In Rider, the editor stays snappy regardless of what's happening in the background. The solution I worked on at Unilink for MoJ had dozens of microservice projects in one solution — Rider handled it without breaking a sweat.
+
+### ReSharper Built In, Not Bolted On
+
+Rider includes the ReSharper engine natively. This means you get all the refactoring power — extract method, inline variable, change signature, move type to file, introduce parameter — without the performance penalty of running it as a Visual Studio plugin.
+
+The refactoring tools are genuinely excellent. Things I use daily: "Safe Delete" (tells you if anything references the thing you're deleting before you delete it), "Find Usages" (faster and more accurate than VS's equivalent), and "Cleanup Code" (applies your formatting rules and removes unused usings in one keystroke).
+
+### Cross-Platform Without Compromise
+
+I use a MacBook at home and Windows at work. Visual Studio for Mac was discontinued — Microsoft themselves said "use VS Code or Rider on Mac." Rider runs identically on macOS, Windows, and Linux. Same keybindings, same features, same plugins. When I SSH into my Ubuntu server to check something, I can open Rider there too.
+
+This matters more than you'd think. Having the same IDE across every machine means my muscle memory works everywhere. No mental context-switching between "VS shortcuts" and "Mac shortcuts."
+
+### Database Tools Built In
+
+Rider includes a full database client (inherited from the IntelliJ platform). I can connect to SQL Server, PostgreSQL, MySQL, and Redis directly from the IDE, run queries, browse schemas, and even get code completion in SQL files based on my actual database schema.
+
+In Visual Studio, I'd typically have SQL Server Management Studio open alongside it, switching between windows. In Rider, I stay in one place. For someone who spends a lot of time writing and tuning SQL (which I do), this is a genuine time saver.
+
+### Docker and Terminal Integration
+
+Rider's built-in terminal is better than Visual Studio's. The Docker integration lets me view running containers, check logs, and manage images without leaving the IDE. Given that I containerise most of my services these days, having this in the same window as my code is practical, not just convenient.
+
+## What Visual Studio Still Does Better
+
+I said I keep Visual Studio installed, and I mean it. There are things it does that Rider can't match.
+
+### Azure Integration
+
+If you're deploying to Azure, Visual Studio's connected services, publish profiles, and Azure resource browser are more mature. I can right-click a project and publish to Azure App Service with a few clicks. Rider can do this through plugins and CLI tools, but it's not as polished.
+
+### XAML and WinForms Designers
+
+If you're working on desktop applications with WPF or WinForms (which I do at PDI Technologies with WinForms), Visual Studio's visual designers are still necessary. Rider has added XAML preview support, but the WinForms designer remains a Visual Studio exclusive. This is the main reason I keep VS installed.
+
+### Debugging Specific Scenarios
+
+Visual Studio's debugger is marginally better for certain complex scenarios — particularly when working with async code and Tasks, where the Parallel Stacks window gives you a visual representation of what's happening. Rider's debugger is perfectly good for day-to-day work, but VS still has the edge in edge cases.
+
+### Enterprise Azure DevOps Integration
+
+If your team uses Azure DevOps for work items and boards, Visual Studio integrates with it natively. Rider doesn't have this — you'd use the web interface or a separate tool. For teams that live in the Azure DevOps ecosystem, this matters.
+
+## ReSharper — Is It Still Worth It?
+
+This is the question I get asked most. If you're staying in Visual Studio, is ReSharper still worth the license cost and the performance hit?
+
+My honest answer: it depends on your solution size. If you're working on a small-to-medium solution (under 15 projects), ReSharper inside Visual Studio is brilliant and the performance impact is manageable. If you're working on a large solution, the performance cost isn't worth it — switch to Rider instead, where you get the same analysis engine without the overhead.
+
+If you're already paying for a JetBrains license for ReSharper, switching to Rider is free — it's included in the same subscription tier. You're literally already paying for it.
+
+## The Practical Switch
+
+If you're thinking about trying Rider, here's what I'd suggest:
+
+**Week 1:** Install Rider alongside Visual Studio. Open the same solution in both. Don't change your Visual Studio setup. Just get used to Rider's layout and keybindings. Rider has a "Visual Studio" keymap that maps most shortcuts to what you're used to.
+
+**Week 2:** Try doing your daily work in Rider. When you hit something you can't figure out, switch back to VS. Keep a note of what sent you back.
+
+**Week 3:** Check your notes. If the list is short (and it usually is — WinForms designer, specific Azure tooling), you've got your answer: Rider for daily coding, VS for the specific tasks that need it.
+
+**Week 4:** Configure Rider properly. Set up your code style settings, import your ReSharper settings if you have them (Rider reads `.editorconfig` and ReSharper `.DotSettings` files directly), and install the plugins you need. The JetBrains plugin marketplace has most things you'll want.
+
+## My Current Setup
+
+Today I use Rider as my primary IDE on both macOS and Windows. I have Visual Studio installed on my work Windows machine for WinForms designer work and occasional Azure publishing. I don't run ReSharper inside Visual Studio anymore — there's no point when Rider gives me the same engine natively.
+
+My Rider plugins: .NET Core Launch Settings, Docker, Database Tools (built in), and the GitToolBox for enhanced Git integration. That's it — Rider needs fewer plugins because it includes more out of the box.
+
+The honest summary: Rider is the better daily driver for most .NET backend development. Visual Studio is still necessary for specific scenarios. The good news is you don't have to choose exclusively — they coexist perfectly well, and using both for their strengths is a valid setup.

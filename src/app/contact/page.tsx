@@ -1,27 +1,35 @@
-import { Container } from "@/components/container";
-import { PageHeading } from "@/components/page-heading";
-import { PageTransitionWrapper } from "@/components/page-transition-wrapper";
-import { ContactCard } from "@/components/contact-card";
-import { SOCIAL } from "@/lib/constants";
-import type { Metadata } from "next";
-import { PageViewEvent } from "@/components/analytics-event";
+import type { Metadata } from 'next';
+import { Container } from '@/features/shared/container';
+import { PageTransitionWrapper } from '@/features/shared/page-transition-wrapper';
+import { PageHeader } from '@/features/shared/page-header';
+import { ContactCard } from '@/features/contact/contact-card';
+import { PageViewEvent } from '@/features/shared/analytics-event';
+import { SOCIAL } from '@/lib/constants';
+import { createPageMetadata } from '@/lib/metadata';
+import { AvailabilityBanner } from '@/features/contact/availability-banner';
+import { contact } from '../../../content/contact';
 
-export const metadata: Metadata = {
-  title: "Contact | Hammayo's Portfolio",
-  description: "Get in touch with me",
-};
+export const metadata: Metadata = createPageMetadata('contact', '/contact');
 
 export default function ContactPage() {
   return (
     <PageTransitionWrapper>
       <PageViewEvent page="contact" />
-      <Container>
-        <PageHeading
-          title="Contact"
-          description="Feel free to reach out through any of these platforms."
-        />
+      <Container className="py-8">
+        <PageHeader title="Contact" subtitle="Let's talk." />
 
-        <div className="grid w-full grid-cols-1 gap-8 mx-auto mt-16 lg:mt-44 sm:grid-cols-3 lg:gap-16">
+        <div className="space-y-8">
+          <AvailabilityBanner availability={contact.availability} />
+
+          <div className="space-y-3">
+            {contact.copy.map((paragraph, i) => (
+              <p key={i} className="text-sm md:text-base text-muted-foreground leading-relaxed">
+                {paragraph}
+              </p>
+            ))}
+          </div>
+
+          <div className="grid w-full grid-cols-1 gap-6 mx-auto sm:grid-cols-3">
           {/* GitHub */}
           <ContactCard
             icon={
@@ -39,7 +47,6 @@ export default function ContactPage() {
             subtitle="GitHub"
             link={SOCIAL.github}
             linkText="View Profile"
-            variant="github"
           />
 
           {/* LinkedIn */}
@@ -56,7 +63,6 @@ export default function ContactPage() {
             subtitle="LinkedIn"
             link={SOCIAL.linkedin}
             linkText="View Profile"
-            variant="linkedin"
           />
 
           {/* Email */}
@@ -73,8 +79,8 @@ export default function ContactPage() {
             subtitle="Email"
             link={`mailto:${SOCIAL.email}`}
             linkText="Send Email"
-            variant="email"
           />
+          </div>
         </div>
       </Container>
     </PageTransitionWrapper>

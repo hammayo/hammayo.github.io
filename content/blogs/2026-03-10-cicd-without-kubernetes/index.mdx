@@ -1,0 +1,101 @@
+---
+title: "CI/CD Without Kubernetes: TeamCity, Jenkins, and Octopus Deploy in 2026"
+date: "2026-03-10"
+summary: "Not every team needs Kubernetes. Here's how to build a reliable, maintainable CI/CD pipeline with the tools most .NET shops actually use."
+tags: ["devops", "ci-cd", "docker", ".net", "teamcity"]
+published: false
+---
+
+The DevOps conversation in 2026 defaults to Kubernetes. Every tutorial assumes you're deploying to a cluster. Every job description lists K8s as a requirement.
+
+And then there are the rest of us — teams running reliable, high-volume software on Docker without an orchestrator, using TeamCity, Jenkins, or Octopus Deploy, because that's what the organisation standardised on years ago and it works.
+
+This is a practical guide for that world.
+
+## The Stack
+
+At PDI Technologies, my current CI/CD pipeline looks like this:
+
+- **TeamCity** — build server, runs on every push, produces Docker images
+- **Docker** — containers for all services, consistent environments
+- **Azure Container Registry** — image storage
+- **Octopus Deploy** — deployment orchestration, environment promotion, release management
+
+At Unilink (MoJ/HMPPS), we used Jenkins instead of TeamCity. The concepts are identical.
+
+## The Build Pipeline
+
+Every pipeline does the same four things: restore, build, test, publish. The only variation is the commands.
+
+TeamCity build configuration (Kotlin DSL):
+
+```kotlin
+object BuildAndPublish : BuildType({
+    name = "Build and Publish"
+
+    steps {
+        dotnetRestore {
+            projects = "src/MyService/MyService.csproj"
+        }
+        dotnetBuild {
+            projects = "src/MyService/MyService.csproj"
+            configuration = "Release"
+        }
+        dotnetTest {
+            projects = "tests/MyService.Tests/MyService.Tests.csproj"
+            configuration = "Release"
+        }
+        script {
+            scriptContent = """
+                docker build -t myregistry.azurecr.io/myservice:%build.counter% .
+                docker push myregistry.azurecr.io/myservice:%build.counter%
+            """.trimIndent()
+        }
+    }
+
+    triggers {
+        vcs { branchFilter = "+:*" }
+    }
+})
+```
+
+`%build.counter%` is TeamCity's auto-incrementing build number. Use it as your image tag — it's a stable, unique identifier that maps directly back to a build and commit.
+
+## Octopus Deploy for Promotion
+
+Octopus separates the concept of a **release** (a versioned, immutable set of artefacts) from a **deployment** (pushing that release to an environment).
+
+The workflow:
+1. TeamCity builds image `myservice:142` and pushes to ACR
+2. TeamCity creates an Octopus release `1.0.142` referencing that image tag
+3. Octopus automatically deploys release `1.0.142` to Dev
+4. QA promotes that same release to Test
+5. After sign-off, the release is promoted to Production
+
+The same image tag moves through every environment. No rebuilds. No "it worked in test" surprises.
+
+```bash
+octo create-release \
+  --project MyService \
+  --version 1.0.%build.counter% \
+  --package MyService:%build.counter% \
+  --deployTo Dev \
+  --server $OCTOPUS_URL \
+  --apiKey $OCTOPUS_API_KEY
+```
+
+## Secrets Management
+
+Never put secrets in TeamCity build parameters or Octopus variables in plain text. Both tools support secret/sensitive variable types that are masked in logs and never exposed in the UI.
+
+The rule: secrets flow in at deploy time, never at build time. Your Docker image should contain no secrets. Configuration comes from the environment.
+
+## What You Don't Get (and Why That's OK)
+
+Without Kubernetes, you don't get automatic scaling based on load, self-healing restarts across a cluster, or rolling updates at scale.
+
+If you have one to twenty services, moderate traffic, and a team of three to ten engineers, you probably don't need those things. You need reliable builds, consistent environments, and a deployment process that's auditable and reversible.
+
+TeamCity and Octopus give you all of that with less operational overhead than a Kubernetes cluster requires to maintain correctly.
+
+The most reliable CI/CD pipeline is the one your team understands well enough to fix at 11pm.

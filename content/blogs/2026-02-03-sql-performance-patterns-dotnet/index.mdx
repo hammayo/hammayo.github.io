@@ -1,0 +1,126 @@
+---
+title: "SQL Performance Patterns Every .NET Developer Should Know"
+date: "2026-02-20"
+summary: "The query that worked fine in testing will destroy you in production at 3am. Here are the patterns I keep coming back to after years of tuning SQL Server in high-volume systems."
+tags: [".net", "performance", "sql-server"]
+published: false
+---
+
+I've tuned SQL queries in payment systems where every millisecond had a direct cost, and in prison service platforms where a slow report meant a case worker waiting for information they urgently needed. The problems are different but the patterns are the same.
+
+Here's what I actually use.
+
+## Know What the Query Plan Is Telling You
+
+Before you change anything, look at the execution plan. In SQL Server Management Studio: query → include actual execution plan. In code: any query you're worried about, run it once with `SET STATISTICS IO ON` and read the logical reads.
+
+Logical reads are your core metric. Not duration — logical reads. Duration fluctuates. Logical reads tell you how much work SQL Server is actually doing.
+
+```sql
+SET STATISTICS IO ON;
+
+SELECT o.OrderId, o.CreatedAt, c.Name
+FROM Orders o
+INNER JOIN Customers c ON c.CustomerId = o.CustomerId
+WHERE o.Status = 'Pending'
+ORDER BY o.CreatedAt DESC;
+
+-- Table 'Orders'. Scan count 1, logical reads 4821, physical reads 0...
+-- Table 'Customers'. Scan count 0, logical reads 3...
+```
+
+4821 logical reads for a filtered query is a table scan. That's the problem telling you where to look.
+
+## Covering Indexes
+
+The most useful tool in SQL Server. A covering index includes all the columns a query needs, so the engine never has to go back to the base table.
+
+For the query above:
+
+```sql
+CREATE NONCLUSTERED INDEX IX_Orders_Status_CreatedAt
+ON Orders (Status, CreatedAt DESC)
+INCLUDE (CustomerId);
+```
+
+`Status` and `CreatedAt` are in the key (used for filtering and sorting). `CustomerId` is in INCLUDE (needed for the join, but not filtered on). The query now reads from the index only — no table access.
+
+Logical reads drop from 4821 to 4. This is the most common performance fix I make.
+
+## Parameter Sniffing
+
+SQL Server caches query plans. The first time a stored procedure runs, it builds a plan based on the parameter values used. If those values are atypical, every subsequent call gets a bad plan.
+
+Classic symptom: a stored procedure that runs in 50ms from the application but takes 45 seconds when you run it in SSMS with your test values.
+
+```sql
+-- Vulnerable to parameter sniffing
+CREATE PROCEDURE GetOrdersByCustomer
+    @CustomerId INT
+AS
+    SELECT * FROM Orders WHERE CustomerId = @CustomerId;
+```
+
+Quick fix — `OPTION (RECOMPILE)`:
+
+```sql
+CREATE PROCEDURE GetOrdersByCustomer
+    @CustomerId INT
+AS
+    SELECT * FROM Orders
+    WHERE CustomerId = @CustomerId
+    OPTION (RECOMPILE);
+```
+
+This forces a fresh plan on every call. More CPU per call, but consistent performance. Use it for procedures with wildly variable row counts.
+
+Better fix for stable parameters — `OPTIMIZE FOR`:
+
+```sql
+OPTION (OPTIMIZE FOR (@CustomerId = 12345));
+```
+
+Use a representative "average" value. The plan stays cached but it's built for a normal case, not an outlier.
+
+## Avoid Functions on Indexed Columns
+
+This kills indexes silently.
+
+```sql
+-- Bad: function on indexed column — table scan
+WHERE YEAR(CreatedAt) = 2024
+
+-- Good: sargable — index seek
+WHERE CreatedAt >= '2024-01-01' AND CreatedAt < '2025-01-01'
+```
+
+Same with implicit conversions:
+
+```sql
+-- Bad: if OrderRef is varchar, this converts every row
+WHERE OrderRef = 12345
+
+-- Good: match the type
+WHERE OrderRef = '12345'
+```
+
+SQL Server will warn you about implicit conversions in the execution plan — look for the yellow warning triangle.
+
+## Stored Procedures vs Dapper vs EF
+
+In high-volume transactional systems I prefer stored procedures for complex reads and Dapper for simple ones. EF Core is fine for writes and simple queries but can generate surprising SQL for anything with joins or filtering logic.
+
+```csharp
+// Dapper — simple, predictable SQL
+var orders = await connection.QueryAsync<Order>(
+    "SELECT OrderId, Status, CreatedAt FROM Orders WHERE CustomerId = @CustomerId",
+    new { CustomerId = customerId });
+```
+
+For anything running thousands of times per minute, know what SQL is going to the database. A tool like MiniProfiler in development surfaces generated queries before they become a production problem.
+
+## The One Habit That Matters
+
+Add `SET STATISTICS IO ON` to your development environment and leave it on. Read the logical reads for every query you write. Not occasionally — every time. The muscle memory of noticing when a query does too much work is worth more than any specific technique.
+
+The slow query at 3am is always one you wrote six months ago and assumed was fine.

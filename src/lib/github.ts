@@ -2,9 +2,29 @@ import { logger } from './logger';
 import { API } from './constants';
 import { env } from './env';
 
-// GitHub repository interface
+interface PinnedRepoNode {
+  id: string;
+  name: string;
+  description: string | null;
+  url: string;
+  homepageUrl: string | null;
+  primaryLanguage: { name: string } | null;
+  stargazerCount: number;
+  forkCount: number;
+  updatedAt: string;
+  repositoryTopics: { nodes: Array<{ topic: { name: string } }> };
+  isPrivate: boolean;
+  isArchived: boolean;
+  isFork: boolean;
+}
+
+interface GraphQLPinnedResponse {
+  data: { user: { pinnedItems: { nodes: PinnedRepoNode[] } } };
+  errors?: Array<{ message: string }>;
+}
+
 export interface GitHubRepository {
-  id: number;
+  id: string | number;
   name: string;
   description: string | null;
   html_url: string;
@@ -20,7 +40,6 @@ export interface GitHubRepository {
   pinned?: boolean;
 }
 
-// GitHub user overview interface
 export interface GitHubOverview {
   login: string;
   name: string | null;
@@ -32,10 +51,9 @@ export interface GitHubOverview {
   avatar_url: string;
 }
 
-// GitHub API error
 export class GitHubApiError extends Error {
   statusCode: number;
-  
+
   constructor(message: string, statusCode: number) {
     super(message);
     this.name = 'GitHubApiError';
@@ -43,7 +61,6 @@ export class GitHubApiError extends Error {
   }
 }
 
-// Configuration options for repository fetching
 export interface FetchRepositoriesOptions {
   username?: string;
   sort?: 'updated' | 'created' | 'pushed' | 'full_name';
@@ -53,22 +70,18 @@ export interface FetchRepositoriesOptions {
   includeForked?: boolean;
 }
 
-// Helper function to get GitHub headers
-function getGitHubHeaders(includeAuth: boolean = false) {
+function getGitHubHeaders(includeAuth = false) {
   const headers: Record<string, string> = {
     'Accept': 'application/vnd.github.v3+json',
   };
-
   if (includeAuth && env.GITHUB_TOKEN) {
     headers['Authorization'] = `Bearer ${env.GITHUB_TOKEN}`;
   }
-
   return headers;
 }
 
-// Fetch GitHub user overview with caching
 export async function fetchGitHubOverview(username?: string): Promise<GitHubOverview | null> {
-  const githubUser = username || env.GITHUB_USERNAME;
+  const githubUser = username ?? env.GITHUB_USERNAME;
   if (!githubUser) {
     logger.error('GitHub username not provided and not found in environment variables');
     return null;
@@ -76,11 +89,11 @@ export async function fetchGitHubOverview(username?: string): Promise<GitHubOver
 
   try {
     logger.info(`Fetching GitHub overview for user: ${githubUser}`);
-    
+
     const url = new URL(`/users/${githubUser}`, API.github);
     const response = await fetch(url.toString(), {
       headers: getGitHubHeaders(),
-      next: { revalidate: 3600 } // Cache for 1 hour
+      next: { revalidate: 3600 },
     });
 
     if (!response.ok) {
@@ -94,29 +107,23 @@ export async function fetchGitHubOverview(username?: string): Promise<GitHubOver
     if (env.NODE_ENV === 'development') {
       logger.debug('GitHub Overview API Response:', JSON.stringify(data, null, 2));
     }
-
     return data;
   } catch (error) {
-    if (error instanceof Error) {
-      logger.error('Error fetching GitHub overview:', error);
-    } else {
-      logger.error('Unknown error fetching GitHub overview');
-    }
+    logger.error('Error fetching GitHub overview:', error instanceof Error ? error : undefined);
     return null;
   }
 }
 
-// Fetch first 2 pinned repositories using GraphQL API with caching
 export async function fetchPinnedRepositories(username?: string): Promise<GitHubRepository[]> {
-  const githubUser = username || env.GITHUB_USERNAME;
+  const githubUser = username ?? env.GITHUB_USERNAME;
   if (!githubUser || !env.GITHUB_TOKEN) {
-    logger.error('GitHub username or token not found in environment variables');
+    logger.info('GitHub username or token not configured — skipping pinned repos fetch');
     return [];
   }
 
   try {
     logger.info(`Fetching pinned repositories for user: ${githubUser}`);
-    
+
     const query = `
       query {
         user(login: "${githubUser}") {
@@ -155,7 +162,7 @@ export async function fetchPinnedRepositories(username?: string): Promise<GitHub
       method: 'POST',
       headers: getGitHubHeaders(true),
       body: JSON.stringify({ query }),
-      next: { revalidate: 3600 } // Cache for 1 hour
+      next: { revalidate: 3600 },
     });
 
     if (!response.ok) {
@@ -165,7 +172,7 @@ export async function fetchPinnedRepositories(username?: string): Promise<GitHub
       );
     }
 
-    const data = await response.json();
+    const data = await response.json() as GraphQLPinnedResponse;
     if (env.NODE_ENV === 'development') {
       logger.debug('GitHub Pinned Repositories API Response:', JSON.stringify(data, null, 2));
     }
@@ -177,43 +184,37 @@ export async function fetchPinnedRepositories(username?: string): Promise<GitHub
       );
     }
 
-    return data.data.user.pinnedItems.nodes.map((repo: any) => ({
-      id: repo.id,
-      name: repo.name,
-      description: repo.description,
-      html_url: repo.url,
-      homepage: repo.homepageUrl,
-      language: repo.primaryLanguage?.name || null,
+    return data.data.user.pinnedItems.nodes.map((repo) => ({
+      id:               repo.id,
+      name:             repo.name,
+      description:      repo.description,
+      html_url:         repo.url,
+      homepage:         repo.homepageUrl,
+      language:         repo.primaryLanguage?.name ?? null,
       stargazers_count: repo.stargazerCount,
-      forks_count: repo.forkCount,
-      updated_at: repo.updatedAt,
-      topics: repo.repositoryTopics.nodes.map((topic: any) => topic.topic.name),
-      private: repo.isPrivate,
-      archived: repo.isArchived,
-      fork: repo.isFork,
-      pinned: true
+      forks_count:      repo.forkCount,
+      updated_at:       repo.updatedAt,
+      topics:           repo.repositoryTopics.nodes.map(t => t.topic.name),
+      private:          repo.isPrivate,
+      archived:         repo.isArchived,
+      fork:             repo.isFork,
+      pinned:           true,
     }));
   } catch (error) {
-    if (error instanceof Error) {
-      logger.error('Error fetching pinned repositories:', error);
-    } else {
-      logger.error('Unknown error fetching pinned repositories');
-    }
+    logger.error('Error fetching pinned repositories:', error instanceof Error ? error : undefined);
     return [];
   }
 }
 
-// Fetch all repositories with options 
-// TODO: Use env config instead of hardcoded values
 export async function fetchAllRepositories({
   username,
   sort = 'updated',
   direction = 'desc',
   perPage = 100,
   maxRepos = 8,
-  includeForked = false
+  includeForked = false,
 }: FetchRepositoriesOptions = {}): Promise<GitHubRepository[]> {
-  const githubUser = username || env.GITHUB_USERNAME;
+  const githubUser = username ?? env.GITHUB_USERNAME;
   if (!githubUser) {
     logger.error('GitHub username not provided and not found in environment variables');
     return [];
@@ -221,15 +222,15 @@ export async function fetchAllRepositories({
 
   try {
     logger.info(`Fetching GitHub repositories for user: ${githubUser}`);
-    
+
     const url = new URL(`/users/${githubUser}/repos`, API.github);
     url.searchParams.append('sort', sort);
     url.searchParams.append('direction', direction);
     url.searchParams.append('per_page', perPage.toString());
-    
+
     const response = await fetch(url.toString(), {
       headers: getGitHubHeaders(true),
-      next: { revalidate: 3600 }
+      next: { revalidate: 3600 },
     });
 
     if (!response.ok) {
@@ -255,16 +256,11 @@ export async function fetchAllRepositories({
       )
       .slice(0, maxRepos);
   } catch (error) {
-    if (error instanceof Error) {
-      logger.error('Error fetching GitHub repositories:', error);
-    } else {
-      logger.error('Unknown error fetching GitHub repositories');
-    }
+    logger.error('Error fetching GitHub repositories:', error instanceof Error ? error : undefined);
     return [];
   }
 }
 
-// Main function to fetch all GitHub data
 export async function fetchGitHubData(options: FetchRepositoriesOptions = {}): Promise<{
   overview: GitHubOverview | null;
   pinnedRepos: GitHubRepository[];
@@ -273,17 +269,12 @@ export async function fetchGitHubData(options: FetchRepositoriesOptions = {}): P
   const [overview, pinnedRepos, allRepos] = await Promise.all([
     fetchGitHubOverview(options.username),
     fetchPinnedRepositories(options.username),
-    fetchAllRepositories(options)
+    fetchAllRepositories(options),
   ]);
 
-  // Filter out pinned repos from all repos
-  const otherRepos = allRepos.filter(repo => 
-    !pinnedRepos.some(pinnedRepo => pinnedRepo.name === repo.name)
+  const otherRepos = allRepos.filter(
+    repo => !pinnedRepos.some(pinned => pinned.name === repo.name)
   );
 
-  return {
-    overview,
-    pinnedRepos,
-    otherRepos
-  };
+  return { overview, pinnedRepos, otherRepos };
 }

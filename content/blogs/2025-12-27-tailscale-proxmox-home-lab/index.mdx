@@ -1,0 +1,165 @@
+---
+title: "Tailscale + Proxmox + Containers — My Home Lab Stack for Remote Access Without the Pain"
+date: "2025-12-27"
+summary: "Zero port forwarding, zero dynamic DNS, zero headaches. How I use Proxmox, LXC containers, and Tailscale as a subnet router to access my entire home network from anywhere."
+tags: ["homelab", "networking", "self-hosted"]
+published: true
+---
+
+I run a Proxmox server at home. It hosts development VMs, Docker containers, and a few self-hosted services. For a long time, accessing any of it from outside my home network meant either VPN configurations that broke every time my ISP changed my IP, or opening ports on my router and hoping nobody on the internet noticed.
+
+Then I set up Tailscale, and the entire problem disappeared in about ten minutes.
+
+This post walks through my actual setup: Proxmox as the hypervisor, Tailscale for secure remote access, and LXC containers for running services. No theory — just what I run, how I configured it, and the problems I solved along the way.
+
+## Why Proxmox
+
+Proxmox VE is a free, open-source hypervisor built on Debian. It lets you run both full virtual machines (KVM) and lightweight containers (LXC) from a web-based management interface. I chose it over alternatives like ESXi or Hyper-V for a few reasons:
+
+It's free for home use. There's an enterprise subscription for support, but the software itself is fully functional without paying anything. When you first install it, it nags about the missing subscription — you can disable the enterprise repository and add the free community repository instead. Plenty of guides online for this; it takes two minutes.
+
+It runs on commodity hardware. My server is nothing special — a refurbished mini PC with an Intel i5 and 32GB of RAM. Proxmox installed from a USB stick in about five minutes, and I was creating my first container within the hour.
+
+LXC containers are the sweet spot. Full VMs are great when you need complete isolation or a different OS, but for most home lab services, LXC containers are faster to create, use less RAM, and start in seconds. I use LXC containers for lightweight services and full VMs only when I need a complete Windows or Ubuntu desktop environment.
+
+## My Proxmox Layout
+
+Here's what currently runs on my server:
+
+**LXC Containers:**
+- **Tailscale gateway** (Debian 12, 512MB RAM) — the single point of entry for all remote access
+- **Pi-hole** (Debian 12, 256MB RAM) — DNS-level ad blocking for the whole network
+- **Gitea** (Ubuntu 24.04, 1GB RAM) — lightweight self-hosted Git server for personal projects
+- **Docker host** (Ubuntu 24.04, 4GB RAM) — runs Docker Compose stacks for various services
+
+**Full VMs:**
+- **Ubuntu Desktop** (4GB RAM) — for testing and Linux development
+- **Windows 11** (8GB RAM) — for testing Windows-specific builds and WinForms development
+
+The remaining RAM is left free for spinning up temporary containers when I need to test something quickly. Proxmox makes it trivial to create a container from a template, test something, and then destroy it.
+
+## Setting Up Tailscale — The Right Way
+
+There's a debate in the home lab community about where to install Tailscale on a Proxmox server. The options are:
+
+1. **Directly on the Proxmox host** — simplest, but means installing software on the hypervisor itself
+2. **In a dedicated LXC container as a subnet router** — cleaner separation, one Tailscale instance gives access to everything
+3. **On every VM/container individually** — most granular control, but lots of installs to manage
+
+I went with option 2. A single Tailscale LXC container acts as a subnet router, advertising my home network range to my tailnet. This means any device connected to my Tailscale account can access any device on my home network — the Proxmox web UI, the NAS, other containers — through one gateway.
+
+### The Setup Steps
+
+Create a new LXC container in Proxmox. I used Debian 12, 512MB RAM, 10GB disk. Then:
+
+```bash
+# Update and install prerequisites
+apt update && apt upgrade -y
+apt install -y curl
+
+# Install Tailscale
+curl -fsSL https://tailscale.com/install.sh | sh
+
+# Enable IP forwarding (required for subnet routing)
+echo 'net.ipv4.ip_forward = 1' | tee -a /etc/sysctl.d/99-tailscale.conf
+echo 'net.ipv6.conf.all.forwarding = 1' | tee -a /etc/sysctl.d/99-tailscale.conf
+sysctl -p /etc/sysctl.d/99-tailscale.conf
+
+# Start Tailscale and advertise your home subnet
+tailscale up --advertise-routes=192.168.1.0/24 --accept-dns=false
+```
+
+The `--advertise-routes=192.168.1.0/24` part tells Tailscale that this container can route traffic to your entire home network. After running this, go to the Tailscale admin console in your browser, find the new device, and approve the advertised route.
+
+One important Proxmox-specific step: by default, LXC containers can't do IP forwarding. You need to edit the container's config file on the Proxmox host:
+
+```bash
+# On the Proxmox host, edit the container config
+nano /etc/pve/lxc/YOUR_CONTAINER_ID.conf
+
+# Add these lines
+lxc.cgroup2.devices.allow: c 10:200 rwm
+lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
+```
+
+Then restart the container. Without this, Tailscale can't create its tunnel device inside the LXC container.
+
+### Disable Key Expiry
+
+By default, Tailscale rotates keys periodically, which means your device will silently drop off the tailnet if you don't re-authenticate. For a server that needs to be always-on, go to the admin console, click the three dots next to your Tailscale gateway, and select "Disable key expiry."
+
+## Accessing Everything Remotely
+
+With Tailscale running on my phone, laptop, and the home gateway container, I can:
+
+- **Open the Proxmox web UI** at `https://192.168.1.102:8006` from my phone on cellular data
+- **SSH into any container** using its local IP address as if I were sitting at home
+- **Access my Synology NAS** web interface, file shares, and Docker containers
+- **Browse to any self-hosted service** running on my network
+
+All of this works through Tailscale's WireGuard-based mesh VPN. No ports are opened on my router. No dynamic DNS is configured. My ISP can change my IP address as often as they want — Tailscale handles the coordination.
+
+### Tailscale ACLs
+
+If you share your tailnet with family members, you probably don't want everyone having access to your Proxmox admin panel. Tailscale's ACLs let you control this:
+
+```json
+{
+  "acls": [
+    {
+      "action": "accept",
+      "src": ["tag:admin"],
+      "dst": ["*:*"]
+    },
+    {
+      "action": "accept",
+      "src": ["tag:family"],
+      "dst": ["192.168.1.100:5000"]
+    }
+  ]
+}
+```
+
+This gives admin-tagged devices full access, while family-tagged devices can only reach the NAS web interface on port 5000. Clean, simple, and managed from one place.
+
+## Tailscale SSH
+
+One feature I only discovered recently: Tailscale SSH. Instead of managing SSH keys across all your devices, Tailscale can handle authentication using your Tailscale identity. Enable it in the admin console, install the Tailscale SSH host on your servers, and you can SSH into any machine on your tailnet without key management.
+
+```bash
+# On the target machine
+tailscale set --ssh
+
+# From any Tailscale device
+ssh user@machine-name
+```
+
+No key files, no `authorized_keys` management, no "permission denied (publickey)" debugging. It just works. The authentication is tied to your Tailscale login, and you can control access through ACLs.
+
+## Docker Inside LXC — The Nested Container Setup
+
+Running Docker inside a Proxmox LXC container is slightly unusual — it's containers inside containers. But it works well and is lighter than running Docker inside a full VM.
+
+The key requirement is creating a privileged LXC container (or an unprivileged one with the right AppArmor profile). In Proxmox, when creating the container, check "Nesting" under Features. This allows the container to run its own containers.
+
+Inside the LXC container, install Docker normally:
+
+```bash
+curl -fsSL https://get.docker.com | sh
+```
+
+Then use Docker Compose for your services. I keep my compose files in a Git repo on my Gitea instance, so I can version-control my entire home lab configuration.
+
+## Backup Strategy
+
+Proxmox has built-in backup functionality. I run nightly backups of all LXC containers and VMs to my Synology NAS via an NFS share. The backups are compressed and stored with a 7-day retention policy. If a container breaks, I can restore it from the Proxmox UI in a few minutes.
+
+For the Tailscale configuration specifically: the container is so small and quick to recreate that I don't worry too much about backing it up. The Tailscale state is tied to your account, not the device — if the container dies, I can create a new one, install Tailscale, and it rejoins the tailnet automatically.
+
+## What This Setup Gives Me
+
+The practical result is a home lab that I can manage from anywhere. When I was recovering from a knee injury and couldn't easily get to my office, I could access everything from my phone in bed. When I'm at a coffee shop and need to check something on a dev VM, I open my laptop, Tailscale connects automatically, and I'm there.
+
+The total cost: the mini PC was about £150 refurbished, Tailscale's free tier covers everything I need (100 devices, 3 users), and Proxmox is free. The only ongoing cost is electricity — the server draws about 25 watts, so roughly £50 a year.
+
+For a backend engineer who wants a proper lab environment without cloud bills, this is the sweet spot.

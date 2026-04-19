@@ -1,15 +1,14 @@
-import { Container } from "@/components/container";
-import { PageHeading } from "@/components/page-heading";
-import { PageTransitionWrapper } from "@/components/page-transition-wrapper";
-import { ProjectCard } from "@/components/project-card";
-import { fetchGitHubData } from "@/lib/github";
-import type { Metadata } from "next";
-import { PageViewEvent } from "@/components/analytics-event";
+import type { Metadata } from 'next';
+import { Container } from '@/features/shared/container';
+import { PageTransitionWrapper } from '@/features/shared/page-transition-wrapper';
+import { PageHeader } from '@/features/shared/page-header';
+import { ProjectCard } from '@/features/projects/project-card';
+import { fetchGitHubData } from '@/lib/github';
+import { PageViewEvent } from '@/features/shared/analytics-event';
+import { createPageMetadata } from '@/lib/metadata';
+import { about } from '../../../content/about';
 
-export const metadata: Metadata = {
-  title: "Projects | Hammayo's Portfolio",
-  description: "Explore my latest projects and open source contributions on GitHub.",
-};
+export const metadata: Metadata = createPageMetadata('projects', '/projects');
 
 // This ensures the page revalidates every 1 hour
 export const revalidate = 3600;
@@ -33,11 +32,16 @@ export default async function ProjectsPage() {
   return (
     <PageTransitionWrapper>
       <PageViewEvent page="projects" />
-      <Container>
-        <PageHeading 
+      <Container className="py-8">
+        <PageHeader
           title="Projects"
-          description="Explore my most recent projects and open source contributions."
+          subtitle="Explore my most recent projects and open source contributions."
         />
+
+        <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
+          {about.projectsIntro}
+          <br /><br />
+        </p>
 
         {pinnedRepos.length === 0 && otherRepos.length === 0 ? (
           <div className="text-center p-8">
@@ -47,32 +51,25 @@ export default async function ProjectsPage() {
           </div>
         ) : (
           <div className="space-y-8">
-            {/* Recent Pinned Projects Section */}
             {recentPinnedRepos.length > 0 && (
               <div>
                 <h2 className="text-xl font-semibold mb-4 text-zinc-200">Featured Projects</h2>
                 <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
                   {recentPinnedRepos.map((project, index) => (
-                    <ProjectCard 
-                      key={project.id} 
-                      repo={project} 
-                      index={index}
-                      featured={true}
-                    />
+                    <ProjectCard key={project.id} repo={project} index={index} featured />
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Other Pinned Projects Section */}
             {remainingPinnedRepos.length > 0 && (
               <div>
                 <h2 className="text-xl font-semibold mb-4 text-zinc-200">Other Pinned Projects</h2>
                 <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
                   {remainingPinnedRepos.map((project, index) => (
-                    <ProjectCard 
-                      key={project.id} 
-                      repo={project} 
+                    <ProjectCard
+                      key={project.id}
+                      repo={project}
                       index={index + recentPinnedRepos.length}
                     />
                   ))}
@@ -80,15 +77,14 @@ export default async function ProjectsPage() {
               </div>
             )}
 
-            {/* Other Projects Section */}
             {otherRepos.length > 0 && (
               <div>
                 <h2 className="text-xl font-semibold mb-4 text-zinc-200">Other Projects</h2>
                 <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
                   {otherRepos.map((project, index) => (
-                    <ProjectCard 
-                      key={project.id} 
-                      repo={project} 
+                    <ProjectCard
+                      key={project.id}
+                      repo={project}
                       index={index + recentPinnedRepos.length + remainingPinnedRepos.length}
                     />
                   ))}

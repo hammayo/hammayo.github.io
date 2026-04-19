@@ -1,0 +1,74 @@
+---
+title: "What It Actually Means to Build Software for the Prison Service"
+date: "2026-03-07"
+summary: "Four years building software used inside prisons taught me things about compliance, trust, and the cost of bugs that no amount of FinTech work had prepared me for."
+tags: [".net", "compliance", "architecture", "security"]
+published: false
+---
+
+Most software engineers will never write code that directly affects whether someone can call their family.
+
+I spent four years doing exactly that at Unilink Software, building applications used inside His Majesty's Prison and Probation Service (HMPPS). This is what that experience actually looks like from the inside.
+
+## What HMPPS Software Does
+
+The prison service runs on software you've never heard of. Prisoner case management, canteen ordering, phone call management, video conferencing for legal visits, risk assessment tools. Unilink builds several of these.
+
+The users are case workers, governors, and wing officers. The end beneficiaries are prisoners and their families. The consequences of bugs are not "the user sees an error" — they're "a prisoner's legal call didn't connect" or "a welfare flag wasn't surfaced to the right person at the right time."
+
+That context changes how you think about software quality.
+
+## SC Clearance
+
+To work on MoJ systems you need Security Check (SC) clearance. The process involves a background check going back five to ten years: employment history, financial checks, criminal record, and a review of your personal and family background if you have connections to certain countries.
+
+It takes three to six months. While you're waiting, you work on internal tooling or non-classified systems. When it comes through, it's simply a letter — no ceremony.
+
+The practical implication for engineers: you need to be sponsored by an employer, the clearance is tied to that employer, and it lapses if you move to a role that doesn't require it. Renewal through a new employer is possible but requires a new sponsorship and a shorter re-vetting process.
+
+## Audit Trails Are Not Optional
+
+Every significant action in an HMPPS system needs to be attributable. Who did it, when, from which terminal, with which authorisation. This isn't a feature you add at the end — it's a constraint that shapes your data model from the start.
+
+```csharp
+public class AuditEntry
+{
+    public Guid AuditId { get; set; }
+    public string UserId { get; set; }
+    public string Action { get; set; }
+    public string EntityType { get; set; }
+    public string EntityId { get; set; }
+    public string? PreviousValue { get; set; }
+    public string? NewValue { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public string TerminalId { get; set; }
+}
+```
+
+We wrote audit records for every state change on any entity that affected a prisoner's record. No soft deletes without audit. No bulk updates without logging the before and after state.
+
+The audit table is the most important table in the system. Treat it accordingly: separate it, protect it, make it append-only.
+
+## Immutable Records and the Temptation to Fix Things
+
+When something goes wrong in a normal system, you fix the data. In a regulated environment, you document why the record is wrong and create a correction record.
+
+This feels clunky. It is clunky. It's also essential for the defence of any decision that was made on the basis of that record.
+
+The principle: the system's view of history must match what the users experienced. If a case worker made a decision based on incorrect information, that incorrect information needs to be preserved — with a correction alongside it — not overwritten.
+
+## Change Management and Deployments
+
+HMPPS systems deploy to a managed estate. You don't push to production on a Friday afternoon. Change requests are submitted, reviewed by a change advisory board, and approved for specific maintenance windows — often weekend nights.
+
+The discipline this enforces is genuinely valuable. Your deployment has to be reversible. Your migration has to be non-destructive. Your rollback plan has to be written down before the change is approved.
+
+After four years of this, I find it difficult to trust teams who can't answer "how do we roll this back?" before they merge.
+
+## What It Changes About You
+
+Working in a regulated environment makes you slower and more careful in ways that persist long after you leave.
+
+You default to explicit over implicit. You document decisions, not just code. You think about the failure mode before the happy path. You ask "what happens to the audit trail?" before "what happens to the user?"
+
+These are not bad habits to carry into FinTech, retail systems, or anywhere else. The prison service doesn't have a monopoly on consequences — it just makes them visible.

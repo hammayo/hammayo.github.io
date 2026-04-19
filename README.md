@@ -2,291 +2,224 @@
 
 # Hammayo
 
+> A portfolio site for a backend software engineer. Next.js 16, MDX blog, static export, GitHub Pages.
 >
-> A modern, responsive portfolio website built with Next.js, TypeScript, and Tailwind CSS.
->
-> https://hammayo.github.io/ 
->
+> https://hammayo.co.uk
 
 ## Features
 
-- 🚀 Built with Next.js 15
-- 🔍 SEO optimized
-- 📱 Fully responsive
-- 🎨 Dark and light mode
-- 💨 Fast and lightweight
-- ⚡ Server-side rendering
-- 🧠 Type-safe with TypeScript
-- 🛠️ Error boundary for graceful error handling
-- 📊 Centralized environment variable management
-- 🔄 Clean code architecture
-- 📝 Comprehensive documentation
+- **Next.js 16** — static export (`output: 'export'`), App Router, deployed to GitHub Pages
+- **Blog** — MDX files in-repo, Zod-validated frontmatter, full-text search (Pagefind ⌘K), tag filtering, RSS feed (`/feed.xml`), per-post OG images
+- **Colour scheme system** — 4 named schemes driven by time of day, CSS custom properties, smooth crossfades
+- **Dark / light mode** — next-themes
+- **Syntax highlighting** — rehype-pretty-code + Shiki (tokyo-night), copy-to-clipboard on hover
+- **Tailwind CSS v4** — CSS-first config in `globals.css`
+- **Type-safe** — TypeScript strict, Zod v4 validation
+- **CI/CD** — Gitleaks secret scan, build + Pagefind index, deploy to GitHub Pages
 
-## 🚀 Getting Started
+## Getting Started
 
-### Prerequisites
-- Git
-- Node.js 18+
-- npm, yarn, or bun
-
-### Installation
-
-1. Clone the repository:
 ```bash
 git clone https://github.com/hammayo/hammayo.github.io.git
 cd hammayo.github.io
-```
-
-2. Install dependencies:
-```bash
-# Using npm
-npm install
-
-# Using yarn
-yarn install
-
-# Using bun
 bun install
+cp .env.local.example .env.local
+bun run dev
 ```
 
-3. Set up environment variables:
-- Copy `.env.local.example` to `.env.local`
-- Fill in the necessary environment variables
+Open [http://localhost:3000](http://localhost:3000).
 
-### Development
+> **Note:** The blog search (⌘K) requires a built Pagefind index and won't work in `bun run dev`. Run `bun run build && bun run serve` to test search locally.
 
-Start the development server:
+### Local Testing Modes
 
-```bash
-# Using npm
-npm run dev
+| Mode | Command | Navigation | Search | Use Case |
+|---|---|---|---|---|
+| **Dev** | `bun dev` | ✅ Full client-side routing | ❌ Unavailable | Development, testing features |
+| **Static export** | `bun run serve` | ⚠️ Direct URLs only* | ✅ Works | Testing search, pre-deployment |
 
-# Using yarn
-yarn dev
+\* In `bun run serve`, clicking links doesn't navigate (limitation of static export). However, direct URL access works fine (`/about/` loads the About page). **This doesn't affect GitHub Pages** — production uses direct URL access.
 
-# Using bun
-bun dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
-
-### Building for Production
-
-Build the application for production:
+## Build
 
 ```bash
-# Using npm
-npx serve build     
-npm run build
-
-# Using yarn
-yarn build
-
-# Using bun
 bun run build
 ```
 
-### Running in Production
+Runs three steps in sequence:
 
-Start the production server:
+1. `node scripts/copy-blog-assets.mjs` — copies post images/media to `public/blog-assets/`
+2. `next build` — static export to `out/`
+3. `pagefind --site out` — generates full-text search index into `out/pagefind/`
 
-```bash
-# Using npm
-npm run start
-
-# Using yarn
-yarn start
-
-# Using bun
-bun start
-```
-
-## 🛠️ Deployment
-
-### GitHub Pages
-
-The project is configured for easy deployment to GitHub Pages using GitHub Actions. Simply push to the main branch to trigger a deployment.
-
-### Vercel
-
-For deployment to Vercel, connect your GitHub repository to Vercel for automatic deployment.
-
-## 📂 Project Structure
-
-```
-hammayo.github.io/
-├── .github/           # GitHub Actions workflows
-├── .vscode/           # VS Code configuration
-│   └── launch.json    # Debugging configuration
-├── public/            # Static assets
-│   ├── icons/         # Favicon and app icons
-│   └── screenshots/   # README screenshots
-├── src/
-│   ├── app/           # Next.js App Router
-│   │   ├── contact/   # Contact page
-│   │   ├── projects/  # Projects page
-│   │   ├── layout.tsx # Root layout
-│   │   └── page.tsx   # Home page
-│   ├── components/    # React components
-│   │   ├── ui/        # UI components
-│   │   └── project-card.tsx  # Project specific components
-│   ├── lib/           # Utilities
-│   │   ├── constants.ts # App constants
-│   │   ├── env.ts     # Environment variables
-│   │   ├── github.ts  # GitHub API client
-│   │   ├── logger.ts  # Logging utility
-│   │   └── utils.ts   # Utility functions
-│   └── providers/     # React context providers
-├── .env.local         # Local environment variables
-├── .eslintrc.js      # ESLint configuration
-├── .eslintrc.json    # Additional ESLint rules
-├── bun.lock          # Bun lock file
-├── components.json   # shadcn/ui configuration
-├── netlify.toml     # Netlify configuration
-├── next.config.ts   # Next.js configuration
-├── package.json     # Project dependencies
-├── postcss.config.mjs # PostCSS configuration
-├── tailwind.config.ts # Tailwind CSS configuration
-└── tsconfig.json    # TypeScript configuration
-```
-
-## 🔧 Configuration
-
-### Environment Variables
-
-The application uses type-safe environment variables with Zod validation. Create a `.env.local` file with the following variables:
+## Environment Variables
 
 ```bash
-# Next.js
-NODE_ENV=development
+# Local basePath override — only needed if testing static export locally with a sub-path.
+# In CI, basePath is derived automatically from GITHUB_REPOSITORY (env.ts ignores this var when GITHUB_ACTIONS=true).
 NEXT_PUBLIC_BASE_PATH=
 
-# GitHub (for GitHub Pages deployment)
-GITHUB_ACTIONS=
-GITHUB_REPOSITORY=
+# GitHub API — pinned repos on the projects page (optional)
+GITHUB_USERNAME=
+GITHUB_TOKEN=
 
 # Analytics (optional)
 GA_MEASUREMENT_ID=G-xxxxxxxx
 ```
 
-Environment variables are managed in `src/lib/env.ts` with runtime validation:
+`SITE_URL` (`https://hammayo.co.uk`) is hardcoded in `src/lib/constants.ts`.
 
-```typescript
-const envSchema = z.object({
-  // Next.js specific
-  NODE_ENV: z.enum(["development", "production", "test"])
-    .optional()
-    .default("development"),
-  
-  // GitHub specific
-  GITHUB_ACTIONS: z.string().optional(),
-  GITHUB_REPOSITORY: z.string().optional(),
-  
-  // Analytics
-  GA_MEASUREMENT_ID: z.string().optional(),
-});
+## Project Structure
+
+```
+hammayo.github.io/
+├── content/
+│   ├── blogs/                       # Blog posts
+│   │   └── YYYY-MM-DD-slug/
+│   │       ├── index.mdx            # Post content + frontmatter
+│   │       └── assets/              # Images, PDFs, media (optional)
+│   ├── about.ts / cv.ts / blogs.ts / contact.ts  # Page content data
+├── scripts/
+│   └── copy-blog-assets.mjs         # Prebuild: copies assets to public/
+├── src/
+│   ├── app/                         # Route shells
+│   │   ├── blogs/
+│   │   │   ├── page.tsx             # Blog list page
+│   │   │   └── [slug]/page.tsx      # Individual post page
+│   │   ├── feed.xml/route.ts        # RSS 2.0 feed
+│   │   └── sitemap.ts               # Auto-includes blog slugs
+│   ├── design/
+│   │   ├── schemes.ts               # Colour scheme registry
+│   │   └── variants.ts              # CVA variants (gradientText, accentTag, etc.)
+│   ├── features/
+│   │   ├── blogs/                   # BlogCard, BlogList, SearchPalette,
+│   │   │                            # PostHeader, PostBody, PostNav, ScrollProgress,
+│   │   │                            # mdx-components, pipeline, schema
+│   │   └── shared/                  # Header, footer, layout primitives, Radix UI
+│   └── lib/
+│       ├── constants.ts             # SITE, SOCIAL, SITE_URL
+│       ├── env.ts                   # Zod-validated env
+│       └── imageLoader.ts           # GitHub Pages basePath image loader
+└── .github/workflows/deploy.yml     # CI: gitleaks → copy assets → build → pagefind → deploy
 ```
 
-*NOTE*: For GitHub Actions deployment, the following environment variables are automatically set in `.github/workflows/deploy.yml`:
-```yaml
-env:
-  NODE_ENV: production
-  NEXT_PUBLIC_BASE_PATH: ${{ github.event.repository.name }}
+## Colour Scheme System
+
+`SchemeProvider` resolves the active scheme from the visitor's local time and injects CSS custom properties on `:root`. No colour logic lives in individual components.
+
+| Scheme | Hours | Character |
+|---|---|---|
+| `silver` | 06:00–11:59 | Metallic, refined |
+| `deep-purple` | 12:00–17:59 | Saturated, bold |
+| `glass` | 18:00–21:59 | Airy, cool |
+| `violet-blue` | 22:00–05:59 | Deep, rich |
+
+## Writing a Blog Post
+
+### 1. Create the post folder
+
+Folder name format: `YYYY-MM-DD-your-slug`
+
+```bash
+mkdir -p content/blogs/2026-05-01-my-post-title/assets
 ```
 
+### 2. Create `index.mdx`
 
-### Base Path Configuration
+```markdown
+---
+title: "Your post title"
+date: "2026-05-01"
+summary: "One sentence shown in the post card and RSS feed."
+tags: ["architecture", "next.js"]
+published: true
+---
 
-The application automatically configures base paths for different environments:
+Your post body in Markdown. MDX is supported — you can use React components inline.
 
-- **Development**: No base path
-- **GitHub Pages**: Uses repository name as base path
-- **Production**: Configurable via environment variables
+## A section heading
 
-Base path logic is handled in `src/lib/env.ts`:
+Regular paragraph text. **Bold**, _italic_, `inline code`.
 
-```typescript
-export const isGithubActions = Boolean(env.GITHUB_ACTIONS);
-export const repo = env.GITHUB_REPOSITORY?.replace(/.*?\//, '') || '';
-export const basePath = isGithubActions ? `/${repo}` : '';
-export const assetPrefix = isGithubActions ? `/${repo}/` : '';
+```ts
+// Code blocks are syntax-highlighted with a copy button
+const example = true;
+` ``
+
+![Alt text](./assets/my-image.png)
 ```
 
-### Configuration Files
+**Frontmatter fields:**
 
-- **next.config.ts**: Next.js configuration including image optimization and base path settings
-- **tailwind.config.ts**: Tailwind CSS theme and plugin configuration
-- **components.json**: shadcn/ui component configuration
-- **tsconfig.json**: TypeScript compiler options
-- **postcss.config.mjs**: PostCSS plugins configuration
-- **eslintrc.js**: ESLint rules and TypeScript integration
-- **netlify.toml**: Netlify deployment configuration
+| Field | Required | Notes |
+|---|---|---|
+| `title` | Yes | Post title |
+| `date` | Yes | `YYYY-MM-DD` format |
+| `summary` | Yes | Shown on list card and in RSS |
+| `tags` | No | Lowercase array, e.g. `["next.js", "docker"]` |
+| `published` | No | Defaults to `true`. Set `false` to draft |
+| `readingTime` | No | Auto-calculated if omitted (200 wpm) |
 
-### Constants
+### 3. Add images or media (optional)
 
-Application-wide constants are centralized in `src/lib/constants.ts`:
+Place files in the `assets/` subfolder. Reference them with relative paths in MDX:
 
-```typescript
-export const SITE = {
-  name: "Hammayo's Portfolio",
-  title: "Hammayo's | Backend Software Engineer",
-  description: "Portfolio site showcasing dev projects.",
-  // ...
-};
-
-export const SOCIAL = {
-  github: "https://github.com/hammayo",
-  linkedin: "https://linkedin.com/in/hammayo",
-  email: "hammy@hammayo.co.uk",
-};
-
-export const THEME = {
-  defaultTheme: "dark",
-  lightThemeColor: "#ffffff",
-  darkThemeColor: "#000000",
-};
+```markdown
+![Diagram](./assets/diagram.png)
+[Download spec](./assets/spec.pdf)
 ```
 
-## 🔧 Best Practices
+Assets are automatically copied to `public/blog-assets/your-slug/` at build time.
 
-- **Type Safety**: Comprehensive TypeScript usage for type safety
-- **Environment Variable Management**: Centralized environment variable management with runtime validation
-- **Error Handling**: Comprehensive error boundary implementation
-- **Logging**: Structured logging system
-- **Code Organization**: Clear separation of concerns
-- **Configuration Management**: Centralized constants and configuration
-- **Responsive Design**: Mobile-first approach with Tailwind CSS
-- **SEO Optimization**: Metadata and semantic HTML
-- **Performance Optimization**: Efficient bundle size and loading strategies
-- **Accessibility**: ARIA attributes and semantic HTML
+### 4. Preview locally
 
-### Personal Information
+```bash
+bun run dev
+```
 
-Edit the following files to customize portfolio:
+Open `http://localhost:3000/blogs` — your post appears in the list. The search palette will show "unavailable in development" (expected).
 
-1. **Home Page**: `/src/app/page.tsx` - Update introduction and hero section
-2. **Projects**: GitHub repositories are automatically fetched and displayed
-3. **Contact Information**: `/src/app/contact/page.tsx` - Update contact details
-4. **Header Links**: `/src/components/header.tsx` - Modify navigation links
+> To preview with full search: `bun run build && bun run serve`
 
-### Styling
+### 5. Publish
 
-- **Colors**: Edit the gradient colors in `/src/app/globals.css`
-- **Theme**: Modify the theme variables in `/src/app/globals.css`
-- **Typography**: Change the font in `/src/app/layout.tsx`
+```bash
+git add content/blogs/2026-05-01-my-post-title/
+git commit -m "content: add post — my post title"
+git push origin feature/my-post-title
+```
 
-## 📷 Screenshots
+Open a PR from your feature branch → `develop`, then merge `develop` → `main`. GitHub Actions picks up the push to `main`, runs the full build pipeline, and deploys to `hammayo.co.uk`. The post goes live in ~2 minutes.
 
-![Home Page](/public/screenshots/home.png)
+### Drafts
 
-![Dark/Light Mode](/public/screenshots/contact.png)
+Set `published: false` to keep a post out of production builds, the sitemap, and the RSS feed. It still appears when running `bun run dev` locally.
 
+## Deployment
 
-## Acknowledgements
+Two workflows run on `main`:
 
-- [Next.js](https://nextjs.org/)
-- [TypeScript](https://www.typescriptlang.org/)
-- [shadcn/ui](https://ui.shadcn.com/)
-- [Tailwind CSS](https://tailwindcss.com/)
-- [Framer Motion](https://www.framer.com/motion/)
+**`deploy.yml`** — triggered on every push to `main`:
 
+1. **Gitleaks** — secret scan; blocks deploy if any credential is found in committed files or git history
+2. **Copy assets** — `node scripts/copy-blog-assets.mjs`
+3. **Build** — `bunx --bun next build` → static output in `out/`
+4. **Index** — `bunx pagefind --site out` → search index in `out/pagefind/`
+5. **Deploy** — `out/` uploaded to GitHub Pages, served at `hammayo.co.uk`
+
+**`version-increment.yml`** — triggered when a PR is merged into `main`:
+
+1. Reads the current `version` from `package.json`
+2. Bumps the patch version (`1.0.x → 1.0.x+1`) and commits `[skip ci]`
+3. Creates a GitHub Release with auto-generated release notes
+
+## Customisation
+
+| What | Where |
+|---|---|
+| Name, title, social links | `src/lib/constants.ts` |
+| Colour schemes | `src/design/schemes.ts` |
+| Blog tag order | `content/blogs.ts` → `pinnedTags` |
+| Navigation links | `src/features/shared/header.tsx` |
+| Global CSS, fonts | `src/app/globals.css` |
+| MDX element overrides | `src/features/blogs/mdx-components.tsx` |

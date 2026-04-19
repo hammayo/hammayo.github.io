@@ -1,0 +1,95 @@
+---
+title: "Containerising Legacy .NET Services: What No One Warns You About"
+date: "2026-01-15"
+summary: "Moving a prison service platform from bare-metal Windows services to Docker containers taught me more about our own codebase than three years of feature work."
+tags: ["docker", ".net", "devops", "microservices"]
+published: false
+---
+
+When I joined Unilink Software, the deployment process for our HMPPS (His Majesty's Prison and Probation Service) platform looked like this: Remote Desktop into a VM, stop the Windows service, overwrite the binaries, restart, pray.
+
+By the time I left, our services ran in Docker containers on Linux, built and deployed through Jenkins pipelines, with consistent environments from dev to production.
+
+This is what I learned along the way.
+
+## The Starting Point
+
+Legacy .NET doesn't mean .NET Framework 2.0. It can mean .NET 6 services that were written for Windows, hard-coded paths using backslashes, dependency on the Windows registry, or services that relied on MSMQ for messaging.
+
+Our services hit most of those.
+
+The first thing to do is not write a Dockerfile. The first thing to do is run the application and look at everything it touches.
+
+## The Audit Phase
+
+Before writing a single line of Docker config, spend a day with Sysinternals Process Monitor. Filter for file system activity, registry reads, and network connections while your service starts up. You'll find things the team forgot about.
+
+We found:
+- Config reads from `C:\ProgramData\Unilink\` — no environment variable support
+- A hardcoded connection string in a config transform that only ran on the build server
+- A dependency on a Windows-only COM component that had been wrapped in a `try/catch` and silently ignored for two years
+
+None of these were in the documentation, because the documentation was three engineers' combined memory.
+
+## The Dockerfile
+
+Once you know what the service actually needs, write a multi-stage build:
+
+```dockerfile
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+COPY ["src/Unilink.Service.csproj", "src/"]
+RUN dotnet restore "src/Unilink.Service.csproj"
+
+COPY src/ src/
+RUN dotnet publish "src/Unilink.Service.csproj" -c Release -o /app/publish --no-restore
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+WORKDIR /app
+
+COPY --from=build /app/publish .
+
+ENV ASPNETCORE_ENVIRONMENT=Production
+ENTRYPOINT ["dotnet", "Unilink.Service.dll"]
+```
+
+The `mcr.microsoft.com` images are the official Microsoft images — use them, not community images, for anything in a regulated environment.
+
+## Configuration: The Real Problem
+
+The .NET configuration system (`IConfiguration`, `appsettings.json`, environment variables) is genuinely good. The problem is that legacy services often don't use it correctly — they call `ConfigurationManager.AppSettings["key"]` directly, which doesn't read environment variables.
+
+The migration path:
+1. Inject `IConfiguration` wherever `ConfigurationManager` is called
+2. Map old app settings keys to environment variable names
+3. Add a validation step at startup that checks required config is present
+
+```csharp
+// Before
+var connStr = ConfigurationManager.AppSettings["Database:ConnectionString"];
+
+// After
+var connStr = _configuration["Database:ConnectionString"]
+    ?? throw new InvalidOperationException("Database:ConnectionString is required");
+```
+
+Don't skip the validation. A container that starts up but silently uses a null connection string is harder to debug than one that exits immediately with a clear error.
+
+## Messaging: MSMQ to Something Real
+
+MSMQ doesn't work in containers. It's Windows-only, it requires a service installation, and it can't be shared between containers.
+
+We moved to Kafka for high-throughput streams and RabbitMQ for simpler task queues. The migration was a rewrite of the messaging layer — there's no shortcut here. But the contracts (what messages look like, what consumers expect) stayed the same. Separate the transport from the message shape.
+
+## What Worked
+
+Containerising forced conversations that hadn't happened in years. Why does this service need to write to disk? What happens if it restarts? Why are these two services sharing a database connection string?
+
+Every ugly assumption surfaced. Some of them we fixed. Some of them we documented as known constraints. Either outcome was better than not knowing.
+
+## The Part Nobody Talks About
+
+The hard part isn't Docker. It's getting a regulated-environment ops team, who are responsible for systems that affect people's liberty, to trust a new deployment model.
+
+Demonstrate the rollback story first. Show that a bad deployment can be reverted in two minutes by changing a tag and redeploying. That conversation matters more than any Dockerfile.

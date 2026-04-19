@@ -1,0 +1,86 @@
+---
+title: "Real-Time Integrations in Fuel Forecourt Systems: What I've Learned at PDI"
+date: "2026-04-18"
+summary: "Fuel forecourts are complex real-time environments: pump controllers, site controllers, POS kiosks, payment processors, and loyalty platforms all talking to each other simultaneously. Here's what building integrations in this space actually involves."
+tags: [".net", "real-time", "integrations", "payments", "architecture"]
+published: false
+---
+
+Most engineers have filled up a car. Few have thought about what happens in the 40 seconds between lifting the nozzle and the receipt printing.
+
+At PDI Technologies, I've spent the last year building the integration layer that sits between those systems. It's a more complex real-time environment than most enterprise software, and it's taught me things about integration design that apply well beyond forecourts.
+
+## The Systems Involved
+
+A fuel forecourt is not one system — it's five or six systems that need to agree on state in real time:
+
+**Pump controllers** — the hardware units attached to each pump. They send events: nozzle lifted, fuelling started, fuelling complete, volume and price. They also receive authorisation signals: this pump is cleared to dispense, this pump is locked.
+
+**Site controller (DOMS)** — the on-site server that coordinates all pumps and is the source of truth for the forecourt. DOMS (Dealer Operations Management System) manages the price file, pump configuration, and transaction records.
+
+**OPT (Outdoor Payment Terminal)** — the card reader on the pump. Handles card-present payments without the customer needing to go inside. Integrates with payment processors and needs to reconcile with the DOMS transaction record.
+
+**POS kiosks** — indoor point-of-sale systems. Handle payment for prepay customers, post-pay after fuelling, tobacco, car wash, and anything else the forecourt sells.
+
+**Payment processor** — the third-party system that handles card authorisation and settlement. Multiple processors may be active at once for different card types.
+
+**Loyalty platforms** — third-party systems (fuel retailer apps, supermarket loyalty cards) that award points, apply discounts, or authorise prepaid fuel budgets.
+
+## The Integration Challenge
+
+Every one of these systems has its own protocol, its own timing requirements, and its own failure modes. The integration layer has to translate between them in real time while maintaining consistency.
+
+A prepay transaction illustrates the complexity:
+
+1. Customer taps loyalty card on OPT
+2. Loyalty platform validates card and authorises £40 fuel budget — 200ms timeout
+3. OPT sends authorisation to DOMS
+4. DOMS clears the pump for up to £40
+5. Customer fuels — pump sends volume events every second
+6. Customer stops at £32.40 — pump sends completion event
+7. DOMS records transaction
+8. Payment processor settles £32.40 against the loyalty authorisation
+9. Loyalty platform is notified of actual spend
+10. Receipt prints
+
+That's nine systems, nine integrations, in under 60 seconds — some of those steps running in parallel, all of them needing to handle timeouts and partial failures gracefully.
+
+## What Breaks and How to Handle It
+
+**The loyalty platform is unavailable.** The customer should still be able to pay by card at the normal rate. The integration layer has to time out the loyalty call quickly — 200ms, not 30 seconds — and fall back to a standard payment flow.
+
+```csharp
+public async Task<AuthorisationResult> AuthoriseLoyalty(
+    LoyaltyAuthorisationRequest request,
+    CancellationToken ct)
+{
+    using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+    cts.CancelAfter(TimeSpan.FromMilliseconds(200));
+
+    try
+    {
+        return await _loyaltyClient.AuthoriseAsync(request, cts.Token);
+    }
+    catch (OperationCanceledException)
+    {
+        _logger.LogWarning(
+            "Loyalty authorisation timed out for terminal {TerminalId}",
+            request.TerminalId);
+        return AuthorisationResult.TimedOut();
+    }
+}
+```
+
+**The pump sends a completion event with no matching authorisation.** Happens when a prepay was cancelled at the OPT but the pump was already running. Route this to a manual reconciliation queue, not discard it.
+
+**Two payment processors are both active and the routing rule is ambiguous.** This needs explicit logging, not silent default behaviour. If money goes to the wrong processor, reconciliation at end of day becomes painful.
+
+## What This Domain Teaches About Integration Design
+
+**Idempotency is non-negotiable.** Pump events can be delivered more than once. Payment confirmations can be retried. Every handler needs to be able to receive the same message twice and produce the same outcome.
+
+**Explicit failure is better than silent default.** When something unexpected happens — an unknown pump state, an unrecognised loyalty card prefix, a transaction that doesn't match any open authorisation — log it explicitly and route it to a reconciliation process. Never silently discard.
+
+**Timeouts are part of the contract.** Every external call needs an explicit timeout. In a real-time system, a slow third party that you wait for indefinitely is more damaging than one that fails fast.
+
+The forecourt is a good model for thinking about any high-volume, multi-party integration. The systems are different. The principles aren't.
