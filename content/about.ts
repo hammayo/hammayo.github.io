@@ -9,8 +9,8 @@ export type CareerEntry = {
 };
 
 export const about = {
-  name:            'Hammayo Babar',
-  shortName:       'Hammy Babar',
+  name:            'Hammayo',
+  shortName:       'Hammy',
   tagline:         'Backend & Infrastructure Engineer',
   careerStartYear: 2004,
 

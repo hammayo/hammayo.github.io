@@ -1,0 +1,101 @@
+---
+title: "Networking My Home Office Cabin — Router, APs, and a Synology NAS That Ties It All Together"
+date: "2025-12-27"
+summary: "How I connected a garden cabin office to my house network without running Ethernet through the garden — the kit, the wireless bridge setup, and lessons learned from two years of running it."
+tags: ["homelab", "networking", "self-hosted"]
+published: true
+---
+
+I work from a log cabin at the bottom of my garden. It's about 15 metres from the house, through a wall, across a patio, and past whatever weather London is throwing at us that day. When I first set it up, I was working off the house Wi-Fi signal that barely reached the cabin — two bars on a good day, constant drops during video calls, and download speeds that made pulling Docker images feel like dial-up.
+
+This is the story of how I fixed it properly, what I spent, and what I'd do differently if I started again.
+
+## The Problem
+
+The cabin needs reliable, fast internet for my day-to-day work: pulling Git repos, running Docker containers, video calls, accessing my Synology NAS for file storage, and SSH-ing into my Proxmox server. "Reliable" is the key word — I can't have the connection dropping mid-deployment or during a stand-up.
+
+The constraints: I didn't want to dig a trench across the garden for Ethernet (landlord wouldn't allow it, and honestly, I couldn't be bothered). Powerline adapters were out because the cabin is on a separate electrical circuit. That left wireless — but proper wireless, not "hope the signal reaches."
+
+## The Kit
+
+Here's what I ended up with:
+
+**Router** — This sits in the house, connected to the broadband. It handles DHCP, DNS, and is the gateway for everything. I've got it configured with a static IP range for my lab devices (192.168.1.100-199) and DHCP for everything else.
+
+**Access Point in the cabin** — This is the critical piece. Rather than trying to extend the house Wi-Fi with a repeater (which halves your bandwidth), I set up a dedicated AP in the cabin that connects back to the house. The AP broadcasts its own SSID for cabin devices, and everything routes through to the router in the house.
+
+**Synology DS118 NAS** — This lives in the house, running DSM (Synology's latest OS). It handles file storage, backups from my MacBook via Time Machine, and Docker containers for a few self-hosted services. It's a single-bay unit, so no RAID — I back up critical files to an external drive and to cloud storage. For a home setup, it's been reliable and quiet.
+
+**Raspberry Pi** — Running Pi-hole for network-wide ad blocking and DNS filtering. Every device on the network uses the Pi as its DNS server, which means I get ad blocking on my phone, laptop, and work machine without installing anything on them individually.
+
+## The Network Layout
+
+```
+ISP Modem
+    │
+Router (192.168.1.1)
+    │
+    ├── Synology DS118 (192.168.1.100) — wired
+    ├── Raspberry Pi (192.168.1.101) — wired, running Pi-hole
+    ├── Proxmox Server (192.168.1.102) — wired
+    │
+    └── [wireless bridge to cabin]
+            │
+        Cabin AP (192.168.1.2)
+            │
+            ├── MacBook (DHCP) — Wi-Fi
+            ├── Work Laptop (DHCP) — Wi-Fi
+            └── Any other cabin devices
+```
+
+Everything is on the same subnet (192.168.1.0/24). The cabin AP is in bridge mode, not routing mode, so there's no double-NAT headache. Devices in the cabin can see and access devices in the house directly — my MacBook can mount the NAS, access Proxmox, and reach the Pi-hole DNS without any routing tricks.
+
+## The Synology DS118 — Small But Capable
+
+I bought the DS118 because I needed something quiet, low-power, and reliable — not a 4-bay rack unit. It runs 24/7 in the house and pulls about 15 watts. For a single-bay NAS, it does a lot:
+
+**File sharing:** SMB shares for documents, project files, and media. My MacBook backs up to it via Time Machine over the network.
+
+**Docker support:** DSM has a built-in Docker package. I run a few lightweight containers on it — nothing heavy, because it's an ARM-based single-bay unit, but enough for things like a local Gitea instance and a small wiki.
+
+**Tailscale:** The Synology package manager has a Tailscale app. One click install, authenticate, and the NAS is accessible from anywhere on my tailnet. I can pull files from my NAS while sitting in a coffee shop with the same speed as if I were at home (well, limited by upload speed, but the connection is seamless).
+
+**DSM itself** is genuinely good. The latest version has a clean interface, proper security features (2FA, firewall rules, automatic security advisor), and it handles updates without the NAS needing to be babysat. I've had exactly zero unplanned downtime in two years.
+
+The one limitation is the single bay — if the drive fails, I lose local copies. My mitigation: weekly backup of critical files to an external USB drive, and cloud sync for documents. It's not enterprise-grade redundancy, but it's appropriate for a home setup.
+
+## Setting Up the Wireless Bridge
+
+This was the part that took the most trial and error. The key insight is that a wireless repeater and a wireless bridge are different things, and most consumer "Wi-Fi extenders" are repeaters — they halve your bandwidth because they receive and retransmit on the same radio.
+
+What you want for a cabin-to-house link is either:
+
+1. A point-to-point wireless bridge (dedicated link between two units)
+2. An AP in the cabin with a wired backhaul (requires running a cable)
+3. A mesh system with a dedicated wireless backhaul channel
+
+I went with option 1. The AP in the cabin connects to the router's Wi-Fi on one radio and broadcasts a local network on another. The practical result: I get 80-90% of the router's speed in the cabin, which is more than enough for everything I do.
+
+## Lessons Learned
+
+**Static IPs for infrastructure devices.** The NAS, Proxmox server, Pi-hole, and cabin AP all have static IPs set on the devices themselves (not DHCP reservations on the router, though I have those too as a belt-and-braces measure). When your DNS server has a static IP, everything else just works.
+
+**Pi-hole as your DNS server is transformative.** I was sceptical, but once I set Pi-hole as the DNS server on the router (so every device on the network uses it automatically), the difference was immediately visible. Fewer ads, faster page loads (because ad resources aren't being fetched), and I can see exactly what's making DNS queries on my network. It also blocks telemetry from devices that phone home constantly.
+
+**Separate SSIDs for work and personal.** I run two SSIDs from the cabin AP — one for my work laptop and one for personal devices. Same network, same subnet, but it makes it easy to see which devices are which in the router's device list. Small thing, but useful when troubleshooting.
+
+**Monitor your NAS temperature.** The DS118 is in a cupboard in the house. Synology's Resource Monitor shows CPU temperature and fan speed. In summer, I've seen it creep up to 55°C in the cupboard. I added a small USB fan to keep air moving, and it dropped back to the low 40s. Worth checking if your NAS is in an enclosed space.
+
+**The cabin AP needs a weatherproof power solution.** My cabin has mains electricity, so this was straightforward — the AP plugs into a wall socket. If your cabin or shed doesn't have power, you'd need to look at PoE (Power over Ethernet) with a cable run, or a weatherproof outdoor AP mounted on the house that points at the cabin.
+
+## What I'd Do Differently
+
+If I were starting from scratch today, I'd seriously consider running a single Ethernet cable from the house to the cabin. Yes, it means either burying it or running it along a fence, but the reliability of a wired backhaul is unbeatable. Wi-Fi bridges work, but they're affected by weather, interference from neighbours' networks, and the occasional unexplained dropout that requires an AP reboot.
+
+I'd also start with a two-bay NAS instead of a single-bay. The DS118 has been great, but having RAID 1 (mirrored drives) would remove the "what if the drive dies" anxiety. The Synology DS223 or similar would have been worth the extra cost.
+
+## The End Result
+
+Today, my cabin office has a reliable 150+ Mbps connection, full access to my NAS and Proxmox server in the house, network-wide ad blocking, and Tailscale for accessing everything from outside. Video calls don't drop, Docker images pull at full speed, and I can work from the cabin as if I were sitting next to the router.
+
+It took a weekend to set up properly and cost less than you'd think. The most expensive single item was the NAS. The networking kit was under £200 total. For a home office setup that I use 8+ hours a day, it's been one of the best investments I've made.

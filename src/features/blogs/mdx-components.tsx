@@ -108,15 +108,39 @@ export const mdxComponents: MDXComponents = {
   },
 
   h2: ({ children, ...props }) => (
-    <h2 className="mt-10 mb-4 text-xl font-semibold text-foreground border-b border-border pb-2" {...props}>
+    <h2 className="mt-10 mb-4 text-xl font-semibold gradient-text border-b border-[var(--scheme-border)] pb-2" {...props}>
       {children}
     </h2>
   ),
 
   h3: ({ children, ...props }) => (
-    <h3 className="mt-8 mb-3 text-lg font-semibold text-foreground" {...props}>
+    <h3 className="mt-8 mb-3 text-lg font-semibold text-[var(--scheme-accent-text)]" {...props}>
       {children}
     </h3>
+  ),
+
+  h4: ({ children, ...props }) => (
+    <h4 className="mt-6 mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground" {...props}>
+      {children}
+    </h4>
+  ),
+
+  // Lists — scheme-coloured markers, prose handles spacing/indent
+  ul: ({ children, ...props }) => (
+    <ul className="marker:text-[var(--scheme-accent)]" {...props}>
+      {children}
+    </ul>
+  ),
+
+  ol: ({ children, ...props }) => (
+    <ol className="marker:text-[var(--scheme-accent-text)]" {...props}>
+      {children}
+    </ol>
+  ),
+
+  // Horizontal rule — thin gradient bar
+  hr: () => (
+    <div className="my-8 h-px gradient-bg opacity-30 rounded-full" />
   ),
 
   blockquote: ({ children, ...props }) => (
@@ -126,5 +150,38 @@ export const mdxComponents: MDXComponents = {
     >
       {children}
     </blockquote>
+  ),
+
+  // Tables — escape prose styles, apply scheme borders
+  table: ({ children, ...props }) => (
+    <div className="not-prose my-6 overflow-x-auto rounded-xl border border-[var(--scheme-border)]">
+      <table className="w-full text-sm" {...props}>
+        {children}
+      </table>
+    </div>
+  ),
+
+  thead: ({ children, ...props }) => (
+    <thead className="bg-[var(--scheme-accent)]/[0.07] border-b border-[var(--scheme-border)]" {...props}>
+      {children}
+    </thead>
+  ),
+
+  tr: ({ children, ...props }) => (
+    <tr className="border-b border-border last:border-0 transition-colors hover:bg-[var(--scheme-accent)]/[0.03]" {...props}>
+      {children}
+    </tr>
+  ),
+
+  th: ({ children, ...props }) => (
+    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[var(--scheme-accent-text)]" {...props}>
+      {children}
+    </th>
+  ),
+
+  td: ({ children, ...props }) => (
+    <td className="px-4 py-3 text-sm text-muted-foreground" {...props}>
+      {children}
+    </td>
   ),
 };

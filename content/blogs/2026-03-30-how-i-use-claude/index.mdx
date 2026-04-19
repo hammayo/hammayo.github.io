@@ -1,0 +1,118 @@
+---
+title: "How I Actually Use Claude — From Prompt Engineering to Agents and MCP"
+date: "2026-03-30"
+summary: "A year of using Claude daily for backend engineering work — what actually helps, what doesn't, and how features like Projects, MCP, and Claude Code fit into a real workflow."
+tags: ["ai", "tooling", "productivity"]
+published: true
+---
+
+I've been using Claude daily for about a year now. Not in a "let me ask it to write me a poem" way — in a "I need to debug this EF Core migration that's silently dropping a column in production" way. This post is a brain-dump of what I've learned about making Claude genuinely useful for software engineering work, covering prompt engineering, the newer features like Projects, MCP, and Managed Agents, and the habits that separate a frustrating AI experience from a productive one.
+
+## Starting With the Right Expectations
+
+The single biggest mistake I made early on was treating Claude like a search engine. "How do I do X in C#?" gets you a generic answer. What actually works is treating it like a very well-read colleague who's just joined your team and needs context.
+
+The difference:
+
+**Weak prompt:** "How do I set up dependency injection in .NET?"
+
+**Better prompt:** "I'm working on a .NET 8 Web API using Clean Architecture. My service layer has a class called `OrderProcessor` that depends on `IOrderRepository` and `IPaymentGateway`. I need to register these in `Program.cs` with scoped lifetime because they use EF Core's `DbContext`. Show me the registration and explain why scoped is the right choice here over transient."
+
+The second prompt gives Claude enough context to give you an answer you can actually use. The first one gives you a tutorial you could have found on Microsoft Learn.
+
+## Prompt Engineering That Actually Matters
+
+After hundreds of conversations, I've settled on a few patterns that consistently get better results.
+
+### Give It a Role and Constraints
+
+I almost always start with something like: "Act as a senior .NET backend engineer reviewing my code. Be direct. If something is wrong, say so — don't soften it."
+
+This isn't magic — it's context-setting. Claude's responses are noticeably more specific and less hedged when you tell it what perspective to take.
+
+### Use System Prompts in Projects
+
+Claude's Projects feature lets you set a system prompt and attach reference files that persist across conversations. I have a project called "Backend Work" with a system prompt that includes my preferred conventions: Clean Architecture, EF Core Code-First, xUnit for testing, specific naming conventions. Every conversation in that project starts with that context already loaded, so I don't have to repeat myself.
+
+This is genuinely one of the most underused features. If you're using Claude for work and you haven't set up a Project with your conventions, you're wasting time on every conversation.
+
+### Break Complex Problems Into Steps
+
+When I need Claude to help with something multi-step — say, refactoring a monolithic service into microservices — I don't dump the entire problem in one message. I work through it conversationally:
+
+1. "Here's my current service. What are the natural bounded contexts you can see?"
+2. "Good. Let's take the Order context. What would the interface boundaries look like?"
+3. "Now show me how the Kafka events would flow between the Order and Inventory contexts."
+
+Each step gives me a chance to course-correct before Claude goes off in the wrong direction. It's the difference between pair programming and throwing a spec over the wall.
+
+### XML Tags for Structure
+
+When I need Claude to produce structured output — say, generating both a migration script and the corresponding EF Core model changes — I use XML tags in my prompt:
+
+```
+Give me the following in separate sections:
+<migration>The SQL migration script</migration>
+<model>The updated EF Core model class</model>
+<test>An xUnit test for the new behaviour</test>
+```
+
+Claude respects these tags consistently and it makes the output much easier to parse and use.
+
+## MCP — Connecting Claude to Your Actual Tools
+
+Model Context Protocol is where things get properly interesting. MCP lets Claude talk to external tools and data sources through a standardised protocol. In practice, this means Claude can read your files, query your database, interact with your GitHub repos, and pull from your Google Drive — all within a conversation.
+
+I've connected Claude to Notion for project documentation and Google Drive for shared specs. The practical benefit is huge: instead of copy-pasting a requirements document into the chat, I can say "pull up the API spec from Drive and tell me which endpoints are missing error handling."
+
+For anyone running a home lab or working with self-hosted tools, the MCP ecosystem is growing quickly. There are MCP servers for PostgreSQL, SQLite, GitHub, file systems, and dozens more. If you're building internal tools, this is worth exploring.
+
+## Claude Code — The Terminal Agent
+
+Claude Code is the command-line tool that turns Claude into a coding agent. You point it at your repo, and it can read files, make edits, run tests, and iterate on solutions — all from your terminal.
+
+I've used it for a few things:
+
+**Refactoring sessions.** "Find all uses of the deprecated `ILogger` extension method in this solution and replace them with the structured logging pattern we use in `OrderService`." Claude Code reads the files, proposes changes, and applies them — with you approving each one.
+
+**Test generation.** "Write xUnit tests for `PaymentGatewayService` covering the happy path, insufficient funds, and gateway timeout scenarios. Use Moq for dependencies." It reads the actual service code, understands the dependencies, and generates tests that actually compile.
+
+**Documentation.** "Read all the public API controllers in this project and generate a markdown summary of each endpoint with its parameters and response types." This is the kind of tedious-but-valuable work that Claude Code handles well.
+
+The key thing with Claude Code is that it has CLAUDE.md files — project-level instructions that tell it your conventions, preferences, and constraints. This is the equivalent of the Projects system prompt, but for your codebase. If you set this up properly, Claude Code produces output that actually matches your team's style.
+
+## Managed Agents — What's New
+
+Anthropic recently launched Managed Agents in public beta. The idea is straightforward: instead of running your own agent infrastructure (sandboxing, state management, credential handling), you define an agent and Anthropic runs it for you.
+
+For backend engineers, the interesting application is automation tasks that need to run for extended periods — things like code review bots, data processing pipelines, or monitoring agents that react to alerts. The pricing is standard token rates plus a small per-hour runtime charge.
+
+I haven't shipped anything with Managed Agents yet, but I've been experimenting with building a PR review agent that checks new pull requests against our team's coding standards. Early days, but the infrastructure barrier is genuinely lower than rolling your own.
+
+## Best Practices I've Learned the Hard Way
+
+**Always verify generated code.** Claude is good, but it's not infallible. I've had it generate EF Core configurations that looked correct but had subtle issues with cascade delete behaviour. Trust, but verify — especially for database operations.
+
+**Use the "think step by step" pattern for complex logic.** When I need Claude to work through something intricate — like designing an event-driven workflow with compensation logic — I explicitly say "think through this step by step before giving me the implementation." The reasoning quality improves noticeably.
+
+**Don't fight the context window.** If a conversation is getting long and Claude starts losing track of earlier context, start a new conversation and paste in the current state. It's faster than trying to remind Claude of things it said 40 messages ago.
+
+**Provide examples of what you want.** If I need Claude to generate code in a specific style, I paste in an example from my codebase and say "follow this pattern." This is consistently more effective than describing the style in words.
+
+**Use Claude for the first draft, not the final draft.** The best workflow I've found is: Claude generates the skeleton, I review and adjust, then Claude helps refine specific sections. Trying to get a perfect answer in one shot leads to frustration.
+
+## Where Claude Falls Short (Honestly)
+
+It's worth being honest about limitations. Claude sometimes generates plausible-looking code that doesn't actually work — particularly with less common library APIs or very recent framework changes. It can be confidently wrong about Azure service limits or pricing. And it sometimes over-engineers solutions when a simple approach would do.
+
+The trick is knowing when to trust it and when to double-check. For well-established patterns (SOLID principles, common EF Core operations, standard CI/CD configurations), it's very reliable. For edge cases, newer APIs, or anything involving specific version compatibility, verify independently.
+
+## Getting Started If You Haven't Yet
+
+If you're a .NET developer who hasn't properly explored Claude yet, here's what I'd suggest:
+
+Start with a Claude Project. Set a system prompt with your tech stack and conventions. Attach your coding standards document if you have one. Then start using it for code review — paste in a pull request and ask Claude to review it. You'll see immediately whether the system prompt is giving you useful, relevant feedback or generic advice.
+
+From there, try Claude Code on a small refactoring task. Then explore MCP connections to the tools you actually use.
+
+The goal isn't to replace your expertise — it's to handle the mechanical parts faster so you can focus on the decisions that actually matter.

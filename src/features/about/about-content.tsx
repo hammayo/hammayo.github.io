@@ -22,7 +22,7 @@ export function AboutContent({ about }: AboutContentProps) {
         <PageHeader title="About" subtitle={about.tagline} className="mb-0" />
         <div className="flex items-center gap-3 flex-shrink-0">
           <p className="text-sm font-semibold text-right hidden sm:block">
-            <span className="animate-gradient gradient-text">{about.name}</span>
+            <span className="animate-gradient gradient-text"></span>
           </p>
           <Image
             loader={imageLoader}

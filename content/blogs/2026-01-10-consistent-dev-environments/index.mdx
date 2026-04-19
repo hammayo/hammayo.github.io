@@ -1,0 +1,213 @@
+---
+title: "One Developer, Three Operating Systems — How I Keep My Dev Environment Consistent"
+date: "2026-01-10"
+summary: "MacBook at home, Windows at work, Ubuntu in a VM. How I use a dotfiles repo, Bash as a common shell, and a few disciplined habits to keep the same workflow across all three platforms."
+tags: ["tooling", "devops", "dotfiles"]
+published: true
+---
+
+My daily reality: at home I develop on a MacBook running macOS with Parallels Desktop for Windows and Ubuntu VMs. At work, I'm on Windows 11 Pro. My home lab runs Ubuntu Server. At any point in the day, I might be writing C# in Rider on macOS, debugging a WinForms app in Visual Studio on Windows, or SSH-ing into an Ubuntu container on Proxmox.
+
+If I had a different set of tools, aliases, and configurations on each platform, I'd spend half my day remembering which machine I'm on instead of writing code. This post is about how I keep everything consistent — the dotfiles, the tools, the shell setup, and the VM configurations that make it all work.
+
+## The Core Problem
+
+It's not just "I use multiple operating systems." It's that I switch between them constantly, sometimes within the same hour. I'll be writing backend code on macOS, flip to a Windows VM to test a WinForms change, then SSH into Ubuntu to check a Docker container. Each switch is a context change, and every difference in tooling adds friction.
+
+The things that need to be the same across platforms: Git configuration, shell aliases, SSH keys, common CLI tools, editor settings, and the general "feel" of the terminal. The things that can be different: the IDE (Rider on Mac, VS on Windows for specific tasks), the OS-specific tools, and the desktop environment.
+
+## macOS as Home Base
+
+My MacBook is the primary machine at home. The shell setup:
+
+**Terminal:** I use the built-in Terminal.app with Bash. I know Zsh is the default on macOS now, and I know there are fancier terminal emulators. Bash works, it's what I know, and it's the same shell that runs on my Ubuntu servers. Consistency over aesthetics.
+
+**Homebrew** handles package management. The essentials I install on every fresh macOS setup:
+
+```bash
+brew install git node dotnet-sdk docker
+brew install --cask rider visual-studio-code parallels
+```
+
+**Dotfiles repo:** I keep my shell configuration in a Git repo (`~/.dotfiles`). This includes `.bashrc`, `.bash_aliases`, `.gitconfig`, and a setup script that symlinks everything into place. When I set up a new machine or reinstall, I clone the repo, run the setup script, and my environment is ready.
+
+The `.bash_aliases` file is the same across macOS and Linux:
+
+```bash
+# Navigation
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ll='ls -alF'
+
+# Git shortcuts
+alias gs='git status'
+alias gp='git pull'
+alias gc='git commit'
+alias gco='git checkout'
+alias gl='git log --oneline -20'
+
+# Docker
+alias dc='docker compose'
+alias dps='docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"'
+alias dlogs='docker logs -f'
+
+# .NET
+alias dr='dotnet run'
+alias dt='dotnet test'
+alias db='dotnet build'
+```
+
+These aliases work identically on macOS and Ubuntu. On Windows (via WSL or Git Bash), they work there too. One file, three platforms.
+
+## Parallels Desktop — Windows and Ubuntu on macOS
+
+Parallels is how I run Windows and Ubuntu on my MacBook. I've tried VirtualBox and VMware Fusion, and Parallels is the smoothest experience on Apple Silicon Macs. The integration is good enough that I sometimes forget I'm in a VM.
+
+### My Parallels Setup
+
+**Windows 11 VM:** 8GB RAM, 4 cores, 100GB disk. This runs Visual Studio for WinForms development and any Windows-specific testing. Parallels' Coherence mode lets me run Windows apps alongside macOS apps without seeing the full Windows desktop, but honestly I prefer the full-screen VM approach — it's clearer which environment I'm in.
+
+**Ubuntu 24.04 VM:** 4GB RAM, 2 cores, 60GB disk. This mirrors my production Linux environment more closely than macOS does. I use it for testing Docker configurations, running Linux-specific tools, and verifying that my code behaves the same on Linux as on macOS (it usually does, but "usually" isn't "always" when you're dealing with file path separators and case sensitivity).
+
+### Shared Folders
+
+Parallels lets you share macOS folders with VMs. I share my `~/Projects` directory with both VMs, so the same codebase is accessible from macOS, Windows, and Ubuntu without copying files. The performance is good enough for development — I wouldn't run a database on a shared folder, but for source code it's seamless.
+
+### Snapshots Before Experiments
+
+Before I install something experimental or make system-level changes in a VM, I take a Parallels snapshot. If things go wrong, I roll back in 30 seconds. This is liberating — I'm much more willing to try new tools and configurations when I know I can undo everything instantly.
+
+## Windows 11 Pro at Work
+
+My work machine runs Windows 11 Pro. The development stack:
+
+**Git Bash** gives me a Bash environment on Windows. It ships with Git for Windows and provides most of the Unix commands I use daily. My dotfiles repo works here too — I clone it and symlink the `.bash_aliases` and `.gitconfig` files.
+
+**WSL2 (Windows Subsystem for Linux):** This is Ubuntu running natively inside Windows, and it's remarkably good. I use it for Docker development (Docker Desktop integrates with WSL2), running Bash scripts, and any Linux-specific tooling. The file system integration means I can access my Windows files from Ubuntu and vice versa.
+
+The practical workflow: I write code in Rider (which runs natively on Windows), build and test using either the Windows .NET SDK or WSL2's .NET SDK depending on the target, and use Docker through WSL2 for containerised services.
+
+### WSL2 Tips That Took Me Too Long to Discover
+
+**Memory limits:** WSL2 will happily consume all your RAM if you let it. Create a `.wslconfig` file in your Windows user directory:
+
+```ini
+[wsl2]
+memory=8GB
+processors=4
+swap=4GB
+```
+
+This caps WSL2's memory usage so your Windows host doesn't starve.
+
+**Accessing WSL files from Windows:** The WSL file system is mounted at `\\wsl$\Ubuntu` in Windows Explorer. You can open files in Rider or VS Code directly from here. Going the other direction, your Windows drives are mounted at `/mnt/c/`, `/mnt/d/`, etc. inside WSL.
+
+**VS Code Remote - WSL extension:** If you use VS Code for quick edits, the Remote - WSL extension lets you open a project that lives in WSL and edit it with full IntelliSense, but the language server runs inside WSL. This means path resolution, file watching, and builds all behave like Linux, even though your editor is running on Windows.
+
+## Keeping It All in Sync
+
+The secret to making this multi-platform setup not drive you mad is version-controlling everything that matters.
+
+### Dotfiles Repository
+
+My `.dotfiles` repo contains:
+
+```
+.dotfiles/
+├── .bashrc
+├── .bash_aliases
+├── .gitconfig
+├── .editorconfig
+├── setup.sh          # macOS/Linux setup
+├── setup-windows.sh  # Git Bash / WSL setup
+└── rider/
+    └── settings.zip  # Rider settings export
+```
+
+The setup scripts detect the OS and apply the right configuration:
+
+```bash
+#!/bin/bash
+OS="$(uname -s)"
+DIR="$(cd "$(dirname "$0")" && pwd)"
+
+ln -sf "$DIR/.bashrc" "$HOME/.bashrc"
+ln -sf "$DIR/.bash_aliases" "$HOME/.bash_aliases"
+ln -sf "$DIR/.gitconfig" "$HOME/.gitconfig"
+
+if [ "$OS" = "Darwin" ]; then
+    echo "macOS detected — installing Homebrew packages"
+    # macOS-specific setup
+elif [ "$OS" = "Linux" ]; then
+    echo "Linux detected"
+    # Linux-specific setup
+fi
+
+echo "Done. Restart your shell."
+```
+
+When I change an alias or a Git setting, I update the dotfiles repo, push it, and pull it on the other machines. The whole sync takes 30 seconds.
+
+### Git Configuration
+
+My `.gitconfig` is the same everywhere:
+
+```ini
+[user]
+    name = Hammayo Babar
+    email = hammayo.babar@gmail.com
+[core]
+    autocrlf = input
+    editor = code --wait
+[pull]
+    rebase = true
+[init]
+    defaultBranch = main
+[alias]
+    lg = log --oneline --graph --decorate -20
+    st = status -sb
+    co = checkout
+    unstage = reset HEAD --
+```
+
+The `autocrlf = input` setting is crucial for cross-platform work. It ensures line endings are normalised to LF in the repo, regardless of whether you committed from Windows (which uses CRLF) or macOS/Linux (which uses LF). Without this, you'll get phantom diffs where every line in a file appears changed because the line endings are different.
+
+### SSH Keys
+
+I use the same SSH key across all my machines, stored in `~/.ssh/`. On macOS, the keychain handles the passphrase. On Windows, I use `ssh-agent` in Git Bash. On Ubuntu (both native and WSL), `ssh-agent` again.
+
+The key pair lives in my dotfiles repo in an encrypted form (using `age` encryption). When setting up a new machine, I decrypt it into `~/.ssh/` and set the permissions:
+
+```bash
+chmod 700 ~/.ssh
+chmod 600 ~/.ssh/id_ed25519
+chmod 644 ~/.ssh/id_ed25519.pub
+```
+
+## The Daily Workflow
+
+A typical day looks like this:
+
+**Morning:** Open MacBook, start Rider, pull latest code. Work on backend features in C# on macOS. Docker Compose up for local dependencies (SQL Server container, Redis container).
+
+**Midday:** Flip to Parallels Windows VM to test a WinForms change in Visual Studio. The shared folder means the code is already there — no copy step.
+
+**Afternoon:** SSH into Proxmox via Tailscale to check on a running service. Use the same Bash aliases I use everywhere else.
+
+**Work days:** Same workflow on the Windows 11 work machine, but with Rider running natively on Windows and Docker through WSL2.
+
+The point is: regardless of which OS I'm in, my muscle memory works. `gs` shows Git status. `dc up` starts Docker Compose. `dt` runs dotnet test. The tools are different underneath, but the interface is the same.
+
+## What Makes This Work (and What Doesn't)
+
+**What works:** Bash as a common shell, version-controlled dotfiles, Rider running on all three platforms, Docker being available everywhere (native on Mac, Docker Desktop on Windows with WSL2 backend, native on Linux).
+
+**What doesn't work perfectly:** File system performance on shared folders is slower than native. Parallels shared folders add maybe 10-20% latency compared to local disk. Not a problem for code editing, but noticeable when running a build that touches thousands of files.
+
+**What I'd change:** I'd invest more time in setting up Dev Containers (the VS Code / Rider feature that runs your development environment inside a Docker container). This would give me truly identical environments everywhere, regardless of host OS. It's on my list but I haven't got round to it yet.
+
+## The Bottom Line
+
+You don't need a complicated setup to work across multiple operating systems. You need three things: a dotfiles repo, a shell that works the same everywhere (Bash), and the discipline to keep your configurations version-controlled. Everything else is details.
+
+The initial setup takes an afternoon. After that, it's automatic — and the mental energy you save from not having to remember "wait, is the alias `gs` or `git status` on this machine?" adds up to hours every week.
