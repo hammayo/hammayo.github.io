@@ -7,12 +7,11 @@ on:
       - main
 
 jobs:
-  increment-version:
+  tag-release:
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      pull-requests: write
 
     steps:
       - name: Checkout repository
@@ -21,34 +20,25 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-
-      - name: Install dependencies
-        run: bun install
-
       - name: Configure Git
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
-      - name: Increment version
+      - name: Create version tag
         id: version
         run: |
-          CURRENT_VERSION=$(node -p "require('./package.json').version")
-          NEW_VERSION=$(node -p "const [major, minor, patch] = '${CURRENT_VERSION}'.split('.'); [major, minor, parseInt(patch) + 1].join('.')")
-          node -e "const fs=require('fs'),p=require('./package.json');p.version='${NEW_VERSION}';fs.writeFileSync('./package.json',JSON.stringify(p,null,2)+'\n')"
-          echo "new_version=${NEW_VERSION}" >> $GITHUB_OUTPUT
-          git add package.json bun.lock
-          git commit -m "chore: bump version to ${NEW_VERSION} [skip ci]"
-          git push
+          LATEST=$(git describe --tags --abbrev=0 2>/dev/null || echo "v.0.0.0")
+          NEW_TAG=$(echo $LATEST | awk -F. '{$NF=$NF+1; print}' OFS='.')
+          git tag $NEW_TAG
+          git push origin $NEW_TAG
+          echo "tag=${NEW_TAG}" >> $GITHUB_OUTPUT
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v.${{ steps.version.outputs.new_version }}
-          name: Release v.${{ steps.version.outputs.new_version }}
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Release ${{ steps.version.outputs.tag }}
           draft: false
           prerelease: false
           generate_release_notes: true
