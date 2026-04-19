@@ -3,6 +3,7 @@ import { Button } from '@/features/shared/ui/button';
 import { Mail } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from './theme-toggle';
+import { SchemeSelector } from './scheme-selector';
 import { CopyrightYear } from './copyright-year';
 import { Container } from './container';
 import { GithubIcon, LinkedinIcon } from './icons';
@@ -47,7 +48,8 @@ export function Footer({ className }: { className?: string }) {
               <span className="sr-only">Email</span>
             </a>
           </Button>
-          <div className="ml-2 border-l border-border/40 pl-4">
+          <div className="ml-2 border-l border-border/40 pl-4 flex items-center gap-3">
+            <SchemeSelector />
             <ThemeToggle aria-label="Toggle color theme" />
           </div>
         </div>
