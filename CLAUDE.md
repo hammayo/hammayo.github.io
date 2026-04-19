@@ -1,4 +1,4 @@
-cl# CLAUDE.md
+# CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -41,7 +41,17 @@ Static exports create pre-rendered HTML files + RSC payload files (`.txt` files 
 
 ### Colour scheme system
 
-`SchemeProvider` (`src/providers/scheme-provider.tsx`) resolves a scheme from visitor local time and injects CSS custom properties (`--scheme-from`, `--scheme-via`, `--scheme-to`, `--scheme-accent`, `--scheme-glow`, `--scheme-border`) onto `:root`. Components never hardcode colours — they reference these vars.
+`SchemeProvider` (`src/providers/scheme-provider.tsx`) resolves a scheme from visitor local time and injects CSS custom properties onto `:root`. Components never hardcode colours — they reference these vars.
+
+| Variable | Source | Notes |
+|---|---|---|
+| `--scheme-from/via/to` | `schemes.ts` | Gradient stop hex values |
+| `--scheme-accent` | `schemes.ts` | Raw accent hex — use for backgrounds, borders |
+| `--scheme-accent-text` | `globals.css` | Text-safe accent — darkened in light mode (`color-mix(… 60%, #000)`), full accent in dark mode. **Always use this for text/links, never `--scheme-accent` directly** |
+| `--scheme-glow` | `schemes.ts` | rgba for box-shadow |
+| `--scheme-border` | `schemes.ts` | rgba for borders |
+| `--scheme-button-from/via/to` | `schemes.ts` | Darker gradient for CTA buttons |
+| `--scheme-transition` | `schemes.ts` | Crossfade duration ms |
 
 Time-of-day mapping: `silver` 06–11, `deep-purple` 12–17, `glass` 18–21, `violet-blue` 22–05.
 
@@ -72,6 +82,8 @@ Frontmatter schema is in `src/features/blogs/schema.ts`. Invalid frontmatter on 
 
 Asset paths in MDX (`./assets/filename`) are rewritten to `/blog-assets/[slug]/filename` at parse time. The assets must be copied first by `copy-blog-assets.mjs`.
 
+**Hero image:** If `assets/hero.{png,jpg,jpeg,webp}` exists in a post folder, `PostHeader` renders a full photo header with a dark overlay. Without it, a scheme-gradient fallback header renders instead.
+
 ### `next/og` (Satori) constraints
 
 Satori (used by `opengraph-image.tsx` files) requires:
@@ -89,6 +101,8 @@ Satori (used by `opengraph-image.tsx` files) requires:
 | `src/design/variants.ts` | CVA variants used site-wide |
 | `src/features/shared/` | Header, footer, animated background, analytics, error boundary |
 | `src/features/blogs/pipeline.ts` | All blog data access — the only place that reads `content/blogs/` |
+| `src/features/blogs/mdx-components.tsx` | Custom MDX renderers: `CodeBlock` (copy-to-clipboard on hover), images, links, headings, tables |
+| `content/about.ts` | All about-page and homepage bio content — edit here, not in components |
 
 ### ESLint config
 

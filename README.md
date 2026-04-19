@@ -14,7 +14,7 @@
 - **Dark / light mode** — next-themes
 - **Syntax highlighting** — rehype-pretty-code + Shiki (tokyo-night), copy-to-clipboard on hover
 - **Tailwind CSS v4** — CSS-first config in `globals.css`
-- **Type-safe** — TypeScript strict, Zod v4 validation, zero `any`
+- **Type-safe** — TypeScript strict, Zod v4 validation
 - **CI/CD** — Gitleaks secret scan, build + Pagefind index, deploy to GitHub Pages
 
 ## Getting Started
@@ -55,7 +55,8 @@ Runs three steps in sequence:
 ## Environment Variables
 
 ```bash
-# GitHub Pages routing (set automatically by deploy.yml)
+# Local basePath override — only needed if testing static export locally with a sub-path.
+# In CI, basePath is derived automatically from GITHUB_REPOSITORY (env.ts ignores this var when GITHUB_ACTIONS=true).
 NEXT_PUBLIC_BASE_PATH=
 
 # GitHub API — pinned repos on the projects page (optional)
@@ -77,7 +78,7 @@ hammayo.github.io/
 │   │   └── YYYY-MM-DD-slug/
 │   │       ├── index.mdx            # Post content + frontmatter
 │   │       └── assets/              # Images, PDFs, media (optional)
-│   ├── about.ts / cv.ts / blogs.ts  # Page content data
+│   ├── about.ts / cv.ts / blogs.ts / contact.ts  # Page content data
 ├── scripts/
 │   └── copy-blog-assets.mjs         # Prebuild: copies assets to public/
 ├── src/
@@ -185,10 +186,10 @@ Open `http://localhost:3000/blogs` — your post appears in the list. The search
 ```bash
 git add content/blogs/2026-05-01-my-post-title/
 git commit -m "content: add post — my post title"
-git push origin main
+git push origin feature/my-post-title
 ```
 
-GitHub Actions picks up the push, runs the full build pipeline, and deploys to `hammayo.co.uk`. The post goes live in ~2 minutes.
+Open a PR from your feature branch → `develop`, then merge `develop` → `main`. GitHub Actions picks up the push to `main`, runs the full build pipeline, and deploys to `hammayo.co.uk`. The post goes live in ~2 minutes.
 
 ### Drafts
 
@@ -196,13 +197,21 @@ Set `published: false` to keep a post out of production builds, the sitemap, and
 
 ## Deployment
 
-Push to `main` triggers `deploy.yml`:
+Two workflows run on `main`:
+
+**`deploy.yml`** — triggered on every push to `main`:
 
 1. **Gitleaks** — secret scan; blocks deploy if any credential is found in committed files or git history
 2. **Copy assets** — `node scripts/copy-blog-assets.mjs`
 3. **Build** — `bunx --bun next build` → static output in `out/`
 4. **Index** — `bunx pagefind --site out` → search index in `out/pagefind/`
 5. **Deploy** — `out/` uploaded to GitHub Pages, served at `hammayo.co.uk`
+
+**`version-increment.yml`** — triggered when a PR is merged into `main`:
+
+1. Reads the current `version` from `package.json`
+2. Bumps the patch version (`1.0.x → 1.0.x+1`) and commits `[skip ci]`
+3. Creates a GitHub Release with auto-generated release notes
 
 ## Customisation
 
