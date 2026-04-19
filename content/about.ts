@@ -66,5 +66,5 @@ export const about = {
 
   projectsIntro: "Most of my professional work lives behind firewalls and NDAs — prison systems, payment platforms, and enterprise retail integrations that you'll never see on GitHub. But here are the projects I can talk about, along with some personal work that shows how I think about problems.",
 
-  avatarPath: '/images/avatar.jpg',
+  avatarPath: '/images/_hb-logo.png',
 };
