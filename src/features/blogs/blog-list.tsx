@@ -15,6 +15,7 @@ interface BlogListProps {
 export function BlogList({ posts, pinnedTags }: BlogListProps) {
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Collect all unique tags; pinned tags come first, rest alphabetically
   const allTags = useMemo(() => {
@@ -27,6 +28,13 @@ export function BlogList({ posts, pinnedTags }: BlogListProps) {
   const filtered = activeTag
     ? posts.filter(p => p.tags.includes(activeTag))
     : posts;
+
+  const POSTS_PER_PAGE = 6;
+  const totalPages = Math.ceil(filtered.length / POSTS_PER_PAGE);
+  const paginated = filtered.slice(
+    (currentPage - 1) * POSTS_PER_PAGE,
+    currentPage * POSTS_PER_PAGE
+  );
 
   return (
     <div>
@@ -50,7 +58,7 @@ export function BlogList({ posts, pinnedTags }: BlogListProps) {
       {/* Tag filter chips */}
       <div className="flex flex-wrap items-center gap-2 mb-6">
         <button
-          onClick={() => setActiveTag(null)}
+          onClick={() => { setActiveTag(null); setCurrentPage(1); }}
           className={cn(
             accentTag(),
             'cursor-pointer transition-opacity',
@@ -62,7 +70,7 @@ export function BlogList({ posts, pinnedTags }: BlogListProps) {
         {allTags.map(tag => (
           <button
             key={tag}
-            onClick={() => setActiveTag(activeTag === tag ? null : tag)}
+            onClick={() => { setActiveTag(activeTag === tag ? null : tag); setCurrentPage(1); }}
             className={cn(
               accentTag(),
               'cursor-pointer transition-opacity',
@@ -75,20 +83,95 @@ export function BlogList({ posts, pinnedTags }: BlogListProps) {
       </div>
 
       {/* Post grid */}
-      {filtered.length === 0 ? (
+      {paginated.length === 0 ? (
         <p className="text-sm text-muted-foreground py-8 text-center">
           No posts{activeTag ? ` tagged "${activeTag}"` : ''}.
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          {filtered.map((post, i) => (
+          {paginated.map((post, i) => (
             <BlogCard key={post.slug} post={post} index={i} />
           ))}
         </div>
       )}
 
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
+      )}
+
       {/* Search palette */}
       <SearchPalette open={searchOpen} onOpenChange={setSearchOpen} />
+    </div>
+  );
+}
+
+function getPageWindow(current: number, total: number): (number | '...')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+
+  const pages = new Set<number>([1, total, current]);
+  if (current > 1) pages.add(current - 1);
+  if (current < total) pages.add(current + 1);
+
+  const sorted = [...pages].sort((a, b) => a - b);
+  const result: (number | '...')[] = [];
+  for (let i = 0; i < sorted.length; i++) {
+    if (i > 0 && sorted[i] - sorted[i - 1] > 1) result.push('...');
+    result.push(sorted[i]);
+  }
+  return result;
+}
+
+interface PaginationProps {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+}
+
+function Pagination({ currentPage, totalPages, onPageChange }: PaginationProps) {
+  const pageItems = getPageWindow(currentPage, totalPages);
+  const btnBase = 'px-3 py-1.5 rounded-lg border border-[var(--scheme-border)] text-sm transition-colors';
+  const btnActive = cn(accentTag(), 'cursor-pointer');
+  const btnInactive = cn(btnBase, 'text-muted-foreground hover:text-foreground cursor-pointer');
+  const btnDisabled = cn(btnBase, 'text-muted-foreground opacity-40 cursor-not-allowed pointer-events-none');
+
+  return (
+    <div className="flex items-center justify-center gap-1 mt-8">
+      <button
+        onClick={() => onPageChange(currentPage - 1)}
+        className={currentPage === 1 ? btnDisabled : btnInactive}
+        aria-label="Previous page"
+      >
+        ←
+      </button>
+
+      {pageItems.map((item, i) =>
+        item === '...' ? (
+          <span key={`ellipsis-${i}`} className="px-2 text-sm text-muted-foreground">…</span>
+        ) : (
+          <button
+            key={item}
+            onClick={() => onPageChange(item)}
+            className={item === currentPage ? btnActive : btnInactive}
+            aria-label={`Page ${item}`}
+            aria-current={item === currentPage ? 'page' : undefined}
+          >
+            {item}
+          </button>
+        )
+      )}
+
+      <button
+        onClick={() => onPageChange(currentPage + 1)}
+        className={currentPage === totalPages ? btnDisabled : btnInactive}
+        aria-label="Next page"
+      >
+        →
+      </button>
     </div>
   );
 }
