@@ -30,9 +30,8 @@ export function BlogList({ posts, pinnedTags }: BlogListProps) {
 
   return (
     <div>
-      {/* Toolbar: search button + tag chips */}
-      <div className="flex flex-wrap items-center gap-2 mb-6">
-        {/* Search trigger */}
+      {/* Search row — right-aligned above pills */}
+      <div className="flex justify-end mb-2">
         <button
           onClick={() => setSearchOpen(true)}
           className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--scheme-border)] text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -46,8 +45,10 @@ export function BlogList({ posts, pinnedTags }: BlogListProps) {
             ⌘K
           </kbd>
         </button>
+      </div>
 
-        {/* Tag filter chips */}
+      {/* Tag filter chips */}
+      <div className="flex flex-wrap items-center gap-2 mb-6">
         <button
           onClick={() => setActiveTag(null)}
           className={cn(
