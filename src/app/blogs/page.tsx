@@ -22,17 +22,14 @@ export default function BlogsPage() {
     <PageTransitionWrapper>
       <PageViewEvent page="blogs" />
       <Container className="py-8">
-        <PageHeader title="Writing" subtitle={authoredSubtitle} className="mb-2" />
-        {postCount && (
-          <p className="text-xs text-muted-foreground mb-8">{postCount}</p>
-        )}
+        <PageHeader title="Writing" subtitle={authoredSubtitle} className="mb-4" />
 
         {posts.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8">
             No posts yet — check back soon.
           </p>
         ) : (
-          <BlogList posts={posts} pinnedTags={blogsConfig.pinnedTags} />
+          <BlogList posts={posts} pinnedTags={blogsConfig.pinnedTags} postCount={postCount} />
         )}
       </Container>
     </PageTransitionWrapper>

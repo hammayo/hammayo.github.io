@@ -10,9 +10,10 @@ import type { PostMeta } from './schema';
 interface BlogListProps {
   posts: PostMeta[];
   pinnedTags: string[];
+  postCount?: string | null;
 }
 
-export function BlogList({ posts, pinnedTags }: BlogListProps) {
+export function BlogList({ posts, pinnedTags, postCount }: BlogListProps) {
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -38,8 +39,13 @@ export function BlogList({ posts, pinnedTags }: BlogListProps) {
 
   return (
     <div>
-      {/* Search row — right-aligned above pills */}
-      <div className="flex justify-end mb-2">
+      {/* Count + search row */}
+      <div className="flex items-center justify-between mb-2">
+        {postCount ? (
+          <p className="text-xs text-muted-foreground">{postCount}</p>
+        ) : (
+          <span />
+        )}
         <button
           onClick={() => setSearchOpen(true)}
           className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--scheme-border)] text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -134,10 +140,10 @@ interface PaginationProps {
 
 function Pagination({ currentPage, totalPages, onPageChange }: PaginationProps) {
   const pageItems = getPageWindow(currentPage, totalPages);
-  const btnBase = 'px-3 py-1.5 rounded-lg border border-[var(--scheme-border)] text-sm transition-colors';
-  const btnActive = cn(accentTag(), 'cursor-pointer');
-  const btnInactive = cn(btnBase, 'text-muted-foreground hover:text-foreground cursor-pointer');
-  const btnDisabled = cn(btnBase, 'text-muted-foreground opacity-40 cursor-not-allowed pointer-events-none');
+  const btnBase = 'inline-flex items-center justify-center min-w-[2rem] h-8 px-3 rounded-lg border text-sm transition-colors';
+  const btnActive = cn(btnBase, 'border-[var(--scheme-accent)] bg-[var(--scheme-accent)]/10 text-[var(--scheme-accent-text)] font-medium cursor-pointer');
+  const btnInactive = cn(btnBase, 'border-[var(--scheme-border)] text-muted-foreground hover:text-foreground hover:border-[var(--scheme-border)] cursor-pointer');
+  const btnDisabled = cn(btnBase, 'border-[var(--scheme-border)] text-muted-foreground opacity-40 cursor-not-allowed pointer-events-none');
 
   return (
     <div className="flex items-center justify-center gap-1 mt-8">
