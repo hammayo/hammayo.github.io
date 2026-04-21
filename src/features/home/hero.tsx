@@ -19,7 +19,7 @@ const TitleContent = () => (
 
 export function Hero() {
   return (
-    <CardEffects variant="featured" className="rounded-2xl overflow-hidden">
+    <CardEffects variant="featured" alwaysAnimate>
       <TitleContent />
     </CardEffects>
   );

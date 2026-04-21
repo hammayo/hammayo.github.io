@@ -235,6 +235,39 @@
     animation-play-state: running;
   }
 
+  /* Always-on variant — solid distinct border, always animating, intensifies on hover */
+  .gradient-border-active {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .gradient-border-active::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    padding: 2px;
+    border-radius: inherit;
+    background: conic-gradient(
+      from var(--border-angle),
+      var(--scheme-from),
+      var(--scheme-via),
+      var(--scheme-to),
+      var(--scheme-from)
+    );
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 1;
+    animation: border-rotate 2.5s linear infinite;
+    z-index: 0;
+  }
+
+  .gradient-border-active:hover::before {
+    padding: 2.5px;
+    animation-duration: 1.8s;
+  }
+
   /* Animation delay utilities (replaces tailwind.config.ts plugin) */
   .animate-delay-100 { animation-delay: 100ms; }
   .animate-delay-200 { animation-delay: 200ms; }
