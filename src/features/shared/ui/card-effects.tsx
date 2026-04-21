@@ -13,9 +13,11 @@ interface CardEffectsProps {
   delay?: number;
   /** Always show scheme-coloured border (not just on hover) */
   bordered?: boolean;
+  /** Keep the rotating gradient border always running, not just on hover */
+  alwaysAnimate?: boolean;
 }
 
-export function CardEffects({ children, variant = 'default', className = '', delay = 0, bordered = false }: CardEffectsProps) {
+export function CardEffects({ children, variant = 'default', className = '', delay = 0, bordered = false, alwaysAnimate = false }: CardEffectsProps) {
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
 
@@ -36,7 +38,7 @@ export function CardEffects({ children, variant = 'default', className = '', del
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       onMouseMove={handleMouseMove}
-      className={cn('group relative h-full gradient-border-hover rounded-xl', className)}
+      className={cn('group relative h-full rounded-xl', alwaysAnimate ? 'gradient-border-active' : 'gradient-border-hover', className)}
     >
       <div className={cn(
         'relative h-full overflow-hidden transition-all duration-500 rounded-xl',
@@ -46,7 +48,12 @@ export function CardEffects({ children, variant = 'default', className = '', del
         bordered ? 'border scheme-border' : 'border border-zinc-200/50 dark:border-white/[0.05]',
         'group-hover:border-transparent',
         variant === 'featured'
-          ? 'bg-gradient-to-br from-[var(--scheme-accent)]/[0.07] via-zinc-100/60 to-sky-50/30 dark:from-zinc-900/60 dark:via-zinc-900/30 dark:to-zinc-800/30 border border-[var(--scheme-accent)]/40 dark:border-transparent dark:ring-1 dark:ring-[var(--scheme-border)]'
+          ? cn(
+              'bg-gradient-to-br from-[var(--scheme-accent)]/[0.07] via-zinc-100/60 to-sky-50/30 dark:from-zinc-900/60 dark:via-zinc-900/30 dark:to-zinc-800/30',
+              alwaysAnimate
+                ? 'border border-transparent dark:border-transparent'
+                : 'border border-[var(--scheme-accent)]/40 dark:border-transparent dark:ring-1 dark:ring-[var(--scheme-border)]'
+            )
           : cardBgBase,
         variant === 'featured' && 'group-hover:ring-transparent',
       )}>

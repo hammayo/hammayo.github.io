@@ -20,14 +20,14 @@ import {
 const SCHEME_LABELS: Record<SchemeName, string> = {
   silver: 'Silver',
   glass: 'Glass',
-  'deep-purple': 'Deep Purple',
+  'nebula': 'Nebula',
   'violet-blue': 'Violet Blue',
 };
 
 const SCHEME_TIMES: Record<SchemeName, string> = {
   silver: '06–12',
   glass: '12–18',
-  'deep-purple': '18–22',
+  'nebula': '18–22',
   'violet-blue': '22–06',
 };
 
