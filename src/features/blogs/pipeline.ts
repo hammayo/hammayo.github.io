@@ -104,7 +104,10 @@ export async function getPostBySlug(slug: string): Promise<Post | null> {
       parseFrontmatter: true,
       mdxOptions: {
         rehypePlugins: [
-          [rehypePrettyCode, { theme: 'tokyo-night' }],
+          [rehypePrettyCode, {
+            theme: { dark: 'tokyo-night', light: 'github-light' },
+            defaultColor: 'light',
+          }],
         ],
       },
     },

@@ -1,43 +1,68 @@
-'use client';
-
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState } from 'react';
 import type { MDXComponents } from 'mdx/types';
+import { CopyButton } from './copy-button';
 
-function CopyButton({ code }: { code: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      onClick={async () => {
-        await navigator.clipboard.writeText(code);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      }}
-      className="absolute right-3 top-3 rounded-md border border-border bg-muted/50 px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
-      aria-label="Copy code"
-    >
-      {copied ? 'Copied!' : 'Copy'}
-    </button>
-  );
+function extractText(node: React.ReactNode): string {
+  if (typeof node === 'string') return node;
+  if (typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(extractText).join('');
+  if (node != null && typeof node === 'object' && 'props' in (node as object)) {
+    return extractText((node as React.ReactElement<{ children?: React.ReactNode }>).props.children);
+  }
+  return '';
 }
 
-function CodeBlock({ children, ...props }: React.HTMLAttributes<HTMLPreElement>) {
-  const codeEl = (children as React.ReactElement<{ children?: string }>)?.props;
-  const code   = typeof codeEl?.children === 'string' ? codeEl.children : '';
+function CodeBlock({
+  children,
+  style: _style,
+  'data-language': language,
+  ...props
+}: React.HTMLAttributes<HTMLPreElement> & { 'data-language'?: string }) {
+  const code = extractText(children).trimEnd();
   return (
-    <div className="relative my-6 group">
+    <div
+      className="not-prose my-6 rounded-xl overflow-hidden"
+      style={{
+        background: 'var(--code-bg)',
+        border: '1px solid var(--scheme-border)',
+      }}
+    >
+      {/* Terminal chrome header */}
+      <div
+        className="flex items-center justify-between px-4 py-1.5"
+        style={{
+          background: 'var(--code-header-bg)',
+          backgroundImage: 'linear-gradient(105deg, color-mix(in srgb, var(--scheme-from) 18%, transparent) 0%, color-mix(in srgb, var(--scheme-via) 12%, transparent) 50%, color-mix(in srgb, var(--scheme-to) 8%, transparent) 100%)',
+          borderBottom: '1px solid var(--code-header-border)',
+        }}
+      >
+        <div className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-[#ff5f57]" />
+          <span className="w-2 h-2 rounded-full bg-[#febc2e]" />
+          <span className="w-2 h-2 rounded-full bg-[#28c840]" />
+        </div>
+        <div className="flex items-center gap-2">
+          {language && (
+            <span
+              className="text-[10px] font-mono uppercase tracking-widest select-none"
+              style={{ color: 'var(--scheme-accent-text)' }}
+            >
+              {language}
+            </span>
+          )}
+          {code && <CopyButton code={code} />}
+        </div>
+      </div>
+
+      {/* Code body */}
       <pre
         {...props}
-        className="overflow-x-auto rounded-xl border border-border bg-zinc-900 dark:bg-zinc-950 p-4 text-sm leading-relaxed"
+        className="overflow-x-auto p-5 text-[0.8rem] leading-relaxed m-0 rounded-none"
+        style={{ background: 'var(--code-bg)' }}
       >
         {children}
       </pre>
-      {code && (
-        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-          <CopyButton code={code.trimEnd()} />
-        </div>
-      )}
     </div>
   );
 }

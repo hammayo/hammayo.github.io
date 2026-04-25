@@ -1,0 +1,235 @@
+---
+title: "Building a Bash-first dev toolkit: what I automated, what I didn't, and what's next"
+date: "2026-04-25"
+summary: "A backend engineer's take on automating local dev environment setup with Bash — the architecture decisions, the honest gaps, and the things I'm still planning to fix."
+tags: ["bash", "devops", "tooling", "shell", "automation"]
+published: true
+---
+
+Most of my career has been spent writing backend systems — APIs, data pipelines, auth
+services, event-driven architectures. I don't usually think of shell scripting as
+something worth engineering properly. It's the glue you write at 5pm to avoid doing
+something tedious tomorrow morning.
+
+That attitude left me with a graveyard of one-off scripts that broke the moment I
+set up a new machine. So I rebuilt them as a proper toolkit — with interfaces,
+documentation, and the same design discipline I'd apply to production code.
+
+Here's what I built, where I took shortcuts, and what I still want to fix.
+
+## The problem worth solving
+
+I work across macOS and WSL on Windows, switch between projects frequently, and
+occasionally need to set up a new machine from scratch. Each time, I'd spend half
+a day installing tools, configuring the shell, and hunting for the one alias I'd
+forgotten to carry over.
+
+The real cost wasn't the setup time. It was the mental overhead of knowing my
+environment had drifted — that the version of a tool on my macOS machine might not
+match what was on the WSL instance, and that half my muscle-memory aliases only
+existed in one place.
+
+The goal was simple: one command to go from a blank Ubuntu or macOS install to
+a fully configured shell with the tools I use every day.
+
+## `setup-distro.sh` — the bootstrap
+
+This is the centrepiece. It's an idempotent, category-driven installer that
+symlinks dotfiles, installs dev tools, and configures the shell.
+
+```bash
+# Install everything
+bash setup-distro.sh
+
+# Dotfiles only — shell config without reinstalling tools
+bash setup-distro.sh --only=dotfiles
+
+# Upgrade existing tools
+bash setup-distro.sh --upgrade
+```
+
+The key design decision was idempotency. Every install step is guarded by a
+`needs_install` check — if the tool already exists and `--upgrade` isn't set,
+the step is skipped. Re-running the script on an already-configured machine
+produces the same output as running it the first time, just with `(already installed)`
+instead of `(installed)`.
+
+Categories run in dependency order:
+
+```
+dotfiles → core → cli → shell → languages → cloud → web → containers → powershell
+```
+
+`cloud` depends on `languages` because wrangler requires npm. Skip `languages`
+and wrangler is silently skipped with a warning. That kind of graceful dependency
+handling took longer to get right than the installs themselves.
+
+### Dotfiles: symlink vs copy
+
+The bootstrap makes a deliberate distinction between files that should track the
+repo and files that shouldn't:
+
+- `.bashrc`, `.bash_profile`, `.zshrc` — **symlinked**. Edits to the repo are
+  live immediately in every shell. No re-running setup after a change.
+- `.bashrc.local` — **copied**. Machine-specific config: paths, aliases, startup
+  commands. Different on every machine.
+- `.secrets` — **copied, chmod 600**. API tokens and PATs. Sourced by
+  `.bashrc.local` but never inline in it.
+
+That last separation took me an embarrassingly long time to commit to. For years
+I had tokens hardcoded in `.bashrc.local` with a comment saying *don't commit
+this*. The comment was wrong twice — once when I staged it by accident, once when
+I shared the file to help a colleague and forgot to sanitise it first.
+
+The current pattern is straightforward:
+
+```bash
+# ~/.bashrc.local — safe to inspect and share
+[[ -f "$HOME/.secrets" ]] && source "$HOME/.secrets"
+```
+
+```bash
+# ~/.secrets — never leaves the machine
+export ANTHROPIC_API_KEY="sk-ant-..."
+export AZURE_DEVOPS_PAT="..."
+```
+
+## `.bashrc` — the shell config
+
+The shell config is designed around three constraints: no secrets, graceful
+degradation, and platform awareness.
+
+Graceful degradation means every optional tool is detected at runtime. If `eza`
+isn't installed, `ls` aliases fall back to `lsd`, then to plain `ls`. If `bat`
+isn't there, `cat` stays as `cat`. The shell works on a bare Ubuntu install and
+gets progressively better as tools are added.
+
+Platform awareness is handled by a `PLATFORM` variable set at the top of `.bashrc`:
+
+```bash
+_detect_platform() {
+    case "$(uname -s)" in
+        Darwin) echo "macos" ;;
+        Linux)
+            grep -qi microsoft /proc/version 2>/dev/null && echo "wsl" && return
+            . /etc/os-release 2>/dev/null
+            case "$ID" in
+                ubuntu|debian|mint) echo "debian" ;;
+                fedora|rhel|centos) echo "redhat" ;;
+                arch|manjaro)       echo "arch"   ;;
+                *)                  echo "linux"  ;;
+            esac ;;
+    esac
+}
+PLATFORM=$(_detect_platform)
+```
+
+`PLATFORM` is available everywhere `.bashrc` is sourced — including in
+`.bashrc.local`, where it drives the platform-conditional `DEV_TOOLBOX` path
+and navigation aliases.
+
+## `_update-repos.sh` — bulk git operations
+
+I work in a monorepo-adjacent environment where a single feature often spans
+several repositories. Pulling them all individually is tedious. This script
+scans a root directory, finds repos matching a prefix, and fetches and pulls
+them in parallel using background subshells:
+
+```bash
+bash _update-repos.sh --root-path ~/repos --prefix Hydra --parallel 4 --verbose
+```
+
+The parallelism is poll-based — a simple loop checks active job counts every
+100ms and throttles to `--parallel N`. Not elegant, but it requires no external
+dependencies and works on Bash 4+.
+
+Results are written to temp files per repo and collected after all workers finish.
+The final report is sorted alphabetically regardless of completion order.
+
+## Starship and the theme system
+
+Rather than a static prompt config, there's a theme library:
+
+```
+scripts/bash/.config/starship/
+├── hammy-toolbox.toml    ← active default (Gruvbox Dark)
+├── gruvbox-rainbow.toml
+├── catppuccin-powerline.toml
+├── tokyo-night.toml
+└── pastel-powerline.toml
+```
+
+`setup-distro.sh` symlinks `hammy-toolbox.toml` to `~/.config/starship/starship.toml`.
+A `starship-theme` shell function handles switching without touching the repo:
+
+```bash
+starship-theme                # list available themes
+starship-theme tokyo-night    # apply
+```
+
+All themes use hex colour palettes rather than terminal colour names. A theme that
+looks right in Gruvbox terminal colours looks wrong on a default macOS terminal
+unless you control the exact values. Named palette references solve this.
+
+## What's not covered
+
+**No dry-run mode.** `setup-distro.sh` has no `--dry-run` flag. You can't preview
+what would be installed without committing to the run. For a script that touches
+symlinks, installs packages, and writes to `~`, this is a real gap. It's tracked
+as a known improvement, not an oversight — implementing it properly means every
+install function needs to respect a global dry-run flag, which I haven't done yet.
+
+**No source validation in `fc-rsync.sh`.** The rsync backup script will happily
+call rsync with a source path that doesn't exist. rsync fails with a cryptic error
+rather than a useful message. A two-line guard would fix it and I keep forgetting
+to add it.
+
+**The default prefix is useless.** Both `_update-repos.sh` and its PowerShell
+equivalent default to `--prefix Hydra`. That prefix matches nothing on any machine
+except mine. The default exists to satisfy the argument parser. In practice,
+`--prefix` is required — I just haven't made it formally required yet.
+
+**No gitleaks `--config` passthrough.** The pre-commit hook runs gitleaks without
+passing `--config` explicitly. This means `scripts/git-hooks/.gitleaks.toml`
+is silently ignored when the hook runs unless gitleaks finds it via its own
+discovery. The custom allowlist has no effect. The fix is a single line — I need
+to actually do it.
+
+**PowerShell 5.1 on the same machine.** The toolkit is Bash-first on macOS and
+WSL, PowerShell-first on Windows. There's no PowerShell equivalent of
+`setup-distro.sh` — bootstrapping a Windows machine is still manual.
+
+## What's next
+
+The gaps above are the honest backlog. Beyond fixing them, the things I actually
+want to build:
+
+**Secrets from a manager, not a file.** The `~/.secrets` pattern is better than
+inline tokens, but it's still a plaintext file at rest. On macOS, the Keychain
+CLI (`security find-generic-password`) can serve secrets directly into the shell
+without a file that could be accidentally `cat`-ed or included in a backup. The
+`~/.secrets` pattern would become a shim — present on machines without a manager,
+replaced by Keychain or 1Password CLI where they're available.
+
+**Self-updating the toolbox.** There's no mechanism to pull changes from the repo
+and re-apply the bootstrap. The symlinks mean `.bashrc` changes are live, but
+new tools added to `setup-distro.sh` require a manual re-run. An `update-toolbox`
+command that does a `git pull` and re-runs `setup-distro.sh --only=dotfiles` would
+cover most cases.
+
+**Fish shell support.** Everything is bash and zsh. Fish has syntax that makes
+some patterns cleaner and a plugin ecosystem I want to explore. The platform
+detection and alias structure would need a full rewrite for Fish — it's a larger
+effort than porting the config line by line.
+
+**A TOML config file for user preferences.** Right now, defaults like the repos
+root path and prefix are hardcoded in each script. A single `~/.config/toolbox/config.toml`
+read at the top of each script would make them properly configurable without
+environment variables or editing the scripts directly.
+
+The toolkit does its job well enough that I've stopped thinking about it when
+I set up a new machine. The next step is making it work well enough that someone
+else could use it without reading the source.
+
+The code is on [GitHub](https://github.com/hammayo/.local-dev-toolbox) if you
+want to see how any of this is put together.
