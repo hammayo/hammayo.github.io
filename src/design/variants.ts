@@ -1,5 +1,8 @@
 import { cva } from 'class-variance-authority';
 
+/** Shared gradient border that animates in on hover. Apply alongside a `border` class. */
+export const schemeHoverBorder = 'gradient-border-hover hover:border-transparent';
+
 /**
  * Gradient text variant.
  * Uses CSS custom properties set by SchemeProvider.
