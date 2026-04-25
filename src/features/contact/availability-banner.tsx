@@ -1,5 +1,6 @@
 // src/features/contact/availability-banner.tsx
-import { accentTag } from '@/design/variants';
+import { accentTag, schemeHoverBorder } from '@/design/variants';
+import { cn } from '@/lib/utils';
 import type { contact } from '../../../content/contact';
 
 interface AvailabilityBannerProps {
@@ -8,7 +9,7 @@ interface AvailabilityBannerProps {
 
 export function AvailabilityBanner({ availability }: AvailabilityBannerProps) {
   return (
-    <div className="w-full rounded-xl border scheme-border bg-[var(--scheme-accent)]/5 p-5 space-y-4 gradient-border-hover hover:border-transparent">
+    <div className={cn('w-full rounded-xl border scheme-border bg-[var(--scheme-accent)]/5 p-5 space-y-4', schemeHoverBorder)}>
       <div className="space-y-1">
         <p className="text-xs uppercase tracking-widest text-muted-foreground">Currently open to</p>
         <p className="text-sm font-medium text-foreground">{availability.openTo}</p>
