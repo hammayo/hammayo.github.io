@@ -3,7 +3,7 @@ title: "From Backend Engineer to DevOps: What Transfers and What Doesn't"
 date: "2026-03-28"
 summary: "After 20 years on the backend, I've spent the last few years moving closer to infrastructure and deployment. Here's what I wish I'd known before starting that shift."
 tags: ["devops", "career", ".net", "docker", "ci-cd"]
-published: false
+published: true
 ---
 
 The job description says "DevOps Engineer." You've spent your career writing C# services, tuning SQL queries, and wiring up message queues. You know Docker well enough, you've touched CI/CD pipelines, and you're tired of waiting for the platform team to deploy your code.
@@ -16,7 +16,7 @@ Here's an honest account from someone mid-transition.
 
 **Debugging under pressure.** The single most transferable skill. Infrastructure incidents and application bugs require exactly the same approach: what changed, when, what does the evidence say, what's the fastest safe intervention. If you've debugged a production outage in a .NET service, you already know how to think through a failing deployment pipeline.
 
-**Scripting and automation.** Backend engineers write code. DevOps is largely writing code that manages infrastructure. PowerShell, Bash, Python — you probably know one of these well. The patterns (loops, conditionals, error handling, idempotency) are the same. The target is different.
+**Scripting and automation.** Backend engineers write code. DevOps is largely writing code that manages infrastructure. PowerShell, Bash, Python — you probably know one of these well. The patterns (loops, conditionals, error handling, idempotency) are the same. The target is different. If you haven't yet treated your shell setup as code worth engineering — dotfiles, idempotent installers, platform detection — [that's a worthwhile investment before you make the move](/blogs/bash-dev-toolkit).
 
 **Reading logs.** You've spent years reading application logs. Infrastructure generates more of them, in more places, with less structure. But the habit of "find the first error, work backwards to the cause" is identical.
 
@@ -41,7 +41,7 @@ The "DevOps Engineer" role title is used for at least three different jobs:
 2. **Release engineer** — owns pipelines and deployment processes
 3. **Backend engineer with infra skills** — writes application code and also manages the deployments
 
-The third is where most backend engineers land when they make this transition. It's a legitimate and valuable role. Being the person on a backend team who actually understands what the pipeline is doing, can write a Dockerfile that works correctly, and knows how to diagnose a failing deployment — that's rare and useful.
+The third is where most backend engineers land when they make this transition. It's a legitimate and valuable role. Being the person on a backend team who actually understands what the pipeline is doing, can write a Dockerfile that works correctly, and knows how to diagnose a failing deployment — that's rare and useful. If you want to see what that looks like in practice — TeamCity, Octopus Deploy, and Docker without Kubernetes — [I've written a guide for that world](/blogs/cicd-without-kubernetes).
 
 You don't have to become a Kubernetes operator to add infrastructure value. Understanding your own deployment path deeply is a good start.
 

@@ -6,7 +6,7 @@ tags: ["tooling", "devops", "dotfiles"]
 published: true
 ---
 
-My daily reality: at home I develop on a MacBook running macOS with Parallels Desktop for Windows and Ubuntu VMs. At work, I'm on Windows 11 Pro. My home lab runs Ubuntu Server. At any point in the day, I might be writing C# in Rider on macOS, debugging a WinForms app in Visual Studio on Windows, or SSH-ing into an Ubuntu container on Proxmox.
+My daily reality: at home I develop on a MacBook running macOS with Parallels Desktop for Windows and Ubuntu VMs. At work, I'm on Windows 11 Pro. My home lab runs Ubuntu Server. At any point in the day, I might be writing C# in [Rider](/blogs/rider-vs-visual-studio) on macOS, debugging a WinForms app in Visual Studio on Windows, or SSH-ing into an Ubuntu container on Proxmox.
 
 If I had a different set of tools, aliases, and configurations on each platform, I'd spend half my day remembering which machine I'm on instead of writing code. This post is about how I keep everything consistent — the dotfiles, the tools, the shell setup, and the VM configurations that make it all work.
 
@@ -192,7 +192,7 @@ A typical day looks like this:
 
 **Midday:** Flip to Parallels Windows VM to test a WinForms change in Visual Studio. The shared folder means the code is already there — no copy step.
 
-**Afternoon:** SSH into Proxmox via Tailscale to check on a running service. Use the same Bash aliases I use everywhere else.
+**Afternoon:** SSH into Proxmox via [Tailscale](/blogs/tailscale-proxmox-home-lab) to check on a running service. Use the same Bash aliases I use everywhere else.
 
 **Work days:** Same workflow on the Windows 11 work machine, but with Rider running natively on Windows and Docker through WSL2.
 
@@ -205,6 +205,8 @@ The point is: regardless of which OS I'm in, my muscle memory works. `gs` shows 
 **What doesn't work perfectly:** File system performance on shared folders is slower than native. Parallels shared folders add maybe 10-20% latency compared to local disk. Not a problem for code editing, but noticeable when running a build that touches thousands of files.
 
 **What I'd change:** I'd invest more time in setting up Dev Containers (the VS Code / Rider feature that runs your development environment inside a Docker container). This would give me truly identical environments everywhere, regardless of host OS. It's on my list but I haven't got round to it yet.
+
+The other thing I've since done is turn the `setup.sh` in this post into a proper toolkit — idempotent installs, dotfile symlinks, graceful category dependencies. That's covered in [Building a Bash-first dev toolkit](/blogs/bash-dev-toolkit).
 
 ## The Bottom Line
 
