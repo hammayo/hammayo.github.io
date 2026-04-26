@@ -27,6 +27,25 @@ At Unilink (MoJ/HMPPS), we used Jenkins instead of TeamCity. The concepts are id
 
 Every pipeline does the same four things: restore, build, test, publish. The only variation is the commands.
 
+```
+  git push
+     │
+     ▼
+ ┌────────────────────────────────────────────────┐
+ │ TeamCity                                        │
+ │ restore → build → test → docker build + push   │
+ └──────────────────┬──────────────────┬──────────┘
+                    │                  │
+                    ▼                  ▼
+      Azure Container Registry    Octopus Deploy
+      myservice:142 ──────────────►Release 1.0.142
+                                        │
+                            ┌───────────┼───────────┐
+                            ▼           ▼           ▼
+                           Dev  ──►   Test  ──►   Prod
+                         (auto)    (QA gate)   (sign-off)
+```
+
 TeamCity build configuration (Kotlin DSL):
 
 ```kotlin

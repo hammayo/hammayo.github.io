@@ -40,6 +40,31 @@ The remaining RAM is left free for spinning up temporary containers when I need 
 
 ## Setting Up Tailscale — The Right Way
 
+```
+                  ┌──────────────────────────────────┐
+                  │         Tailscale Network         │
+                  │                                   │
+                  │   Laptop ──────────── Phone       │
+                  │  (abroad)           (cellular)    │
+                  │      │                  │         │
+                  │      └────────┬─────────┘         │
+                  └──────────────┼───────────────────┘
+                                 │
+                  ┌──────────────┴──────────────┐
+                  │    Tailscale Gateway LXC     │
+                  │    on Proxmox                │
+                  │    (subnet router)           │
+                  └──────────────┬──────────────┘
+                                 │ advertises 192.168.1.0/24
+              ───────────────────┼──────────────────────────
+                            Home Network
+              ──────────────────────────────────────────────
+                   │                  │               │
+            Proxmox Host        Synology NAS       Pi-hole
+            192.168.1.102       192.168.1.100    192.168.1.101
+            (VMs, LXC)          (NAS, Docker)      (DNS)
+```
+
 There's a debate in the home lab community about where to install Tailscale on a Proxmox server. The options are:
 
 1. **Directly on the Proxmox host** — simplest, but means installing software on the hypervisor itself

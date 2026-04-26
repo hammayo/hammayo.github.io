@@ -35,17 +35,17 @@ ISP Modem
     │
 Router (192.168.1.1)
     │
-    ├── Synology DS118 (192.168.1.100) — wired
-    ├── Raspberry Pi (192.168.1.101) — wired, running Pi-hole
-    ├── Proxmox Server (192.168.1.102) — wired
+    ├── Synology DS118    192.168.1.100  — NAS, Time Machine, Docker
+    ├── Raspberry Pi      192.168.1.101  — Pi-hole (network DNS)
+    ├── Proxmox Server    192.168.1.102  — VMs, LXC containers
     │
-    └── [wireless bridge to cabin]
-            │
-        Cabin AP (192.168.1.2)
-            │
-            ├── MacBook (DHCP) — Wi-Fi
-            ├── Work Laptop (DHCP) — Wi-Fi
-            └── Any other cabin devices
+    └── House AP ┄┄┄┄ 15m wireless bridge ┄┄┄┄ Cabin AP (192.168.1.2)
+                                                  │
+                                                  ├── MacBook Pro   (Wi-Fi)
+                                                  ├── Work Laptop   (Wi-Fi)
+                                                  └── Other devices (Wi-Fi)
+
+All devices on 192.168.1.0/24 — cabin AP in bridge mode, no double-NAT.
 ```
 
 Everything is on the same subnet (192.168.1.0/24). The cabin AP is in bridge mode, not routing mode, so there's no double-NAT headache. Devices in the cabin can see and access devices in the house directly — my MacBook can mount the NAS, access Proxmox, and reach the Pi-hole DNS without any routing tricks.

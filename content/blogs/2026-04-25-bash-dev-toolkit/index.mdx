@@ -61,6 +61,10 @@ Categories run in dependency order:
 
 ```
 dotfiles → core → cli → shell → languages → cloud → web → containers → powershell
+                                    │         ▲
+                                    └─────────┘
+                                 cloud requires languages
+                                   (wrangler needs npm)
 ```
 
 `cloud` depends on `languages` because wrangler requires npm. Skip `languages`

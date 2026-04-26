@@ -110,6 +110,24 @@ The secret to making this multi-platform setup not drive you mad is version-cont
 
 ### Dotfiles Repository
 
+```
+                      GitHub
+                   ┌───────────┐
+                   │ .dotfiles │
+                   │   repo    │
+                   └─────┬─────┘
+         ┌───────────────┼───────────────┐
+         ▼               ▼               ▼
+      macOS           Windows           WSL2
+   ~/.dotfiles       ~/.dotfiles     ~/.dotfiles
+    setup.sh      setup-windows.sh    setup.sh
+         │               │               │
+         └───────────────┴───────────────┘
+               .bashrc · .bash_aliases
+               .gitconfig · .editorconfig
+            same files, symlinked on all platforms
+```
+
 My `.dotfiles` repo contains:
 
 ```
