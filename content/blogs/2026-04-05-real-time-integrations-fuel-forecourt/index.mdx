@@ -1,9 +1,9 @@
 ---
-title: "Real-Time Integrations in Fuel Forecourt Systems: What I've Learned at PDI"
+title: "Real-Time Integrations in Fuel Forecourt Systems: What I've Learned"
 date: "2026-04-18"
 summary: "Fuel forecourts are complex real-time environments: pump controllers, site controllers, POS kiosks, payment processors, and loyalty platforms all talking to each other simultaneously. Here's what building integrations in this space actually involves."
 tags: [".net", "real-time", "integrations", "payments", "architecture"]
-published: false
+published: true
 ---
 
 Most engineers have filled up a car. Few have thought about what happens in the 40 seconds between lifting the nozzle and the receipt printing.
@@ -31,6 +31,26 @@ A fuel forecourt is not one system — it's five or six systems that need to agr
 Every one of these systems has its own protocol, its own timing requirements, and its own failure modes. The integration layer has to translate between them in real time while maintaining consistency.
 
 A prepay transaction illustrates the complexity:
+
+```
+  Customer    OPT       Loyalty      DOMS       Pump     Payment
+               │        Platform      │          │      Processor
+      │        │           │          │          │          │
+      ├─tap───►│           │          │          │          │
+      │        ├──────────►│          │          │          │
+      │        │◄─auth £40─┤ ≤200ms   │          │          │
+      │        ├──────────────────────►          │          │
+      │        │           │     clear pump      │          │
+      │        │           │          ├──────────►          │
+      │        │           │     fuelling (vol events/sec)  │
+      │        │           │          │◄─complete┤          │
+      │        │           │          ├──────────────────────►
+      │        │           │          │          │  settle  │
+      │        │◄──────────┤ notify   │          │  £32.40  │
+      │◄─rcpt──┤           │          │          │          │
+```
+
+Step by step:
 
 1. Customer taps loyalty card on OPT
 2. Loyalty platform validates card and authorises £40 fuel budget — 200ms timeout

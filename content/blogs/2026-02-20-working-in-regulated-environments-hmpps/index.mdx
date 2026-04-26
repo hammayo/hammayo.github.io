@@ -3,7 +3,7 @@ title: "What It Actually Means to Build Software for the Prison Service"
 date: "2026-03-07"
 summary: "Four years building software used inside prisons taught me things about compliance, trust, and the cost of bugs that no amount of FinTech work had prepared me for."
 tags: [".net", "compliance", "architecture", "security"]
-published: false
+published: true
 ---
 
 Most software engineers will never write code that directly affects whether someone can call their family.
@@ -61,7 +61,7 @@ The principle: the system's view of history must match what the users experience
 
 HMPPS systems deploy to a managed estate. You don't push to production on a Friday afternoon. Change requests are submitted, reviewed by a change advisory board, and approved for specific maintenance windows — often weekend nights.
 
-The discipline this enforces is genuinely valuable. Your deployment has to be reversible. Your migration has to be non-destructive. Your rollback plan has to be written down before the change is approved.
+The discipline this enforces is genuinely valuable. Your deployment has to be reversible. Your migration has to be non-destructive. Your rollback plan has to be written down before the change is approved. The practical side of making that real — containerising legacy services so they're stateless, auditable, and actually rollback-able — is something I covered in [Containerising Legacy .NET Services](/blogs/containerising-legacy-dotnet).
 
 After four years of this, I find it difficult to trust teams who can't answer "how do we roll this back?" before they merge.
 

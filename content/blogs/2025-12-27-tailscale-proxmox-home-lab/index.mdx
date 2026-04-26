@@ -6,7 +6,7 @@ tags: ["homelab", "networking", "self-hosted"]
 published: true
 ---
 
-I run a Proxmox server at home. It hosts development VMs, Docker containers, and a few self-hosted services. For a long time, accessing any of it from outside my home network meant either VPN configurations that broke every time my ISP changed my IP, or opening ports on my router and hoping nobody on the internet noticed.
+I run a Proxmox server at home. It hosts development VMs, Docker containers, and a few self-hosted services. (The physical network that all of this runs on — the wireless bridge to my cabin office, the router, the NAS — is its own story, covered in [Networking My Home Office Cabin](/blogs/home-lab-networking).) For a long time, accessing any of it from outside my home network meant either VPN configurations that broke every time my ISP changed my IP, or opening ports on my router and hoping nobody on the internet noticed.
 
 Then I set up Tailscale, and the entire problem disappeared in about ten minutes.
 
@@ -40,6 +40,31 @@ The remaining RAM is left free for spinning up temporary containers when I need 
 
 ## Setting Up Tailscale — The Right Way
 
+```
+                  ┌──────────────────────────────────┐
+                  │         Tailscale Network        │
+                  │                                  │
+                  │   Laptop ──────────── Phone      │
+                  │  (abroad)           (cellular)   │
+                  │      │                  │        │
+                  │      └────────┬─────────┘        │
+                  └──────────────┼───────────────────┘
+                                 │
+                  ┌──────────────┴──────────────┐
+                  │    Tailscale Gateway LXC    │
+                  │    on Proxmox               │
+                  │    (subnet router)          │
+                  └──────────────┬──────────────┘
+                                 │ advertises 192.168.10.0/24
+              ───────────────────┼──────────────────────────
+                            Home Network
+              ──────────────────────────────────────────────
+                   │                  │               │
+            Proxmox Host        Synology NAS       Pi-hole
+            192.168.10.112      192.168.10.121     192.168.10.110
+            (VMs, LXC)          (NAS, Docker)      (DNS)
+```
+
 There's a debate in the home lab community about where to install Tailscale on a Proxmox server. The options are:
 
 1. **Directly on the Proxmox host** — simplest, but means installing software on the hypervisor itself
@@ -66,10 +91,10 @@ echo 'net.ipv6.conf.all.forwarding = 1' | tee -a /etc/sysctl.d/99-tailscale.conf
 sysctl -p /etc/sysctl.d/99-tailscale.conf
 
 # Start Tailscale and advertise your home subnet
-tailscale up --advertise-routes=192.168.1.0/24 --accept-dns=false
+tailscale up --advertise-routes=192.168.10.0/24 --accept-dns=false
 ```
 
-The `--advertise-routes=192.168.1.0/24` part tells Tailscale that this container can route traffic to your entire home network. After running this, go to the Tailscale admin console in your browser, find the new device, and approve the advertised route.
+The `--advertise-routes=192.168.10.0/24` part tells Tailscale that this container can route traffic to your entire home network. After running this, go to the Tailscale admin console in your browser, find the new device, and approve the advertised route.
 
 One important Proxmox-specific step: by default, LXC containers can't do IP forwarding. You need to edit the container's config file on the Proxmox host:
 
@@ -92,7 +117,7 @@ By default, Tailscale rotates keys periodically, which means your device will si
 
 With Tailscale running on my phone, laptop, and the home gateway container, I can:
 
-- **Open the Proxmox web UI** at `https://192.168.1.102:8006` from my phone on cellular data
+- **Open the Proxmox web UI** at `https://192.168.10.112:8006` from my phone on cellular data
 - **SSH into any container** using its local IP address as if I were sitting at home
 - **Access my Synology NAS** web interface, file shares, and Docker containers
 - **Browse to any self-hosted service** running on my network
@@ -114,7 +139,7 @@ If you share your tailnet with family members, you probably don't want everyone 
     {
       "action": "accept",
       "src": ["tag:family"],
-      "dst": ["192.168.1.100:5000"]
+      "dst": ["192.168.10.100:5000"]
     }
   ]
 }

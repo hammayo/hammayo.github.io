@@ -30,7 +30,10 @@ match what was on the WSL instance, and that half my muscle-memory aliases only
 existed in one place.
 
 The goal was simple: one command to go from a blank Ubuntu or macOS install to
-a fully configured shell with the tools I use every day.
+a fully configured shell with the tools I use every day. I'd already written about
+[keeping those environments consistent across platforms](/blogs/consistent-dev-environments) —
+the dotfiles structure, the WSL config, the shared aliases. This toolkit is the
+automation layer that builds that environment from scratch.
 
 ## `setup-distro.sh` — the bootstrap
 
@@ -58,6 +61,10 @@ Categories run in dependency order:
 
 ```
 dotfiles → core → cli → shell → languages → cloud → web → containers → powershell
+                                    │         ▲
+                                    └─────────┘
+                                 cloud requires languages
+                                   (wrangler needs npm)
 ```
 
 `cloud` depends on `languages` because wrangler requires npm. Skip `languages`
@@ -164,7 +171,7 @@ A `starship-theme` shell function handles switching without touching the repo:
 
 ```bash
 starship-theme                # list available themes
-starship-theme tokyo-night    # apply
+starship-theme hammy-toolbox  # apply
 ```
 
 All themes use hex colour palettes rather than terminal colour names. A theme that

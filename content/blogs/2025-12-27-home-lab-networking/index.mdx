@@ -20,7 +20,7 @@ The constraints: I didn't want to dig a trench across the garden for Ethernet (l
 
 Here's what I ended up with:
 
-**Router** — This sits in the house, connected to the broadband. It handles DHCP, DNS, and is the gateway for everything. I've got it configured with a static IP range for my lab devices (192.168.1.100-199) and DHCP for everything else.
+**Router** — This sits in the house, connected to the broadband. It handles DHCP, DNS, and is the gateway for everything. I've got it configured with a static IP range for my lab devices (192.168.10.100-199) and DHCP for everything else.
 
 **Access Point in the cabin** — This is the critical piece. Rather than trying to extend the house Wi-Fi with a repeater (which halves your bandwidth), I set up a dedicated AP in the cabin that connects back to the house. The AP broadcasts its own SSID for cabin devices, and everything routes through to the router in the house.
 
@@ -33,22 +33,22 @@ Here's what I ended up with:
 ```
 ISP Modem
     │
-Router (192.168.1.1)
+Router (192.168.10.1)
     │
-    ├── Synology DS118 (192.168.1.100) — wired
-    ├── Raspberry Pi (192.168.1.101) — wired, running Pi-hole
-    ├── Proxmox Server (192.168.1.102) — wired
+    ├── Raspberry Pi      192.168.10.110  — Pi-hole (network DNS)
+    ├── Proxmox Server    192.168.10.112  — VMs, LXC containers
+    ├── Synology DS118    192.168.10.121  — NAS, Time Machine, Docker
     │
-    └── [wireless bridge to cabin]
-            │
-        Cabin AP (192.168.1.2)
-            │
-            ├── MacBook (DHCP) — Wi-Fi
-            ├── Work Laptop (DHCP) — Wi-Fi
-            └── Any other cabin devices
+    └── House AP ┄┄┄┄ 15m bridge ┄┄┄┄ Cabin AP (192.168.10.2)
+                                                  │
+                                                  ├── MacBook Pro   (Wi-Fi)
+                                                  ├── Work Laptop   (Wi-Fi)
+                                                  └── Other devices (Wi-Fi)
+
+All devices on 192.168.10.0/24 — cabin AP in bridge mode, no double-NAT.
 ```
 
-Everything is on the same subnet (192.168.1.0/24). The cabin AP is in bridge mode, not routing mode, so there's no double-NAT headache. Devices in the cabin can see and access devices in the house directly — my MacBook can mount the NAS, access Proxmox, and reach the Pi-hole DNS without any routing tricks.
+Everything is on the same subnet (192.168.10.0/24). The cabin AP is in bridge mode, not routing mode, so there's no double-NAT headache. Devices in the cabin can see and access devices in the house directly — my MacBook can mount the NAS, access Proxmox, and reach the Pi-hole DNS without any routing tricks.
 
 ## The Synology DS118 — Small But Capable
 
@@ -99,3 +99,5 @@ I'd also start with a two-bay NAS instead of a single-bay. The DS118 has been gr
 Today, my cabin office has a reliable 150+ Mbps connection, full access to my NAS and Proxmox server in the house, network-wide ad blocking, and Tailscale for accessing everything from outside. Video calls don't drop, Docker images pull at full speed, and I can work from the cabin as if I were sitting next to the router.
 
 It took a weekend to set up properly and cost less than you'd think. The most expensive single item was the NAS. The networking kit was under £200 total. For a home office setup that I use 8+ hours a day, it's been one of the best investments I've made.
+
+If the physical network is the foundation, remote access is what makes the lab genuinely useful when you're away from home — I covered the Tailscale and Proxmox side of that in [a companion post](/blogs/tailscale-proxmox-home-lab).
