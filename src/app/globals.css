@@ -158,13 +158,19 @@
   }
 }
 
-/* Dual syntax theme switching — light is default (via pipeline defaultColor:'light'),
-   dark mode overrides token colors to the tokyo-night palette via CSS variables */
+/* Dual syntax theme switching — shiki emits --shiki-light / --shiki-dark on every span.
+   !important required on both rules: prose-code sets color on <code> which can win
+   over an unlayered rule without it. font-style handles italic tokens (e.g. comments). */
+[data-rehype-pretty-code-figure] code {
+  background-color: transparent !important;
+}
+[data-rehype-pretty-code-figure] code span {
+  color: var(--shiki-light) !important;
+  font-style: var(--shiki-light-font-style, inherit) !important;
+}
 .dark [data-rehype-pretty-code-figure] code span {
   color: var(--shiki-dark) !important;
-}
-.dark [data-rehype-pretty-code-figure] code {
-  background-color: transparent !important;
+  font-style: var(--shiki-dark-font-style, inherit) !important;
 }
 
 /* Scheme-aware gradient text utility */
