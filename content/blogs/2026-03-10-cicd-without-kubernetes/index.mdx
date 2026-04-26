@@ -3,14 +3,14 @@ title: "CI/CD Without Kubernetes: TeamCity, Jenkins, and Octopus Deploy in 2026"
 date: "2026-03-10"
 summary: "Not every team needs Kubernetes. Here's how to build a reliable, maintainable CI/CD pipeline with the tools most .NET shops actually use."
 tags: ["devops", "ci-cd", "docker", ".net", "teamcity"]
-published: false
+published: true
 ---
 
 The DevOps conversation in 2026 defaults to Kubernetes. Every tutorial assumes you're deploying to a cluster. Every job description lists K8s as a requirement.
 
 And then there are the rest of us — teams running reliable, high-volume software on Docker without an orchestrator, using TeamCity, Jenkins, or Octopus Deploy, because that's what the organisation standardised on years ago and it works.
 
-This is a practical guide for that world.
+This is a practical guide for that world. Before a pipeline can build and push a Docker image, the service has to actually work in a container — if you're starting from legacy .NET, [there are landmines to navigate](/blogs/containerising-legacy-dotnet) that no Dockerfile tutorial warns you about.
 
 ## The Stack
 

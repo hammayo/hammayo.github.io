@@ -3,7 +3,7 @@ title: "Containerising Legacy .NET Services: What No One Warns You About"
 date: "2026-01-15"
 summary: "Moving a prison service platform from bare-metal Windows services to Docker containers taught me more about our own codebase than three years of feature work."
 tags: ["docker", ".net", "devops", "microservices"]
-published: false
+published: true
 ---
 
 When I joined Unilink Software, the deployment process for our HMPPS (His Majesty's Prison and Probation Service) platform looked like this: Remote Desktop into a VM, stop the Windows service, overwrite the binaries, restart, pray.
@@ -90,6 +90,6 @@ Every ugly assumption surfaced. Some of them we fixed. Some of them we documente
 
 ## The Part Nobody Talks About
 
-The hard part isn't Docker. It's getting a regulated-environment ops team, who are responsible for systems that affect people's liberty, to trust a new deployment model.
+The hard part isn't Docker. It's getting a regulated-environment ops team, who are responsible for systems that affect people's liberty, to trust a new deployment model. (If you're wondering what building software for that environment actually involves — the SC clearance, the audit trail requirements, the change advisory board — I've written about that [separately](/blogs/working-in-regulated-environments-hmpps).)
 
 Demonstrate the rollback story first. Show that a bad deployment can be reverted in two minutes by changing a tag and redeploying. That conversation matters more than any Dockerfile.
