@@ -15,7 +15,7 @@ function extractText(node: React.ReactNode): string {
 
 function CodeBlock({
   children,
-  style: _style,
+  style: shikiStyle,
   'data-language': language,
   ...props
 }: React.HTMLAttributes<HTMLPreElement> & { 'data-language'?: string }) {
@@ -55,11 +55,11 @@ function CodeBlock({
         </div>
       </div>
 
-      {/* Code body */}
+      {/* Code body — merge shikiStyle so --shiki-light/dark defaults on <pre> are preserved */}
       <pre
         {...props}
         className="overflow-x-auto p-5 text-[0.8rem] leading-relaxed m-0 rounded-none"
-        style={{ background: 'var(--code-bg)' }}
+        style={{ ...shikiStyle, background: 'var(--code-bg)' }}
       >
         {children}
       </pre>

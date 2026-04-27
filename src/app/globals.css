@@ -158,13 +158,20 @@
   }
 }
 
-/* Dual syntax theme switching — light is default (via pipeline defaultColor:'light'),
-   dark mode overrides token colors to the tokyo-night palette via CSS variables */
-.dark [data-rehype-pretty-code-figure] code span {
-  color: var(--shiki-dark) !important;
-}
-.dark [data-rehype-pretty-code-figure] code {
+/* Dual syntax theme switching — shiki emits --shiki-light / --shiki-dark on every span.
+   Selector uses data-theme on <code> directly (set by rehype-pretty-code) rather than
+   the figure ancestor, which may not be present in the React tree after MDX compilation.
+   !important required: prose-code:text-[...] on PostBody sets color on <code> elements. */
+code[data-theme] {
   background-color: transparent !important;
+}
+code[data-theme] span {
+  color: var(--shiki-light) !important;
+  font-style: var(--shiki-light-font-style, inherit) !important;
+}
+.dark code[data-theme] span {
+  color: var(--shiki-dark) !important;
+  font-style: var(--shiki-dark-font-style, inherit) !important;
 }
 
 /* Scheme-aware gradient text utility */
