@@ -33,7 +33,7 @@ export function RecentPosts({ posts }: RecentPostsProps) {
                 {post.title}
               </span>
               <span className="text-xs text-muted-foreground flex-shrink-0">
-                {format(new Date(post.date), 'MMM yyyy')}
+                {format(new Date(post.date), 'MMM dd, yyyy')}
               </span>
             </Link>
           </li>
