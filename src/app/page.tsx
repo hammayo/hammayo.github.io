@@ -13,7 +13,7 @@ export default function HomePage() {
     <PageTransitionWrapper>
       <PageViewEvent page="home" />
       <div className="flex-1 flex flex-col items-center justify-center">
-        <Container className="text-center space-y-8">
+        <Container className="text-left space-y-8">
           <div className="opacity-0 animate-fade-in animate-delay-500">
             <Hero />
           </div>
