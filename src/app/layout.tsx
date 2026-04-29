@@ -27,6 +27,10 @@ export const metadata: Metadata = {
   keywords: SITE.keywords,
   alternates: {
     canonical: SITE_URL,
+    languages: {
+      'en-GB':     SITE_URL,
+      'x-default': SITE_URL,
+    },
     types: {
       'application/rss+xml': `${SITE_URL}/feed.xml`,
     },
@@ -49,20 +53,11 @@ export const metadata: Metadata = {
     siteName: SITE.name,
     title: SITE.title,
     description: SITE.description,
-    images: [
-      {
-        url: `${SITE_URL}/screenshots/home.png`,
-        width: 1200,
-        height: 630,
-        alt: `${SITE.name} Homepage`,
-      },
-    ],
   },
   twitter: {
     card: 'summary_large_image',
     title: SITE.title,
     description: SITE.description,
-    images: [`${SITE_URL}/screenshots/home.png`],
   },
   icons: {
     icon: [

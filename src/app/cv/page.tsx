@@ -8,10 +8,13 @@ import { cv } from "../../../content/cv";
 export const metadata: Metadata = {
   title: PAGE_META.cv.title,
   description: PAGE_META.cv.description,
+  alternates: {
+    canonical: `${SITE_URL}/cv/`,
+  },
   openGraph: {
     title: PAGE_META.cv.title,
     description: PAGE_META.cv.description,
-    url: `${SITE_URL}/cv`,
+    url: `${SITE_URL}/cv/`,
   },
   twitter: {
     title: PAGE_META.cv.title,
