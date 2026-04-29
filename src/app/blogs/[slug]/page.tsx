@@ -28,11 +28,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title:       `${post.title} | Hammayo's Portfolio`,
     description: post.summary,
     authors:     [{ name: 'Hammy Babar', url: SITE_URL }],
-    alternates:  { canonical: `${SITE_URL}/blogs/${slug}` },
+    alternates:  { canonical: `${SITE_URL}/blogs/${slug}/` },
     openGraph: {
       title:         post.title,
       description:   post.summary,
-      url:           `${SITE_URL}/blogs/${slug}`,
+      url:           `${SITE_URL}/blogs/${slug}/`,
       type:          'article',
       publishedTime: post.date,
       modifiedTime:  post.date,

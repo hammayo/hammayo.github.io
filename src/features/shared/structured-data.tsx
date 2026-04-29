@@ -27,14 +27,6 @@ export function StructuredData() {
     '@type': 'WebSite',
     url: SITE_URL,
     name: SITE.name,
-    potentialAction: {
-      '@type': 'SearchAction',
-      target: {
-        '@type': 'EntryPoint',
-        urlTemplate: `${SITE_URL}/blogs?q={search_term_string}`,
-      },
-      'query-input': 'required name=search_term_string',
-    },
   };
 
   return (

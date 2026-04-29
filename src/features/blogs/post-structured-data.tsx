@@ -7,7 +7,7 @@ interface Props {
 }
 
 export function PostStructuredData({ post, slug }: Props) {
-  const postUrl = `${SITE_URL}/blogs/${slug}`;
+  const postUrl = `${SITE_URL}/blogs/${slug}/`;
 
   const blogPosting = {
     '@context': 'https://schema.org',

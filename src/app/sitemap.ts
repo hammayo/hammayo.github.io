@@ -9,37 +9,37 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   const staticRoutes: MetadataRoute.Sitemap = [
     {
-      url:             SITE_URL,
+      url:             `${SITE_URL}/`,
       lastModified:    new Date('2024-01-01'),
       changeFrequency: 'monthly',
       priority:        1,
     },
     {
-      url:             `${SITE_URL}/about`,
+      url:             `${SITE_URL}/about/`,
       lastModified:    new Date('2024-01-01'),
       changeFrequency: 'monthly',
       priority:        0.8,
     },
     {
-      url:             `${SITE_URL}/projects`,
+      url:             `${SITE_URL}/projects/`,
       lastModified:    new Date('2025-06-01'),
       changeFrequency: 'monthly',
       priority:        0.8,
     },
     {
-      url:             `${SITE_URL}/blogs`,
+      url:             `${SITE_URL}/blogs/`,
       lastModified:    new Date(posts[0]?.date ?? '2024-01-01'),
       changeFrequency: 'weekly',
       priority:        0.8,
     },
     {
-      url:             `${SITE_URL}/cv`,
+      url:             `${SITE_URL}/cv/`,
       lastModified:    new Date('2024-01-01'),
       changeFrequency: 'monthly',
       priority:        0.6,
     },
     {
-      url:             `${SITE_URL}/contact`,
+      url:             `${SITE_URL}/contact/`,
       lastModified:    new Date('2024-01-01'),
       changeFrequency: 'monthly',
       priority:        0.5,
@@ -47,7 +47,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   ];
 
   const postRoutes: MetadataRoute.Sitemap = posts.map(post => ({
-    url:             `${SITE_URL}/blogs/${post.slug}`,
+    url:             `${SITE_URL}/blogs/${post.slug}/`,
     lastModified:    new Date(post.date),
     changeFrequency: 'monthly' as const,
     priority:        0.7,

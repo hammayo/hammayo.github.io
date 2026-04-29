@@ -5,16 +5,17 @@ type PageKey = keyof typeof PAGE_META;
 
 export function createPageMetadata(key: PageKey, urlPath: string): Metadata {
   const meta = PAGE_META[key];
+  const path = urlPath.endsWith('/') ? urlPath : `${urlPath}/`;
   return {
     title: meta.title,
     description: meta.description,
     alternates: {
-      canonical: `${SITE_URL}${urlPath}`,
+      canonical: `${SITE_URL}${path}`,
     },
     openGraph: {
       title: meta.title,
       description: meta.description,
-      url: `${SITE_URL}${urlPath}`,
+      url: `${SITE_URL}${path}`,
     },
     twitter: {
       title: meta.title,
