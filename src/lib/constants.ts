@@ -9,9 +9,21 @@ export const SITE_URL = 'https://hammayo.co.uk';
 export const SITE = {
   name:        "Hammayo's Portfolio",
   title:       "Hammayo's | Backend Software Engineer",
-  description: 'Portfolio site showcasing 20 years of backend engineering across finance, justice, and public service.',
-  author:      'Hammy',
-  keywords:    ['backend engineer', 'software developer', '.NET', 'C#', 'Docker', 'Azure', 'microservices', 'HMPPS', 'portfolio', 'hammy', 'HB'],
+  description: 'Portfolio site showcasing 20+ years of backend engineering across finance, justice, and public service.',
+  author:      'Hammy Babar',
+  keywords:    [
+    // Personal brand
+    'Hammy Babar', 'Hammayo Babar', 'Hammayo',
+    // Recruiter signals
+    'SC cleared engineer', 'SC cleared backend engineer', 'backend engineer UK',
+    'backend engineer London', 'Sutton', 'hire backend engineer',
+    // Technical stack
+    'C#', '.NET', 'Azure', 'Docker', 'microservices', 'CI/CD',
+    // Domain experience
+    'HMPPS', 'MoJ', 'fintech', 'payment systems',
+    // General
+    'backend software engineer', 'portfolio',
+  ],
 };
 
 // Social links and contact information
@@ -39,27 +51,27 @@ export const SITE_LAUNCH_YEAR = 2024;
 // Per-page SEO metadata — all page metadata exports import from here
 export const PAGE_META = {
   home: {
-    title: "Hammayo's | Backend Software Engineer",
+    title:       "Hammayo's | Backend Software Engineer",
     description: 'Portfolio site showcasing 20+ years of backend engineering across finance, justice, and public service.',
   },
   about: {
-    title: "About | Hammayo's Portfolio",
-    description: 'Backend engineer with 20+ years across finance, justice, and retail. C#, .NET, Azure, Docker, SC cleared.',
+    title:       "About | Hammayo's Portfolio",
+    description: 'Backend engineer with 20+ years across finance, justice, and retail. C#, .NET, Azure, Docker. SC cleared. Sutton, London — open to hybrid and remote across the UK.',
   },
   blogs: {
-    title: "Blogs | Hammayo's Portfolio",
+    title:       "Blogs | Hammayo's Portfolio",
     description: 'Practical writing on .NET, Docker, CI/CD, and engineering in regulated environments.',
   },
   cv: {
-    title: "CV | Hammayo's Portfolio",
-    description: "Hammy Babar's professional CV and experience.",
+    title:       "CV | Hammayo's Portfolio",
+    description: "Hammy Babar's professional CV — C#, .NET, Azure, Docker, microservices. SC cleared. 20+ years across finance, justice, and public service.",
   },
   projects: {
-    title: "Projects | Hammayo's Portfolio",
+    title:       "Projects | Hammayo's Portfolio",
     description: "Most of my work lives behind NDAs — prison systems, payment platforms, enterprise integrations. Here's what I can show.",
   },
   contact: {
-    title: "Contact | Hammayo's Portfolio",
+    title:       "Contact | Hammayo's Portfolio",
     description: 'Currently open to backend and DevOps roles. SC cleared. Based in Sutton, open to hybrid and remote across the UK.',
   },
 };
