@@ -3,12 +3,16 @@ import { Hero } from '@/features/home/hero';
 import { HomepageBio } from '@/features/home/homepage-bio';
 import { SkillsStrip } from '@/features/home/skills-strip';
 import { CTARow } from '@/features/home/cta';
+import { RecentPosts } from '@/features/home/recent-posts';
 import { PageTransitionWrapper } from '@/features/shared/page-transition-wrapper';
 import { PageViewEvent } from '@/features/shared/analytics-event';
 import { about } from '../../content/about';
 import { cv } from '../../content/cv';
+import { getAllPostsMeta } from '@/features/blogs/pipeline';
 
 export default function HomePage() {
+  const recentPosts = getAllPostsMeta().slice(0, 3);
+
   return (
     <PageTransitionWrapper>
       <PageViewEvent page="home" />
@@ -29,6 +33,9 @@ export default function HomePage() {
           </div>
           <div className="opacity-0 animate-fade-in animate-delay-400">
             <CTARow />
+          </div>
+          <div className="opacity-0 animate-fade-in animate-delay-500">
+            <RecentPosts posts={recentPosts} />
           </div>
         </Container>
       </div>

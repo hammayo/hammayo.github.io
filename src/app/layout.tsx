@@ -10,8 +10,8 @@ import { SITE, THEME, SITE_URL } from '@/lib/constants';
 import { Footer } from '@/features/shared/footer';
 import { ErrorBoundary } from '@/features/shared/error-boundary';
 import { Analytics } from '@/features/shared/analytics';
+import { WebVitals } from '@/features/shared/web-vitals';
 import { StructuredData } from '@/features/shared/structured-data';
-import Script from 'next/script';
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],
@@ -84,21 +84,9 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en-GB" suppressHydrationWarning>
       <head>
         <StructuredData />
-        <Script
-          src={`https://www.googletagmanager.com/gtag/js?id=${process.env.GA_MEASUREMENT_ID}`}
-          strategy="afterInteractive"
-        />
-        <Script id="google-analytics" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', '${process.env.GA_MEASUREMENT_ID}');
-          `}
-        </Script>
       </head>
       <body className={`${jetbrainsMono.variable} font-sans antialiased overflow-x-hidden`}>
         <ThemeProvider
@@ -121,6 +109,7 @@ export default function RootLayout({
           </SchemeProvider>
         </ThemeProvider>
         <Analytics />
+        <WebVitals />
       </body>
     </html>
   );
