@@ -7,7 +7,6 @@ import { PostBody } from '@/features/blogs/post-body';
 import { PostNav } from '@/features/blogs/post-nav';
 import { PostStructuredData } from '@/features/blogs/post-structured-data';
 import { PostBreadcrumb } from '@/features/blogs/post-breadcrumb';
-import { PostAuthor } from '@/features/blogs/post-author';
 import { ScrollProgress } from '@/features/blogs/scroll-progress';
 import { getAllSlugs, getPostBySlug, getAllPostsMeta } from '@/features/blogs/pipeline';
 import { SITE_URL } from '@/lib/constants';
@@ -62,9 +61,8 @@ export default async function PostPage({ params }: Props) {
       <PageViewEvent page="blog-post" />
       <ScrollProgress />
       <Container>
-        <div className="flex items-center justify-between mb-4">
+        <div className="mb-4">
           <PostBreadcrumb title={post.title} />
-          <PostAuthor />
         </div>
         <PostHeader post={post} />
         <article>
