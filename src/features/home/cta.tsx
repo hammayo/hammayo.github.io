@@ -3,7 +3,7 @@ import { ctaButton } from '@/design/variants';
 
 export function CTARow() {
   return (
-    <div className="flex flex-col sm:flex-row items-start justify-start gap-4">
+    <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
       <Link href="/projects" className={ctaButton({ variant: 'gradient' })}>
         View Projects
       </Link>
