@@ -8,6 +8,9 @@ export function createPageMetadata(key: PageKey, urlPath: string): Metadata {
   return {
     title: meta.title,
     description: meta.description,
+    alternates: {
+      canonical: `${SITE_URL}${urlPath}`,
+    },
     openGraph: {
       title: meta.title,
       description: meta.description,
