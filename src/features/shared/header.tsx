@@ -15,6 +15,7 @@ const NAV_LINKS = [
   { href: '/about',    label: 'About'    },
   { href: '/projects', label: 'Projects' },
   { href: '/blogs',    label: 'Blogs'    },
+  { href: '/cv',       label: 'CV'       },
   { href: '/contact',  label: 'Contact'  },
 ] as const;
 

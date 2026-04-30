@@ -6,12 +6,15 @@ import imageLoader from '@/lib/imageLoader';
 import type { about as AboutType } from '../../../content/about';
 import { TimelineSection } from './timeline-section';
 import { PageHeader } from '@/features/shared/page-header';
+import { RecentPosts } from '@/features/home/recent-posts';
+import type { PostMeta } from '@/features/blogs/schema';
 
 interface AboutContentProps {
   about: typeof AboutType;
+  recentPosts: PostMeta[];
 }
 
-export function AboutContent({ about }: AboutContentProps) {
+export function AboutContent({ about, recentPosts }: AboutContentProps) {
   return (
     <div className="space-y-8">
       {/* Page title row: title/tagline left, avatar + name right */}
@@ -42,11 +45,6 @@ export function AboutContent({ about }: AboutContentProps) {
         ))}
       </div>
 
-      {/* Career Timeline */}
-      <div className="max-w-2xl">
-        <TimelineSection timeline={about.careerTimeline} />
-      </div>
-
       {/* Sectors */}
       <div className="space-y-2">
         <h2 className="text-xs uppercase tracking-widest text-muted-foreground">Sectors & Domains</h2>
@@ -64,6 +62,14 @@ export function AboutContent({ about }: AboutContentProps) {
         <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Philosophy</p>
         <p className="text-sm md:text-base italic text-foreground/80">&ldquo;{about.philosophy}&rdquo;</p>
       </div>
+
+      {/* Career Timeline */}
+      <div className="max-w-2xl">
+        <TimelineSection timeline={about.careerTimeline} />
+      </div>
+
+      {/* Recent Writing */}
+      <RecentPosts posts={recentPosts} />
     </div>
   );
 }

@@ -1,9 +1,9 @@
 import { SITE_URL, SITE, SOCIAL } from '@/lib/constants';
 
 export function StructuredData() {
-  const person = {
-    '@context': 'https://schema.org',
+  const personEntity = {
     '@type': 'Person',
+    '@id': `${SITE_URL}/#person`,
     name: 'Hammayo Babar',
     jobTitle: 'Backend Software Engineer',
     description: SITE.description,
@@ -22,11 +22,25 @@ export function StructuredData() {
     ],
   };
 
+  const person = {
+    '@context': 'https://schema.org',
+    ...personEntity,
+  };
+
   const website = {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     url: SITE_URL,
     name: SITE.name,
+  };
+
+  const profilePage = {
+    '@context': 'https://schema.org',
+    '@type': 'ProfilePage',
+    url:          `${SITE_URL}/about/`,
+    dateCreated:  '2024-01-01',
+    dateModified: '2026-04-29',
+    mainEntity:   personEntity,
   };
 
   return (
@@ -38,6 +52,10 @@ export function StructuredData() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(website) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(profilePage) }}
       />
     </>
   );

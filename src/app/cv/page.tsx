@@ -1,31 +1,18 @@
-import { Container } from "@/features/shared/container";
-import { PageTransitionWrapper } from "@/features/shared/page-transition-wrapper";
-import { PAGE_META, SITE_URL } from "@/lib/constants";
-import { gradientText } from "@/design/variants";
-import type { Metadata } from "next";
-import { cv } from "../../../content/cv";
+import type { Metadata } from 'next';
+import { Container } from '@/features/shared/container';
+import { PageTransitionWrapper } from '@/features/shared/page-transition-wrapper';
+import { PageViewEvent } from '@/features/shared/analytics-event';
+import { createPageMetadata } from '@/lib/metadata';
+import { gradientText } from '@/design/variants';
+import { cv } from '../../../content/cv';
 
-export const metadata: Metadata = {
-  title: PAGE_META.cv.title,
-  description: PAGE_META.cv.description,
-  alternates: {
-    canonical: `${SITE_URL}/cv/`,
-  },
-  openGraph: {
-    title: PAGE_META.cv.title,
-    description: PAGE_META.cv.description,
-    url: `${SITE_URL}/cv/`,
-  },
-  twitter: {
-    title: PAGE_META.cv.title,
-    description: PAGE_META.cv.description,
-  },
-};
+export const metadata: Metadata = createPageMetadata('cv', '/cv');
 
 export default function CVPage() {
   return (
     <PageTransitionWrapper>
-      <Container>
+      <PageViewEvent page="cv" />
+      <Container className="py-8">
         <div className="mb-6">
           <div className="flex items-center gap-3">
             <h1 className={gradientText({ size: 'heading' })}>CV</h1>
@@ -33,18 +20,17 @@ export default function CVPage() {
               Coming soon
             </span>
           </div>
-          <p className="text-muted-foreground">{cv.placeholderText}</p>
+          <div className="h-0.5 w-10 rounded-full gradient-bg scheme-glow mt-2" />
+          <p className="text-muted-foreground mt-2">{cv.placeholderText}</p>
         </div>
-        <div>
-          <a
-            href={cv.linkedIn}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-[var(--scheme-accent-text)] hover:underline"
-          >
-            View LinkedIn Profile →
-          </a>
-        </div>
+        <a
+          href={cv.linkedIn}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm text-[var(--scheme-accent-text)] hover:underline"
+        >
+          {'View LinkedIn Profile →'}
+        </a>
       </Container>
     </PageTransitionWrapper>
   );
