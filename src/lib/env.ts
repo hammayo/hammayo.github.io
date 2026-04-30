@@ -7,7 +7,7 @@ const envSchema = z.object({
   GITHUB_REPOSITORY:     z.string().optional(),
   GITHUB_TOKEN:          z.string().optional(),
   GITHUB_ACTIONS:        z.string().optional(),
-  GA_MEASUREMENT_ID:     z.string().optional(),
+  GA_MEASUREMENT_ID:     z.string().optional().default('G-8NQ9R6QK1K'),
 }).passthrough();
 
 function parseEnv() {
@@ -18,7 +18,7 @@ function parseEnv() {
     GITHUB_REPOSITORY:     process.env.GITHUB_REPOSITORY,
     GITHUB_TOKEN:          process.env.GITHUB_TOKEN,
     GITHUB_ACTIONS:        process.env.GITHUB_ACTIONS,
-    GA_MEASUREMENT_ID:     process.env.GA_MEASUREMENT_ID,
+    GA_MEASUREMENT_ID:     process.env.GA_MEASUREMENT_ID ?? 'G-8NQ9R6QK1K',
   });
 
   if (!parsed.success) {

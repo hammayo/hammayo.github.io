@@ -27,7 +27,7 @@ export function PostStructuredData({ post, slug }: Props) {
     '@type': 'BreadcrumbList',
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
-      { '@type': 'ListItem', position: 2, name: 'Writing', item: `${SITE_URL}/blogs` },
+      { '@type': 'ListItem', position: 2, name: 'Writing', item: `${SITE_URL}/blogs/` },
       { '@type': 'ListItem', position: 3, name: post.title, item: postUrl },
     ],
   };

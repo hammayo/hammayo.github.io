@@ -1,8 +1,13 @@
-'use client';
-
+import type { Metadata } from 'next';
 import { Container } from '@/features/shared/container';
 import { Suspense } from 'react';
 import Link from 'next/link';
+
+export const metadata: Metadata = {
+  title: "Page Not Found | Hammayo's Portfolio",
+  description: 'The page you are looking for does not exist.',
+  robots: { index: false },
+};
 
 function NotFoundContent() {
   return (
