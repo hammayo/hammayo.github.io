@@ -45,11 +45,6 @@ export function AboutContent({ about, recentPosts }: AboutContentProps) {
         ))}
       </div>
 
-      {/* Career Timeline */}
-      <div className="max-w-2xl">
-        <TimelineSection timeline={about.careerTimeline} />
-      </div>
-
       {/* Sectors */}
       <div className="space-y-2">
         <h2 className="text-xs uppercase tracking-widest text-muted-foreground">Sectors & Domains</h2>
@@ -66,6 +61,11 @@ export function AboutContent({ about, recentPosts }: AboutContentProps) {
       <div className="border-l-2 border-[var(--scheme-border)] pl-4">
         <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Philosophy</p>
         <p className="text-sm md:text-base italic text-foreground/80">&ldquo;{about.philosophy}&rdquo;</p>
+      </div>
+
+      {/* Career Timeline */}
+      <div className="max-w-2xl">
+        <TimelineSection timeline={about.careerTimeline} />
       </div>
 
       {/* Recent Writing */}

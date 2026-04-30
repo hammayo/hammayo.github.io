@@ -10,7 +10,7 @@ export function RecentPosts({ posts }: RecentPostsProps) {
   if (posts.length === 0) return null;
 
   return (
-    <div className="w-full max-w-2xl mx-auto text-left">
+    <div className="w-full max-w-2xl text-left">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
           Recent Writing
