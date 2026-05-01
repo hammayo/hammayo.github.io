@@ -6,9 +6,9 @@
 
 ## Why Static Export
 
-I chose `output: 'export'` in `next.config.ts` for two reasons: GitHub Pages serves static files only (no Node.js runtime), and I wanted zero infrastructure cost. Every page is pre-rendered at build time into `out/`.
+Going fully static was an easy call. GitHub Pages doesn't run Node.js — it just serves files — and I had no intention of paying for a server to host my personal portfolio. Setting `output: 'export'` in `next.config.ts` means every page pre-renders at build time and lands in `out/`.
 
-The trade-off is no server-side rendering and no RSC streaming in local `serve` mode. Client-side navigation doesn't work in `bun run serve` because a static file server can't handle the `?_rsc=` requests Next.js issues during client-side route transitions. This is expected — it doesn't affect GitHub Pages, where visitors access pages via direct URLs.
+One thing worth knowing: client-side navigation doesn't work in `bun run serve`. Static exports produce pre-rendered HTML plus RSC payload files that Next.js fetches client-side via `?_rsc=` requests — a plain static file server can't handle those. It catches people out the first time. It doesn't affect GitHub Pages because visitors hit pages via direct URLs; it's purely a local testing quirk.
 
 ## App Structure
 
@@ -26,15 +26,15 @@ The trade-off is no server-side rendering and no RSC streaming in local `serve` 
 └───────────────┴─────────────────────────────────────────────┘
 ```
 
-All page content lives in `content/` TypeScript files — not inside components. I edit `content/about.ts`, `content/contact.ts`, `content/cv.ts`, and `content/blogs.ts` for copy changes; components import and render.
+I keep all page copy in `content/` TypeScript files rather than inside components. If I want to change my bio, update my availability, or reword something on the contact page, I edit `content/about.ts`, `content/contact.ts`, or `content/cv.ts` — I don't go hunting through JSX. Components just import and render.
 
 ## Core Configuration
 
-`src/lib/constants.ts` is the single source of truth for site-wide strings: `SITE`, `SOCIAL`, `SITE_URL`, `PAGE_META`. Nothing hardcodes these values in components — everything imports from here.
+Everything that could be a magic string in a component lives in `src/lib/constants.ts` instead — `SITE`, `SOCIAL`, `SITE_URL`, `PAGE_META`. It's the kind of thing that feels like overkill until you have to change your URL and it takes 30 seconds instead of a grep-and-pray.
 
 ## Environment Variables
 
-`src/lib/env.ts` validates all environment variables at startup using Zod. Missing or malformed values log clearly rather than throwing cryptically at runtime.
+`src/lib/env.ts` validates all environment variables with Zod at startup. Missing or malformed values log clearly rather than surfacing as a cryptic runtime crash three steps into a build.
 
 | Variable | Required locally | Purpose |
 |---|---|---|
@@ -47,19 +47,15 @@ In CI, `basePath` is derived from `GITHUB_REPOSITORY` automatically. `env.ts` ig
 
 ## Image Loader
 
-`src/lib/imageLoader.ts` is registered globally in `next.config.ts` as `loaderFile`. GitHub Pages serves this site under a sub-path (`/hammayo.github.io/`), so every image `src` must be prefixed with `basePath`. The global loader handles this transparently.
+GitHub Pages serves this site under a sub-path (`/hammayo.github.io/`), which means every image `src` needs that prefix or they 404. I handle this globally via `src/lib/imageLoader.ts`, registered in `next.config.ts` as `loaderFile`. The loader runs on every `<Image>` automatically — nothing else needs to know it exists.
 
-**Never pass a `loader` prop directly to `<Image>` inside a Server Component.** The prop crosses the RSC serialisation boundary and throws. The global loader is the only supported path.
+One sharp edge: never pass a `loader` prop directly to `<Image>` inside a Server Component. It tries to serialise the function across the RSC boundary and throws. The global loader is the only supported path.
 
 ## GitHub API — Projects Page
 
-`src/lib/github.ts` fetches data at build time:
+The projects page fetches my GitHub data at build time — pinned repos via GraphQL, everything else via REST, both in parallel. `src/lib/github.ts` handles the calls.
 
-- `fetchPinnedRepositories()` — GitHub GraphQL API, up to 6 pinned repos (requires `GITHUB_TOKEN`)
-- `fetchAllRepositories()` — GitHub REST API, fallback when no pinned repos or token
-- `fetchGitHubData()` — parallel wrapper combining both
-
-Without `GITHUB_TOKEN` and `GITHUB_USERNAME` in `.env.local`, the projects page builds successfully but renders no repositories. This is graceful degradation by design — the page won't fail the build.
+If `GITHUB_TOKEN` or `GITHUB_USERNAME` aren't set locally, the page builds fine and just shows no repositories. That's intentional — I didn't want a missing API key to blow up the build. On GitHub Actions the credentials come from repo secrets.
 
 ---
 
