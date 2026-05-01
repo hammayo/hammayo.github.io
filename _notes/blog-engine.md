@@ -22,11 +22,11 @@ public/blog-assets/slug/
 src/app/blogs/[slug]/page.tsx
 ```
 
-I keep `pipeline.ts` as the only place in the codebase that reads `content/blogs/`. All blog data access goes through its three exported functions.
+Everything goes through `pipeline.ts`. I made it the only place in the codebase that reads `content/blogs/` — so if you're ever wondering how the blog list gets built or how a post gets rendered, that's where to start.
 
 ## Frontmatter Schema
 
-I validate frontmatter with Zod in `src/features/blogs/schema.ts`. Invalid frontmatter on a published post throws at build time — it won't silently produce broken output.
+I validate frontmatter with Zod in `src/features/blogs/schema.ts`. Bad frontmatter blows up the build rather than shipping silently broken — I'd rather fix a typo in a field name before deploying than discover a post is missing its title in production.
 
 | Field | Required | Default | Notes |
 |---|---|---|---|
@@ -45,13 +45,13 @@ I validate frontmatter with Zod in `src/features/blogs/schema.ts`. Invalid front
 
 Asset paths in MDX use relative references (`./assets/filename`). I rewrite these to `/blog-assets/[slug]/filename` at parse time — no need to hardcode the public path in posts.
 
-**Hero image:** If `assets/hero.{png,jpg,jpeg,webp}` exists in the post folder, `PostHeader` renders a full photo header with a dark overlay. Without it, a scheme-gradient fallback header renders instead. Detection is automatic — no frontmatter field needed.
+I made hero image detection automatic. If `assets/hero.{png,jpg,jpeg,webp}` exists in the post folder, `PostHeader` renders a full photo header with a dark overlay. Without it, the current colour scheme renders as a gradient header instead. No frontmatter field, no config — the presence of the file is the signal.
 
 ## Pagefind
 
-I use Pagefind for full-text search. It runs as step 3 of `bun run build`, indexes the `out/` directory, and writes the search index to `out/pagefind/`.
+Pagefind is what powers ⌘K search. It runs as step 3 of `bun run build`, indexing the static `out/` directory — so it searches exactly what ships to production, not the source files.
 
-Search is triggered via ⌘K in the UI (`SearchPalette`). It's unavailable in `bun dev` — only works after a full build. I use `bun run build && bun run serve` to test it locally.
+The downside is it's not available in `bun dev`. You need a full build to test search locally. I find `bun run build && bun run serve` fast enough that this rarely bothers me in practice.
 
 See [development.md](development.md) for the full build sequence.
 
@@ -59,22 +59,22 @@ See [development.md](development.md) for the full build sequence.
 
 ### Structured Data
 
-I use `src/features/shared/structured-data.tsx` to inject two JSON-LD scripts into `<head>` via `src/app/layout.tsx`:
+I don't rely on automated schema generators. `src/features/shared/structured-data.tsx` injects two hand-crafted JSON-LD scripts into `<head>` via `src/app/layout.tsx`:
 
 - `Person` — name, job title, location, `sameAs` links (GitHub, LinkedIn), `knowsAbout` skills
 - `WebSite` — URL and site name
 
-These are static — they don't change per page, and I render them once in the root layout.
+Both are static and render once in the root layout — they don't change per page.
 
 ### Dynamic Metadata
 
-I use `createPageMetadata()` in `src/lib/metadata.ts` to generate per-page metadata from `PAGE_META` entries in `src/lib/constants.ts`. Each call produces `title`, `description`, `canonical`, `openGraph`, and `twitter` fields. Blog posts extend this with post-specific titles and descriptions.
+I don't have a CMS generating meta tags — everything is code. `src/lib/constants.ts` holds `PAGE_META` with titles and descriptions for each route. `createPageMetadata()` in `src/lib/metadata.ts` pulls from there and builds the full metadata object Next.js expects — `title`, `description`, `canonical`, `openGraph`, and `twitter`. Blog posts extend it with their own title and summary from frontmatter.
 
 ### OG Images
 
-Every route has its own `opengraph-image.tsx` file using `next/og` (Satori) — I generate per-page social preview images at build time.
+Every route has its own `opengraph-image.tsx` using `next/og` (Satori). I generate per-page social preview images at build time rather than using a single generic image.
 
-Satori constraints — violating them produces broken or empty images:
+Satori has some sharp edges — these are the constraints I hit:
 
 - Every `<div>` with multiple children must have explicit `display: "flex"`
 - No adjacent text nodes — use template literals instead of `{expr} · string` or `&&` in JSX
