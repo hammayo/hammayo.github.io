@@ -2,117 +2,46 @@
 
 # Hammayo
 
-> A portfolio site for a backend software engineer. Next.js 16, MDX blog, static export, GitHub Pages.
->
-> https://hammayo.co.uk
+My first production system processed payments. My second ran inside a prison.
+After twenty years across justice, finance, and retail infrastructure, I
+started writing things down.
 
-## Features
+This is that site. MDX blog, full-text search, CI/CD to GitHub Pages. The
+colour scheme changes based on the time of day — because why not. 🖖
 
-- **Next.js 16** — static export (`output: 'export'`), App Router, deployed to GitHub Pages
-- **Blog** — MDX files in-repo, Zod-validated frontmatter, full-text search (Pagefind ⌘K), tag filtering, RSS feed (`/feed.xml`), per-post OG images
-- **Colour scheme system** — 4 named schemes driven by time of day, CSS custom properties, smooth crossfades
-- **Dark / light mode** — next-themes
-- **Syntax highlighting** — rehype-pretty-code + Shiki (tokyo-night), copy-to-clipboard on hover
-- **Tailwind CSS v4** — CSS-first config in `globals.css`
-- **Type-safe** — TypeScript strict, Zod v4 validation
-- **CI/CD** — Gitleaks secret scan, build + Pagefind index, deploy to GitHub Pages
+**Stack:** Next.js 16 · TypeScript · MDX · Tailwind v4 · Pagefind · GitHub Pages
 
-## Getting Started
+## Quick Start
 
 ```bash
 git clone https://github.com/hammayo/hammayo.github.io.git
 cd hammayo.github.io
 bun install
 cp .env.local.example .env.local
-bun run dev
+bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
 
-> **Note:** The blog search (⌘K) requires a built Pagefind index and won't work in `bun run dev`. Run `bun run build && bun run serve` to test search locally.
+> **Note:** Blog search (⌘K) requires a built Pagefind index and won't work in `bun dev`. Run `bun run build && bun run serve` to test search locally.
 
-### Local Testing Modes
+## Local Testing Modes
 
 | Mode | Command | Navigation | Search | Use Case |
 |---|---|---|---|---|
 | **Dev** | `bun dev` | ✅ Full client-side routing | ❌ Unavailable | Development, testing features |
 | **Static export** | `bun run serve` | ⚠️ Direct URLs only* | ✅ Works | Testing search, pre-deployment |
 
-\* In `bun run serve`, clicking links doesn't navigate (limitation of static export). However, direct URL access works fine (`/about/` loads the About page). **This doesn't affect GitHub Pages** — production uses direct URL access.
+\* In `bun run serve`, clicking links doesn't navigate (static export limitation). Direct URL access works fine (`/about/` loads the About page). This doesn't affect GitHub Pages — production uses direct URL access.
 
-## Build
+## Technical Notes
 
-```bash
-bun run build
-```
-
-Runs three steps in sequence:
-
-1. `node scripts/copy-blog-assets.mjs` — copies post images/media to `public/blog-assets/`
-2. `next build` — static export to `out/`
-3. `pagefind --site out --output-subdir pagefind` — generates full-text search index into `out/pagefind/`
-
-## Environment Variables
-
-```bash
-# Local basePath override — only needed if testing static export locally with a sub-path.
-# In CI, basePath is derived automatically from GITHUB_REPOSITORY (env.ts ignores this var when GITHUB_ACTIONS=true).
-NEXT_PUBLIC_BASE_PATH=
-
-# GitHub API — pinned repos on the projects page (optional)
-GITHUB_USERNAME=
-GITHUB_TOKEN=
-
-# Analytics (optional)
-GA_MEASUREMENT_ID=G-xxxxxxxx
-```
-
-`SITE_URL` (`https://hammayo.co.uk`) is hardcoded in `src/lib/constants.ts`.
-
-## Project Structure
-
-```
-hammayo.github.io/
-├── content/
-│   ├── blogs/                       # Blog posts
-│   │   └── YYYY-MM-DD-slug/
-│   │       ├── index.mdx            # Post content + frontmatter
-│   │       └── assets/              # Images, PDFs, media (optional)
-│   ├── about.ts / cv.ts / blogs.ts / contact.ts  # Page content data
-├── scripts/
-│   └── copy-blog-assets.mjs         # Prebuild: copies assets to public/
-├── src/
-│   ├── app/                         # Route shells
-│   │   ├── blogs/
-│   │   │   ├── page.tsx             # Blog list page
-│   │   │   └── [slug]/page.tsx      # Individual post page
-│   │   ├── feed.xml/route.ts        # RSS 2.0 feed
-│   │   └── sitemap.ts               # Auto-includes blog slugs
-│   ├── design/
-│   │   ├── schemes.ts               # Colour scheme registry
-│   │   └── variants.ts              # CVA variants (gradientText, accentTag, etc.)
-│   ├── features/
-│   │   ├── blogs/                   # BlogCard, BlogList, SearchPalette,
-│   │   │                            # PostHeader, PostBody, PostNav, ScrollProgress,
-│   │   │                            # mdx-components, pipeline, schema
-│   │   └── shared/                  # Header, footer, layout primitives, Radix UI
-│   └── lib/
-│       ├── constants.ts             # SITE, SOCIAL, SITE_URL
-│       ├── env.ts                   # Zod-validated env
-│       └── imageLoader.ts           # GitHub Pages basePath image loader
-└── .github/workflows/deploy.yml     # CI: gitleaks → copy assets → build → pagefind → deploy
-```
-
-## Colour Scheme System
-
-`SchemeProvider` resolves the active scheme from the visitor's local time and injects CSS custom properties on `:root`. No colour logic lives in individual components.
-
-| Scheme | Hours | Character |
-|---|---|---|
-| `silver` | 06:00–11:59 | Metallic, refined |
-| `glass` | 12:00–17:59 | Airy, cool |
-| `deep-purple` | 18:00–21:59 | Saturated, bold |
-| `violet-blue` | 22:00–05:59 | Deep, rich |
+| Topic | Notes |
+|---|---|
+| Architecture & configuration | [_notes/architecture.md](_notes/architecture.md) |
+| Design system | [_notes/design-system.md](_notes/design-system.md) |
+| Blog engine & SEO | [_notes/blog-engine.md](_notes/blog-engine.md) |
+| Development & CI/CD | [_notes/development.md](_notes/development.md) |
 
 ## Writing a Blog Post
 
@@ -174,7 +103,7 @@ Assets are automatically copied to `public/blog-assets/your-slug/` at build time
 ### 4. Preview locally
 
 ```bash
-bun run dev
+bun dev
 ```
 
 Open `http://localhost:3000/blogs` — your post appears in the list. The search palette will show "unavailable in development" (expected).
@@ -193,27 +122,9 @@ Open a PR from your feature branch → `develop`, then merge `develop` → `main
 
 ### Drafts
 
-Set `published: false` to keep a post out of production builds, the sitemap, and the RSS feed. It still appears when running `bun run dev` locally.
+Set `published: false` to keep a post out of production builds, the sitemap, and the RSS feed. It still appears when running `bun dev` locally.
 
-## Deployment
-
-Two workflows run on `main`:
-
-**`deploy.yml`** — triggered on every push to `main`:
-
-1. **Gitleaks** — secret scan; blocks deploy if any credential is found in committed files or git history
-2. **Copy assets** — `node scripts/copy-blog-assets.mjs`
-3. **Build** — `bunx --bun next build` → static output in `out/`
-4. **Index** — `bunx pagefind --site out --output-subdir pagefind` → search index in `out/pagefind/`
-5. **Deploy** — `out/` uploaded to GitHub Pages, served at `hammayo.co.uk`
-
-**`version-increment.yml`** — triggered when a PR is merged into `main`:
-
-1. Reads the latest git tag (e.g. `v.1.0.9`)
-2. Bumps the patch number and pushes a new tag (e.g. `v.1.0.10`) — **no file changes, no commits**
-3. Creates a GitHub Release with auto-generated release notes
-
-> `package.json` version is intentionally static. The authoritative version is the git tag. This avoids CI-to-branch write-back and the merge conflicts it causes.
+> For pipeline internals see [_notes/blog-engine.md](_notes/blog-engine.md).
 
 ## Customisation
 
