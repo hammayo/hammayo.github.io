@@ -18,12 +18,12 @@ git clone https://github.com/hammayo/hammayo.github.io.git
 cd hammayo.github.io
 bun install
 cp .env.local.example .env.local
-bun run dev
+bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
 
-> **Note:** Blog search (⌘K) requires a built Pagefind index and won't work in `bun run dev`. Run `bun run build && bun run serve` to test search locally.
+> **Note:** Blog search (⌘K) requires a built Pagefind index and won't work in `bun dev`. Run `bun run build && bun run serve` to test search locally.
 
 ## Local Testing Modes
 
