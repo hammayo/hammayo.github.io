@@ -22,11 +22,11 @@ public/blog-assets/slug/
 src/app/blogs/[slug]/page.tsx
 ```
 
-`pipeline.ts` is the only place in the codebase that reads `content/blogs/`. All blog data access goes through its three exported functions.
+I keep `pipeline.ts` as the only place in the codebase that reads `content/blogs/`. All blog data access goes through its three exported functions.
 
 ## Frontmatter Schema
 
-Frontmatter is validated by Zod in `src/features/blogs/schema.ts`. Invalid frontmatter on a published post throws at build time — it won't silently produce broken output.
+I validate frontmatter with Zod in `src/features/blogs/schema.ts`. Invalid frontmatter on a published post throws at build time — it won't silently produce broken output.
 
 | Field | Required | Default | Notes |
 |---|---|---|---|
@@ -41,17 +41,17 @@ Frontmatter is validated by Zod in `src/features/blogs/schema.ts`. Invalid front
 
 ## Asset Handling
 
-`scripts/copy-blog-assets.mjs` runs as step 1 of `bun run build`. It copies `content/blogs/*/assets/` → `public/blog-assets/[slug]/`.
+`scripts/copy-blog-assets.mjs` runs as step 1 of `bun run build` and copies `content/blogs/*/assets/` → `public/blog-assets/[slug]/`.
 
-Asset paths in MDX use relative references (`./assets/filename`). These are rewritten to `/blog-assets/[slug]/filename` at parse time — no need to hardcode the public path in posts.
+Asset paths in MDX use relative references (`./assets/filename`). I rewrite these to `/blog-assets/[slug]/filename` at parse time — no need to hardcode the public path in posts.
 
 **Hero image:** If `assets/hero.{png,jpg,jpeg,webp}` exists in the post folder, `PostHeader` renders a full photo header with a dark overlay. Without it, a scheme-gradient fallback header renders instead. Detection is automatic — no frontmatter field needed.
 
 ## Pagefind
 
-Full-text search is powered by Pagefind, which runs as step 3 of `bun run build`. It indexes the `out/` directory and writes the search index to `out/pagefind/`.
+I use Pagefind for full-text search. It runs as step 3 of `bun run build`, indexes the `out/` directory, and writes the search index to `out/pagefind/`.
 
-Search is triggered via ⌘K in the UI (`SearchPalette`). It is unavailable in `bun dev` — only works after a full build. Running `bun run build && bun run serve` is the way to test search locally.
+Search is triggered via ⌘K in the UI (`SearchPalette`). It's unavailable in `bun dev` — only works after a full build. I use `bun run build && bun run serve` to test it locally.
 
 See [development.md](development.md) for the full build sequence.
 
@@ -59,20 +59,20 @@ See [development.md](development.md) for the full build sequence.
 
 ### Structured Data
 
-`src/features/shared/structured-data.tsx` injects two JSON-LD scripts into `<head>` via `src/app/layout.tsx`:
+I use `src/features/shared/structured-data.tsx` to inject two JSON-LD scripts into `<head>` via `src/app/layout.tsx`:
 
 - `Person` — name, job title, location, `sameAs` links (GitHub, LinkedIn), `knowsAbout` skills
 - `WebSite` — URL and site name
 
-These are static — they don't change per page.
+These are static — they don't change per page, and I render them once in the root layout.
 
 ### Dynamic Metadata
 
-`createPageMetadata()` in `src/lib/metadata.ts` generates per-page metadata from `PAGE_META` entries in `src/lib/constants.ts`. Each call produces `title`, `description`, `canonical`, `openGraph`, and `twitter` fields. Blog posts extend this with post-specific titles and descriptions.
+I use `createPageMetadata()` in `src/lib/metadata.ts` to generate per-page metadata from `PAGE_META` entries in `src/lib/constants.ts`. Each call produces `title`, `description`, `canonical`, `openGraph`, and `twitter` fields. Blog posts extend this with post-specific titles and descriptions.
 
 ### OG Images
 
-Every route has its own `opengraph-image.tsx` file using `next/og` (Satori). These generate per-page social preview images at build time.
+Every route has its own `opengraph-image.tsx` file using `next/og` (Satori) — I generate per-page social preview images at build time.
 
 Satori constraints — violating them produces broken or empty images:
 
@@ -82,11 +82,11 @@ Satori constraints — violating them produces broken or empty images:
 
 ### RSS Feed
 
-Auto-generated at `/feed.xml` from `src/app/feed.xml/route.ts`. Includes all published posts with title, summary, date, and canonical URL.
+I auto-generate the RSS feed at `/feed.xml` from `src/app/feed.xml/route.ts`. It includes all published posts with title, summary, date, and canonical URL.
 
 ### Sitemap
 
-`src/app/sitemap.ts` auto-includes all published blog slugs alongside static page URLs. Canonical URLs use `SITE_URL` from `src/lib/constants.ts`.
+My `src/app/sitemap.ts` auto-includes all published blog slugs alongside static page URLs. Canonical URLs use `SITE_URL` from `src/lib/constants.ts`.
 
 ## Writing a Post
 
