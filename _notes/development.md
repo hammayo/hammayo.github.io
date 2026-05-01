@@ -6,7 +6,7 @@
 
 ## Build Pipeline
 
-`bun run build` runs three steps in sequence — order matters:
+I designed `bun run build` as three steps in sequence — order matters:
 
 ```
 bun run build
@@ -23,7 +23,7 @@ bun run build
           must index the built output — cannot run before step 2
 ```
 
-`public/blog-assets/` and `out/` are both gitignored. Neither is committed.
+I gitignore both `public/blog-assets/` and `out/`. Neither is committed.
 
 ## Local Development Modes
 
@@ -34,11 +34,11 @@ bun run build
 
 **Why `bun run serve` breaks client-side navigation:**
 
-Static exports produce pre-rendered HTML files plus RSC payload files (`.txt` files in `out/`). Client-side navigation issues `?_rsc=` requests that require Next.js server handling. A static file server can't handle these — it just serves files. This is expected behaviour, not a bug. It doesn't affect GitHub Pages, where visitors arrive via direct URLs and get the pre-rendered HTML.
+My static export produces pre-rendered HTML files plus RSC payload files (`.txt` files in `out/`). Client-side navigation issues `?_rsc=` requests that require Next.js server handling — a static file server can't handle these. This is expected behaviour, not a bug. It doesn't affect GitHub Pages, where visitors arrive via direct URLs and get the pre-rendered HTML.
 
 ## Environment Variables
 
-Copy `.env.local.example` to `.env.local` and fill in what you need:
+Copy `.env.local.example` to `.env.local` and fill in what you need — I've kept all vars optional except where noted:
 
 | Variable | Required locally | CI behaviour | Purpose |
 |---|---|---|---|
@@ -47,11 +47,11 @@ Copy `.env.local.example` to `.env.local` and fill in what you need:
 | `GITHUB_TOKEN` | For projects page | Set via repo secret | GitHub PAT — enables pinned repos via GraphQL |
 | `GA_MEASUREMENT_ID` | No | Set via repo secret | Google Analytics — omit to disable |
 
-`SITE_URL` (`https://hammayo.co.uk`) is hardcoded in `src/lib/constants.ts` — not an env var.
+I hardcode `SITE_URL` (`https://hammayo.co.uk`) in `src/lib/constants.ts` — it's not an env var.
 
 ## CI/CD Pipeline
 
-Triggered on every push to `main` via `.github/workflows/deploy.yml`:
+Every push to `main` triggers my `.github/workflows/deploy.yml` pipeline:
 
 ```
 push to main
@@ -69,21 +69,21 @@ push to main
   └─ 5. Deploy out/ to GitHub Pages  →  hammayo.co.uk
 ```
 
-Deploy takes approximately 2 minutes end-to-end.
+End-to-end the deploy takes approximately 2 minutes.
 
 ## Version Workflow
 
-Triggered on PR merge to `main` via `.github/workflows/version-increment.yml`:
+On every PR merge to `main`, `.github/workflows/version-increment.yml` runs:
 
 1. Reads the latest git tag (e.g. `v.1.0.9`)
 2. Bumps the patch number and pushes a new tag (e.g. `v.1.0.10`) — no file changes, no commits
 3. Creates a GitHub Release with auto-generated release notes
 
-`package.json` version is intentionally static. The authoritative version is the git tag. This avoids CI-to-branch write-back and the merge conflicts it causes.
+I keep `package.json` version intentionally static. The git tag is authoritative. This avoids CI-to-branch write-back and the merge conflicts it causes.
 
 ## Quality Gates
 
-There is no automated test suite. The bar before merging:
+I don't have an automated test suite. My bar before merging:
 
 ```bash
 bun run type-check   # tsc --noEmit — zero type errors required
