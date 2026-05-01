@@ -6,7 +6,7 @@
 
 ## Two Independent Layers
 
-The visual system has two layers that operate independently. Swapping light/dark mode has no effect on which colour scheme is active, and vice versa.
+I built the visual system as two independent layers. Swapping light/dark mode has no effect on which colour scheme is active, and vice versa.
 
 ```
 ┌──────────────────────────────────────────────┐
@@ -22,11 +22,11 @@ The visual system has two layers that operate independently. Swapping light/dark
 └──────────────────────────────────────────────┘
 ```
 
-Both providers mount in `src/app/layout.tsx`.
+Both providers mount in `src/app/layout.tsx` — nothing else needs to know they exist.
 
 ## Colour Schemes
 
-`SchemeProvider` resolves the active scheme from the visitor's local time and injects CSS custom properties onto `:root`. No colour logic lives in individual components — they reference variables only.
+I use `SchemeProvider` to resolve the active scheme from the visitor's local time and inject CSS custom properties onto `:root`. No colour logic lives in individual components — they reference variables only.
 
 | Scheme | Hours | Character |
 |---|---|---|
@@ -39,7 +39,7 @@ Source of truth: `src/design/schemes.ts` → `resolveTimeOfDayScheme()`.
 
 ## CSS Custom Properties
 
-All colours are CSS custom properties injected onto `:root`. Components reference variables, never raw hex values.
+All colours are CSS custom properties I inject onto `:root`. Components reference variables, never raw hex values.
 
 | Variable | Source | Notes |
 |---|---|---|
@@ -55,9 +55,9 @@ All colours are CSS custom properties injected onto `:root`. Components referenc
 
 ## Tailwind v4
 
-Tailwind is configured CSS-first — there is no `tailwind.config.ts` with content. Configuration lives in `src/app/globals.css` via `@import "tailwindcss"` and `@theme inline {}`. Design tokens are CSS custom properties.
+I configure Tailwind CSS-first — there is no `tailwind.config.ts`. Everything lives in `src/app/globals.css` via `@import "tailwindcss"` and `@theme inline {}`. Design tokens are CSS custom properties.
 
-Four custom utility classes are defined in `globals.css`:
+I define four custom utility classes in `globals.css`:
 
 | Class | Effect |
 |---|---|
@@ -68,7 +68,7 @@ Four custom utility classes are defined in `globals.css`:
 
 ## CVA Variants
 
-Reusable styled components are defined in `src/design/variants.ts` using Class Variance Authority. Use these for consistency — don't inline gradient or glow styles in components.
+I define reusable styled variants in `src/design/variants.ts` using Class Variance Authority. Use these for consistency — don't inline gradient or glow styles in components.
 
 | Variant | Use |
 |---|---|
@@ -79,7 +79,7 @@ Reusable styled components are defined in `src/design/variants.ts` using Class V
 
 ## SCHEME_MODE Toggle
 
-To change how the active scheme is resolved, edit `SCHEME_MODE` in `src/design/schemes.ts`:
+To change how the active scheme resolves, edit `SCHEME_MODE` in `src/design/schemes.ts`:
 
 | Mode | Behaviour |
 |---|---|
@@ -87,7 +87,7 @@ To change how the active scheme is resolved, edit `SCHEME_MODE` in `src/design/s
 | `'config'` | Always uses `SCHEME_DEFAULT` |
 | `'cycle'` | Rotates through `SCHEME_ORDER` at `CYCLE_SPEED` |
 
-No component changes needed — only this one constant.
+No component changes needed — I designed it so only this one constant controls the behaviour.
 
 ---
 
