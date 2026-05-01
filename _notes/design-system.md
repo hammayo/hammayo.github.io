@@ -6,7 +6,7 @@
 
 ## Two Independent Layers
 
-I built the visual system as two independent layers. Swapping light/dark mode has no effect on which colour scheme is active, and vice versa.
+I wanted the colour scheme — the time-of-day gradients — to work independently of light/dark mode. Someone visiting at 9pm in light mode should get the evening gradient in a light context. The two layers never need to know about each other.
 
 ```
 ┌──────────────────────────────────────────────┐
@@ -26,7 +26,7 @@ Both providers mount in `src/app/layout.tsx` — nothing else needs to know they
 
 ## Colour Schemes
 
-I use `SchemeProvider` to resolve the active scheme from the visitor's local time and inject CSS custom properties onto `:root`. No colour logic lives in individual components — they reference variables only.
+The scheme shifts based on the visitor's local time. I like the idea that the site looks different depending on whether you're reading it with your morning coffee or late at night. No toggle, no configuration — it just changes.
 
 | Scheme | Hours | Character |
 |---|---|---|
@@ -51,11 +51,11 @@ All colours are CSS custom properties I inject onto `:root`. Components referenc
 | `--scheme-button-from/via/to` | `schemes.ts` | Darker gradient for CTA buttons |
 | `--scheme-transition` | `schemes.ts` | Crossfade duration in ms |
 
-**Rule:** Never use `--scheme-accent` directly for text or links. Always use `--scheme-accent-text`.
+The `--scheme-accent-text` vs `--scheme-accent` distinction catches people out. `--scheme-accent` is the raw hex from the scheme definition — in light mode it's often too light to read as text. `globals.css` derives `--scheme-accent-text` using `color-mix()` to darken it appropriately. Use `--scheme-accent-text` for anything that needs to be readable; `--scheme-accent` for backgrounds, borders, and decoration.
 
 ## Tailwind v4
 
-I configure Tailwind CSS-first — there is no `tailwind.config.ts`. Everything lives in `src/app/globals.css` via `@import "tailwindcss"` and `@theme inline {}`. Design tokens are CSS custom properties.
+I configure Tailwind CSS-first — no `tailwind.config.ts`. Everything lives in `src/app/globals.css` via `@import "tailwindcss"` and `@theme inline {}`. Design tokens stay as CSS custom properties rather than being duplicated into a JS config file.
 
 I define four custom utility classes in `globals.css`:
 
@@ -68,7 +68,7 @@ I define four custom utility classes in `globals.css`:
 
 ## CVA Variants
 
-I define reusable styled variants in `src/design/variants.ts` using Class Variance Authority. Use these for consistency — don't inline gradient or glow styles in components.
+I define reusable styled variants in `src/design/variants.ts` using Class Variance Authority. If you're adding a new styled element that uses the scheme gradient or glow, reach for one of these rather than inlining the styles — it keeps things consistent when the scheme changes.
 
 | Variant | Use |
 |---|---|
