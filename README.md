@@ -103,7 +103,7 @@ Assets are automatically copied to `public/blog-assets/your-slug/` at build time
 ### 4. Preview locally
 
 ```bash
-bun run dev
+bun dev
 ```
 
 Open `http://localhost:3000/blogs` — your post appears in the list. The search palette will show "unavailable in development" (expected).
@@ -122,7 +122,7 @@ Open a PR from your feature branch → `develop`, then merge `develop` → `main
 
 ### Drafts
 
-Set `published: false` to keep a post out of production builds, the sitemap, and the RSS feed. It still appears when running `bun run dev` locally.
+Set `published: false` to keep a post out of production builds, the sitemap, and the RSS feed. It still appears when running `bun dev` locally.
 
 > For pipeline internals see [_notes/blog-engine.md](_notes/blog-engine.md).
 
