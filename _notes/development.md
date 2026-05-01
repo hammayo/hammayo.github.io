@@ -6,7 +6,7 @@
 
 ## Build Pipeline
 
-I designed `bun run build` as three steps in sequence — order matters:
+I designed `bun run build` as three steps in sequence — order matters, and here's why:
 
 ```
 bun run build
@@ -23,7 +23,7 @@ bun run build
           must index the built output — cannot run before step 2
 ```
 
-I gitignore both `public/blog-assets/` and `out/`. Neither is committed.
+Assets have to exist before Next.js processes the MDX that references them. Pagefind indexes the built output, not the source — so it can't run before step 2. I gitignore both `public/blog-assets/` and `out/`; neither gets committed.
 
 ## Local Development Modes
 
@@ -34,7 +34,7 @@ I gitignore both `public/blog-assets/` and `out/`. Neither is committed.
 
 **Why `bun run serve` breaks client-side navigation:**
 
-My static export produces pre-rendered HTML files plus RSC payload files (`.txt` files in `out/`). Client-side navigation issues `?_rsc=` requests that require Next.js server handling — a static file server can't handle these. This is expected behaviour, not a bug. It doesn't affect GitHub Pages, where visitors arrive via direct URLs and get the pre-rendered HTML.
+My static export produces pre-rendered HTML files plus RSC payload files (`.txt` files in `out/`). When Next.js does client-side navigation it fetches these payloads via `?_rsc=` requests — a static file server just returns 404 for those. The first time this happens it looks like a bug; it isn't. GitHub Pages is unaffected because visitors load pages via direct URLs and get the pre-rendered HTML.
 
 ## Environment Variables
 
@@ -51,25 +51,87 @@ I hardcode `SITE_URL` (`https://hammayo.co.uk`) in `src/lib/constants.ts` — it
 
 ## CI/CD Pipeline
 
-Every push to `main` triggers my `.github/workflows/deploy.yml` pipeline:
+Every push to `main` triggers `.github/workflows/deploy.yml`. Here's what actually runs:
 
-```
-push to main
-  │
-  ├─ 1. Gitleaks secret scan
-  │       scans committed files and git history for credentials
-  │       blocks the deploy if anything is found
-  │
-  ├─ 2. node scripts/copy-blog-assets.mjs
-  │
-  ├─ 3. bunx --bun next build  →  out/
-  │
-  ├─ 4. bunx pagefind --site out  →  out/pagefind/
-  │
-  └─ 5. Deploy out/ to GitHub Pages  →  hammayo.co.uk
+```yaml
+name: CI/CD Pipeline -> Build and Deploy
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
+    needs: secrets-scan
+    runs-on: ubuntu-latest
+    env:
+      NODE_ENV: production
+      NEXT_PUBLIC_BASE_PATH: ${{ github.event.repository.name }}
+      GITHUB_USERNAME: ${{ secrets.GITHUB_USERNAME }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      - name: Cache Next.js build
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('bun.lock') }}-${{ hashFiles('**.[jt]s', '**.[jt]sx', 'content/**/*') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('bun.lock') }}-
+            ${{ runner.os }}-nextjs-
+      - name: Install dependencies
+        run: |
+          bun install
+          bunx --bun next telemetry disable
+      - name: Copy blog assets
+        run: node scripts/copy-blog-assets.mjs
+      - name: Build with Next.js
+        run: bunx --bun next build
+      - name: Index with Pagefind
+        run: bunx pagefind --site out --output-subdir pagefind
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: ./out
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
 ```
 
-End-to-end the deploy takes approximately 2 minutes.
+A few things worth noting: the secrets scan runs first and blocks everything if Gitleaks finds credentials anywhere in the git history — not just the diff. The build caches `.next/cache` keyed on lockfile and source changes, which keeps subsequent deploys fast. End-to-end the pipeline takes about 2 minutes.
 
 ## Version Workflow
 
@@ -79,11 +141,11 @@ On every PR merge to `main`, `.github/workflows/version-increment.yml` runs:
 2. Bumps the patch number and pushes a new tag (e.g. `v.1.0.10`) — no file changes, no commits
 3. Creates a GitHub Release with auto-generated release notes
 
-I keep `package.json` version intentionally static. The git tag is authoritative. This avoids CI-to-branch write-back and the merge conflicts it causes.
+I keep `package.json` version intentionally static because the alternative is CI writing a file and committing it, which triggers another CI run. I've seen that loop go wrong enough times. The git tag is authoritative — it's what the version badge in the README pulls from.
 
 ## Quality Gates
 
-I don't have an automated test suite. My bar before merging:
+I don't have an automated test suite — a personal portfolio doesn't need one. What I do care about: clean TypeScript and a happy linter. My bar before merging:
 
 ```bash
 bun run type-check   # tsc --noEmit — zero type errors required
