@@ -1,0 +1,129 @@
+---
+title: "My MDX Blog Pipeline in 2026: The Decisions, the Trade-offs, and What I'd Do Differently"
+date: "2026-05-11"
+summary: "A honest retrospective on building a blog with Next.js 16, next-mdx-remote, Zod, Shiki, and Pagefind — and why I skipped Hugo, Jekyll, and Astro entirely."
+tags: ["next.js", "mdx", "typescript", "blog", "architecture"]
+published: true
+---
+
+I didn't want to host my blog on Medium. I didn't want Substack, Ghost, or any platform I didn't own and couldn't inspect. I wanted posts to live inside my personal site — versioned in Git, portable, and styled with the same design system I'd already built in TypeScript. If something was broken, I wanted to be able to open a file and fix it.
+
+That goal immediately ruled out a category of tools. And working through the alternatives is actually the most useful part of this story.
+
+## Why not Hugo, Jekyll, or Gatsby?
+
+This is the question I get most when I mention I built the blog myself. Why not reach for a dedicated static site generator?
+
+**Jekyll** was the obvious starting point — it's what GitHub Pages was built around, and the path of least resistance for a `github.io` domain. But Jekyll is Ruby. I don't write Ruby. Every time I need to debug a theme, extend a plugin, or understand why a Liquid template is doing something unexpected, I'm in a foreign ecosystem. For a site I want to iterate on quickly, that friction compounds. Jekyll also hasn't kept pace with the tooling expectations I have in my day job — no TypeScript, no component model, no design token system.
+
+**Hugo** is fast. Genuinely, impressively fast. But it has the same fundamental problem: it's Go, it uses Go templating, and the moment you want to do anything beyond standard blog functionality, you're writing Go or waiting for a plugin that may not exist. I wanted my colour scheme system, my custom MDX components, my Radix UI primitives. Hugo doesn't speak that language.
+
+**Gatsby** I considered seriously, then watched the ecosystem stagnate. The GraphQL data layer was clever but heavy for a personal site, the build times were notorious, and by late 2025 the community momentum had clearly shifted elsewhere. I didn't want to build on a foundation heading toward legacy status.
+
+**Astro** is the one I thought hardest about, and it was a genuine coin flip. It's TypeScript-native, it has an excellent content collections API with schema validation, and it ships minimal JavaScript by default. If I were starting today and didn't already have a Next.js codebase, I might choose it. But I'm a Next.js engineer. I think in React, I know the App Router inside out, and I didn't want to context-switch into a new mental model just to write blog posts. The overhead wasn't worth it for a site maintained by one person.
+
+So: Next.js 16, App Router, TypeScript, and an MDX blog living inside the same repo as the rest of the site.
+
+## What the pipeline actually looks like
+
+Posts live as `index.mdx` files inside date-prefixed folders under `content/blogs/`:
+
+```
+content/blogs/
+└── 2026-05-11-my-post-title/
+    ├── index.mdx
+    └── assets/
+        └── hero.png
+```
+
+The slug is the folder name with the date prefix stripped. A prebuild script (`scripts/copy-blog-assets.mjs`) copies anything in `assets/` to `public/blog-assets/[slug]/`, which is where Next.js can serve them from during static export. That's step one of the build.
+
+All blog data access is centralised in `src/features/blogs/pipeline.ts`, which exports three functions:
+
+- `getAllPostsMeta()` — parses all posts, validates frontmatter with Zod, filters drafts in production, returns sorted `PostMeta[]`
+- `getAllSlugs()` — used by `generateStaticParams` to pre-render every post at build time
+- `getPostBySlug(slug)` — compiles MDX via `next-mdx-remote/rsc`, returns the React content
+
+The whole thing is a static export. `next.config.ts` sets `output: 'export'`, everything is pre-rendered at build time, and the result is a folder of HTML files deployed to GitHub Pages. No server, no runtime, no cold starts.
+
+## Decision 1: `next-mdx-remote` over `@next/mdx`
+
+The first MDX decision is which processor to use, and it's more loaded than it looks.
+
+`@next/mdx` is the official package. It plugs straight into `next.config`, it's well-documented, and it feels like the "right" choice on paper. The catch is that it treats your MDX files as pages — they're compiled as part of the application build, not as data. The moment you want to query posts programmatically (sort by date, filter by tag, build a list page), you're bolting on a separate file-system layer that `@next/mdx` wasn't designed to support.
+
+I went with `next-mdx-remote` instead, specifically the `/rsc` import that supports React Server Components. The key difference: `getPostBySlug()` calls `compileMDX()` inside a Server Component, which means the MDX compilation happens at build time on the server, and the resulting React tree is written into the static output. No MDX processing happens in the browser.
+
+This gives me the best of both worlds — rich MDX components in posts, but a data model I can actually query. The blog list page, tag filtering, reading time, and RSS feed all read from `getAllPostsMeta()`, which returns plain objects. The MDX compilation only runs when rendering a specific post page.
+
+The trade-off is that `next-mdx-remote` is a third-party dependency with its own release cadence. It's well-maintained, but it's not something the Next.js team owns. I'm comfortable with that, but it's worth naming.
+
+## Decision 2: Frontmatter validation with Zod v4
+
+Every post starts with frontmatter:
+
+```yaml
+---
+title: "Your post title"
+date: "2026-05-11"
+summary: "One sentence for the card and RSS feed."
+tags: ["next.js", "architecture"]
+published: true
+---
+```
+
+The schema lives in `src/features/blogs/schema.ts` and is enforced with **Zod v4** inside `getAllPostsMeta()`. If a post has invalid frontmatter — a missing `title`, a malformed `date`, anything that doesn't match the schema — the build throws. Not a warning, a hard failure.
+
+This was a decision I made early and I'm glad I did. The alternative is silent corruption: a post with a missing `date` that sorts incorrectly, a post with a blank `summary` that renders an empty RSS item, a `published` field with a typo that ships a draft accidentally. None of these are catastrophic, but they're exactly the kind of subtle bug that's annoying to track down on a site you deploy infrequently.
+
+The build-time failure is the right trade-off. Better to get a clear error in CI than discover a broken post after it's live.
+
+One nice side effect: the Zod schema generates the TypeScript types for the rest of the application. `PostMeta` is derived from the schema, so every component that renders post data works with types guaranteed to match what's actually in the files. That guarantee propagates all the way to the RSS feed, the sitemap, and the OG images.
+
+## Decision 3: Shiki + rehype-pretty-code for syntax highlighting
+
+Syntax highlighting in MDX pipelines has more opinions than developers. I landed on `rehype-pretty-code` with Shiki as the renderer, using the `tokyo-night` theme.
+
+The reason Shiki over alternatives: it does the work at build time. The output is static HTML with semantic classes, with a copy-to-clipboard button added by the custom `<CodeBlock>` MDX component in `src/features/blogs/mdx-components.tsx`. No JavaScript is shipped to the browser for highlighting, no FOUC while a client-side library loads, and no mismatched theme because a CSS file got out of sync.
+
+The dark/light mode integration is handled by `next-themes`, which toggles a class on the HTML element. `rehype-pretty-code` has native support for this: you declare both a light and dark theme, and it outputs CSS that responds to the `.dark` class. The `tokyo-night` theme has a solid light variant, and it doesn't fight with the colour scheme system because code blocks use their own scoped variables rather than the global `--scheme-*` properties.
+
+One thing I'd revisit: the copy button is implemented in `mdx-components.tsx` with a hover-reveal pattern. It works well on desktop. On mobile it's less intuitive — you can't hover — so there's a tap-to-reveal fallback, but it's not as clean as it should be. If I were doing this again I'd make the button always visible on touch devices from day one rather than retrofitting it.
+
+## SEO and discoverability: what's actually wired up
+
+This section doesn't make it into most MDX blog write-ups, which is a gap given how much of the setup it touches.
+
+**Sitemap** — `src/app/sitemap.ts` auto-generates a sitemap including all published post slugs. It reads from `getAllPostsMeta()`, so any post with `published: true` is in the sitemap without any manual steps. Deployed with each build.
+
+**RSS feed** — `/feed.xml` is generated by `src/app/feed.xml/route.ts`. It includes the post `title`, `summary`, `date`, tags, and canonical URL for every published post. The `published: false` flag filters drafts at the source, so the feed is always clean.
+
+**Per-post OG images** — Each post gets a dynamically generated Open Graph image via `opengraph-image.tsx` using Next.js's built-in Satori integration. The `title` and `summary` from frontmatter are rendered into the image at build time. This matters for social sharing — without a proper OG image, posts shared on LinkedIn render a generic fallback, which looks unprofessional and gets less engagement.
+
+**Meta tags** — `PAGE_META` constants in `src/lib/constants.ts` provide site-wide defaults. Individual post pages override the title and description with frontmatter values, so every post has a unique `<title>` and `<meta name="description">`. The canonical URL is derived from `SITE_URL` + slug.
+
+**Tags** — Tags are lowercase strings in the frontmatter array (`["next.js", "mdx", "typescript"]`). The blog list page renders tag filters using `pinnedTags` from `content/blogs.ts`, which controls display order. Every tag generates a filtered view — useful for readers browsing a topic and good for internal link coherence. Tag pages are included in the sitemap, so they can surface in search results for specific technologies.
+
+**Pagefind** — The on-site search runs entirely client-side using a pre-built index. After `next build` produces the static output in `out/`, the CI pipeline runs `bunx pagefind --site out`, which crawls the HTML and writes a search index into `out/pagefind/`. The ⌘K palette queries that index. Pagefind indexes the rendered HTML — post content, headings, and code blocks are all searchable — and it respects `published: false` automatically because those posts never make it into the static output.
+
+One gotcha worth documenting: Pagefind doesn't run in `bun dev`. The search palette renders an "unavailable in development" state, which is correct behaviour, but it's caught me off guard more than once. To test search locally you need `bun run build && bun run serve` — slower, but it uses the actual static output and the full index.
+
+## The thing that surprised me most
+
+I spent a lot of time on the tooling. Almost none on the writing workflow.
+
+The flow to publish a post is: create a folder, write MDX, commit, push to a feature branch, open a PR to `develop`, merge to `main`, wait ~2 minutes for GitHub Actions. That's not a lot of friction in absolute terms. But opening VS Code to write a post feels meaningfully heavier than opening a notes app. The file is in the repo. There's a commit involved. A build might fail. ESLint might have an opinion about your MDX.
+
+I've thought about building a lightweight web UI that commits directly to the repo — a personal headless CMS with one user. I've thought about keeping drafts in Obsidian and only moving them into the repo when ready, using `published: false` to merge without shipping. Neither feels like the complete answer.
+
+The architecture is right. The writing workflow is still something I'm iterating on.
+
+## Would I make the same choices again?
+
+Mostly yes. `next-mdx-remote/rsc` + Zod frontmatter validation + Shiki is a solid, well-integrated stack. The static export to GitHub Pages means zero hosting costs and no runtime to maintain. The CI pipeline — Gitleaks secret scan, asset copy, build, Pagefind index, deploy — runs in about two minutes on a push to `main`.
+
+The one decision I'd reconsider is Astro, but only at the margin. For a TypeScript engineer already working in the Next.js ecosystem, switching cost isn't worth the benefits. For someone starting fresh, Astro's content collections and zero-JS-by-default model make a genuinely compelling case.
+
+The pipeline I have works. It's typed end-to-end, fails loudly when something is wrong, and ships in two minutes. That's the bar.
+
+The code is on [GitHub](https://github.com/hammayo/hammayo.github.io) if you want to see how any of this is put together.
