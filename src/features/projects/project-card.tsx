@@ -9,14 +9,18 @@ import { GithubIcon } from '@/features/shared/icons';
 import { accentTag, gradientText } from '@/design/variants';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import Link from 'next/link';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faBookOpen } from '@fortawesome/free-solid-svg-icons';
 
 interface ProjectCardProps {
   repo: GitHubRepository;
   index: number;
   featured?: boolean;
+  blogPostSlug?: string;
 }
 
-export function ProjectCard({ repo, index, featured = false }: ProjectCardProps) {
+export function ProjectCard({ repo, index, featured = false, blogPostSlug }: ProjectCardProps) {
   return (
     <CardEffects
       variant={featured ? 'featured' : 'default'}
@@ -72,21 +76,26 @@ export function ProjectCard({ repo, index, featured = false }: ProjectCardProps)
                 Updated {format(new Date(repo.updated_at), 'MMM d, yyyy')}
               </span>
             </div>
-            <div className="flex gap-2">
-              <Button variant="ghost" size="sm" asChild>
-                <a href={repo.html_url} target="_blank" rel="noopener noreferrer">
-                  <GithubIcon className="w-4 h-4 mr-1" />
-                  Code
-                </a>
-              </Button>
-              {repo.homepage && (
+            <div className="flex gap-1">
+              {blogPostSlug && (
                 <Button variant="ghost" size="sm" asChild>
-                  <a href={repo.homepage} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="w-4 h-4 mr-1" />
-                    Demo
-                  </a>
+                  <Link href={`/blogs/${blogPostSlug}`}>
+                    <FontAwesomeIcon icon={faBookOpen} className="w-4 h-4" />
+                  </Link>
                 </Button>
               )}
+              {repo.homepage && (
+                  <Button variant="ghost" size="sm" asChild>
+                    <a href={repo.homepage} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  </Button>
+              )}              
+              <Button variant="ghost" size="sm" asChild>
+                <a href={repo.html_url} target="_blank" rel="noopener noreferrer">
+                  <GithubIcon className="w-4 h-4" />
+                </a>
+              </Button>
             </div>
           </div>
         </div>
