@@ -54,11 +54,17 @@ next-env.d.ts
 .playwright-mcp/
 .obsidian/
 .docs/
-.claude/
+.claude/*
+!.claude/commands/
 
-# Keep screenshots for README.md
-!public/screenshots/
+# Blog automation — ephemeral cache, never commit
+scripts/blog-automation/.last-briefing.json
+scripts/blog-automation/topics-log.json
+content/blogs/**/_social.md
 
 # Blog — generated at build time
 public/blog-assets/
+
+# Keep screenshots for README.md
+!public/screenshots/
 
