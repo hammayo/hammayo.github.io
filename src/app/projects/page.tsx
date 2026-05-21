@@ -13,6 +13,11 @@ export const metadata: Metadata = createPageMetadata('projects', '/projects');
 // This ensures the page revalidates every 1 hour
 export const revalidate = 3600;
 
+const REPO_BLOG_MAP: Record<string, string> = {
+  '.local-dev-toolbox': 'bash-dev-toolkit',
+  'hammayo.github.io':  'revamp-hammayo-site',
+};
+
 export default async function ProjectsPage() {
   const { pinnedRepos, otherRepos } = await fetchGitHubData({
     username: 'hammayo',
@@ -56,7 +61,7 @@ export default async function ProjectsPage() {
                 <h2 className="text-xl font-semibold mb-4 text-zinc-200">Featured Projects</h2>
                 <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
                   {recentPinnedRepos.map((project, index) => (
-                    <ProjectCard key={project.id} repo={project} index={index} featured />
+                    <ProjectCard key={project.id} repo={project} index={index} featured blogPostSlug={REPO_BLOG_MAP[project.name]} />
                   ))}
                 </div>
               </div>
@@ -71,6 +76,7 @@ export default async function ProjectsPage() {
                       key={project.id}
                       repo={project}
                       index={index + recentPinnedRepos.length}
+                      blogPostSlug={REPO_BLOG_MAP[project.name]}
                     />
                   ))}
                 </div>
@@ -86,6 +92,7 @@ export default async function ProjectsPage() {
                       key={project.id}
                       repo={project}
                       index={index + recentPinnedRepos.length + remainingPinnedRepos.length}
+                      blogPostSlug={REPO_BLOG_MAP[project.name]}
                     />
                   ))}
                 </div>

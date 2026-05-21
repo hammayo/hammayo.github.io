@@ -53,7 +53,7 @@ Static exports create pre-rendered HTML files + RSC payload files (`.txt` files 
 | `--scheme-button-from/via/to` | `schemes.ts` | Darker gradient for CTA buttons |
 | `--scheme-transition` | `schemes.ts` | Crossfade duration ms |
 
-Time-of-day mapping: `silver` 06–11, `deep-purple` 12–17, `glass` 18–21, `violet-blue` 22–05.
+Time-of-day mapping: `silver` 06–11, `glass` 12–17, `nebula` 18–21, `violet-blue` 22–05.
 
 To change the active scheme mode (time-of-day / fixed / cycling), edit `SCHEME_MODE` in `src/design/schemes.ts` — no component changes needed.
 
@@ -91,18 +91,40 @@ Satori (used by `opengraph-image.tsx` files) requires:
 - No adjacent text nodes — use template literals instead of `{expr} · string` or `&&` expressions inside JSX
 - Use `x ? <div>{x}</div> : null`, not `x && <div>{x}</div>`
 
+### Theme vs colour scheme
+
+There are two independent styling layers:
+
+- **`ThemeProvider`** (`src/providers/theme-provider.tsx`) — wraps `next-themes`, controls light/dark mode. Toggled by `ThemeToggle` in the header; persisted to `localStorage`.
+- **`SchemeProvider`** (`src/providers/scheme-provider.tsx`) — time-of-day gradient/accent system. Injects CSS custom properties onto `:root`. Operates independently of light/dark mode.
+
+Both providers are mounted in `src/app/layout.tsx`.
+
+### Projects page — GitHub API
+
+The projects page (`src/app/projects/`) fetches live data from GitHub at build time via `src/lib/github.ts`:
+- `fetchPinnedRepositories()` — GraphQL API, fetches up to 6 pinned repos (requires `GITHUB_TOKEN`)
+- `fetchAllRepositories()` — REST API, falls back when token absent
+- `fetchGitHubData()` — parallel wrapper combining both
+
+Without `GITHUB_TOKEN` and `GITHUB_USERNAME`, the projects page builds but shows no repositories. Set both in `.env.local` for local development.
+
 ### Key files
 
 | File | Purpose |
 |---|---|
 | `src/lib/constants.ts` | `SITE`, `SOCIAL`, `SITE_URL`, `PAGE_META` — import from here for all site-wide strings |
 | `src/lib/env.ts` | Zod-validated env, exports `basePath`, `assetPrefix`, `isGithubActions` |
+| `src/lib/github.ts` | GitHub API client — REST + GraphQL; used by the projects page at build time |
 | `src/design/schemes.ts` | Colour scheme definitions and `SCHEME_MODE` toggle |
 | `src/design/variants.ts` | CVA variants used site-wide |
 | `src/features/shared/` | Header, footer, animated background, analytics, error boundary |
 | `src/features/blogs/pipeline.ts` | All blog data access — the only place that reads `content/blogs/` |
 | `src/features/blogs/mdx-components.tsx` | Custom MDX renderers: `CodeBlock` (copy-to-clipboard on hover), images, links, headings, tables |
-| `content/about.ts` | All about-page and homepage bio content — edit here, not in components |
+| `content/about.ts` | About-page and homepage bio content — edit here, not in components |
+| `content/blogs.ts` | Blog config: `pinnedTags` order for filter chips |
+| `content/contact.ts` | Contact page copy and availability data |
+| `content/cv.ts` | CV page data: skills, roles, education |
 
 ### ESLint config
 
