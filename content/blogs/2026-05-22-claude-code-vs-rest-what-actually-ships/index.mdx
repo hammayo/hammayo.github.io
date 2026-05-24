@@ -1,0 +1,81 @@
+---
+title: "Claude Code vs. The Rest: What Actually Ships in May 2026"
+date: "2026-05-24"
+summary: "A year into daily Claude use, I'm getting specific—which AI tool completes backend .NET tasks without hallucinating EF migrations or breaking CI pipelines."
+tags: ["ai", "productivity", "tooling", "automation"]
+published: true
+---
+
+I wrote about using Claude for backend work a year ago. Since then, Claude Code went from 3% developer adoption to 18% worldwide—24% in the US and Canada. For the first time, more US businesses are paying for Claude than ChatGPT. Numbers don't lie, but hype does. So here's what actually works when you're shipping .NET backend code in a regulated environment where breaking a TeamCity pipeline or hallucinating an Entity Framework migration costs you hours.
+
+## Terminal-first matters when you're refactoring payment integrations
+
+I don't care about AI that writes clean React components. I care about AI that can touch a 6,000-line C# service handling fuel forecourt payment state machines without destroying audit trails or introducing race conditions. That's the filter.
+
+Claude Code lives in the terminal. GitHub Copilot lives in the IDE. That distinction matters more than you'd think when you're working in Docker containers, SSHing into build agents, or running EF migrations against a staging SQL Server instance that you absolutely cannot afford to corrupt.
+
+This week I used Claude Code to refactor a webhook retry handler in an ASP.NET Core minimal API. The task: extract retry logic into a configurable `IRetryPolicy`, add telemetry hooks, and ensure existing integration tests still pass. Claude Code handled the extraction, wrote the tests, and spotted a subtle issue where retries weren't respecting cancellation tokens. I merged it in 40 minutes. Copilot would've given me boilerplate for the interface but wouldn't have understood the context well enough to spot the `CancellationToken` misuse across three files.
+
+Where Copilot still wins: inline autocomplete. If I'm writing a LINQ query or a simple controller action, Copilot's faster. It knows my codebase patterns because it's been trained on my repository for months. Claude Code doesn't have that muscle memory yet—it needs more context fed in via chat. But when the task is "refactor this mess and don't break anything," Claude Code's reasoning model wins.
+
+## The hallucination problem: Entity Framework migrations
+
+Let's talk about the failure mode that matters. AI coding tools hallucinate. Claude Code is no exception. But it hallucinates differently.
+
+I asked Claude Code to generate an EF Core migration for adding a composite index to a payments table. It gave me plausible-looking C# that would've compiled. Except the index definition was wrong—it wasn't accounting for the soft-delete pattern we use across all entities. I caught it in code review. Copilot has done the same thing. The difference: Claude Code responded better when I asked it to explain the index strategy and validate against the soft-delete pattern. It corrected itself. Copilot just... kept suggesting the same broken migration.
+
+Here's the rule I've settled on: never trust AI-generated migrations without reviewing them line-by-line. Doesn't matter which tool. But Claude Code at least gives me a conversation where I can challenge it. That's worth something when you're maintaining a regulated system where every schema change gets audited.
+
+## CI/CD pipelines: where GUI-first tools break down
+
+GitHub Copilot lives in my IDE. Claude Code lives in my terminal. That means Claude Code can see my Bash scripts, my Dockerfiles, and my TeamCity build configurations without me copy-pasting them into a chat window.
+
+Last month I rewrote a TeamCity pipeline step that builds and pushes Docker images to our private registry. The old step used shell variables inconsistently and didn't handle multi-stage builds properly. I opened Claude Code in the terminal, pointed it at the `.teamcity` directory, and asked it to refactor the step while preserving all environment variable logic. It did. First try. I ran it through staging. Green build.
+
+Could Copilot have done that? Maybe, if I'd fed it enough context manually. But I didn't have to. Claude Code read the directory structure, understood the TeamCity XML, and made changes that actually worked. That's the difference between a terminal-first tool and an IDE plugin—it doesn't assume you're writing application code. It understands infrastructure as code.
+
+## What I used Claude Code for this week
+
+Real examples from client work. No sanitisation needed—just the tasks:
+
+- Refactored a webhook retry handler (mentioned above). 40 minutes saved.
+- Generated integration tests for a payment reconciliation service. Tests passed. Merged.
+- Rewrote a Bash script that syncs SQL Server backups to S3. Script was brittle. Claude Code made it idempotent.
+- Debugged a race condition in a background job that processes fuel transactions. Claude Code identified the issue faster than I would've by reading logs alone.
+- Wrote a one-off migration script to backfill missing audit log entries. Ran it in staging. No rollback needed.
+
+Where did Copilot help? Inline autocomplete when I was writing LINQ queries for the reconciliation service. That's it. Everything else was Claude Code.
+
+## The uncomfortable truth about adoption
+
+Claude Code hit 18% developer adoption because it's useful, not because of marketing. Anthropic doesn't sponsor conference talks or plaster their logo on every dev tools blog. They built something that works for terminal-first engineers who ship backend systems. That's the demographic that actually pays for tools.
+
+More US businesses pay for Claude than ChatGPT now. That's not a fluke. That's senior engineers at mid-size companies (like the ones I work with at MoJ and HMPPS) choosing what gets them home on time without breaking production.
+
+## What shipped while I was writing this
+
+The Code with Claude conference ran 19–22 May in San Francisco and London simultaneously. I was finishing this post while watching the announcements. Two features are directly relevant to what I've written above.
+
+The first is "Dreaming." Claude Code agents can now write notes to themselves across sessions — recording what they've learned about your codebase, your patterns, your invariants. Take the Entity Framework migrations section: an agent that already knows "this team uses a soft-delete pattern across all entities with `.IsDeleted`" doesn't hallucinate the same index definition twice. It's not autocomplete with memory. It's closer to the developer who's been on the project six months and stopped making the same mistake. In regulated environments where every schema change is audited, that shift matters considerably.
+
+The second is MCP tunnels. Claude Code agents can now reach internal systems — your private Docker registry, your TeamCity build agent, your staging SQL Server — without touching the public internet. I've been routing context into conversations manually for months, copy-pasting Dockerfile contents and TeamCity XML into chat. That workaround goes away when the agent can authenticate directly to internal infrastructure through an MCP tunnel. For teams working in SC-cleared or network-restricted environments, this changes what's architecturally possible.
+
+API volume is up 17× year-on-year. Rate limits were doubled for all plans this week. Those aren't marketing numbers — they're what the pipeline looks like when engineers keep choosing the tool repeatedly, in production.
+
+## Where all three tools still fail
+
+There's a third tool worth naming here: Hermes Agent, built by Nous Research and released in February 2026. Open-source, self-hosted, model-agnostic, and with a self-improving skills system that learns your codebase patterns across sessions — similar to Claude Code's Dreaming feature, but fully inspectable because the skill format is open source. It crossed 140,000 GitHub stars in under three months and is currently the most-used agent on OpenRouter. For backend engineers working without compliance constraints, it looks genuinely compelling.
+
+For regulated-environment work, it's not there yet. No signed provenance for generated artefacts, no approval workflow primitives, no audit trail support. The threat model is unresolved. Those aren't gaps you can paper over when you're touching offender data or payment card information in an SC-cleared environment.
+
+But the gap Hermes exposes is worth sitting with: add it to Claude Code and Copilot and all three fail on the same thing. None of them understand regulated environments well enough to flag PII leaks, audit trail gaps, or data retention violations. They generate code that works functionally and fails compliance review. I still catch that manually, regardless of which tool wrote the code.
+
+All three also struggle with long-running transactions in SQL Server. They'll suggest patterns that cause lock escalation or deadlocks in high-throughput systems. I've raised it. No fix yet.
+
+## What I'm betting on
+
+I'm not switching away from Claude Code for backend work. It's the only tool I've used that doesn't feel like autocomplete with extra steps. It reasons. It challenges my assumptions. It reads infrastructure as code without me explaining Docker to it.
+
+Copilot stays installed for inline autocomplete. Claude Code gets the hard problems. Hermes Agent goes on the watchlist — I'll pick it up seriously when it ships audit trail primitives or someone in the regulated-tech space publishes a hardened deployment pattern for it.
+
+That's the split that works for me in May 2026. If you're shipping .NET in a terminal-first workflow, try Claude Code for a week. If you're in a regulated environment, watch what Hermes does next — but don't bet production on it yet.
