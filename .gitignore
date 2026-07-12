@@ -53,7 +53,8 @@ next-env.d.ts
 .superpowers/
 .playwright-mcp/
 .obsidian/
-.docs/
+_docs/
+.agents/
 .claude/*
 !.claude/commands/
 
