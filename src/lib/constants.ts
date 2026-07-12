@@ -9,7 +9,7 @@ export const SITE_URL = 'https://hammayo.co.uk';
 export const SITE = {
   name:        "Hammayo's Portfolio",
   title:       "Hammayo's | Backend Software Engineer",
-  description: 'Portfolio site showcasing 20+ years of backend engineering across finance, justice, and public service.',
+  description: '20+ years of backend engineering across finance, justice, and retail — now writing about building software with AI, properly.',
   author:      'Hammy Babar',
   keywords:    [
     // Personal brand
@@ -19,6 +19,9 @@ export const SITE = {
     'backend engineer London', 'Sutton', 'hire backend engineer',
     // Technical stack
     'C#', '.NET', 'Azure', 'Docker', 'microservices', 'CI/CD',
+    // AI-assisted development
+    'AI-assisted development', 'Claude Code', 'spec-driven development',
+    'AI developer workflow', 'AI coding for experienced engineers',
     // Domain experience
     'HMPPS', 'MoJ', 'fintech', 'payment systems',
     // General
@@ -52,7 +55,7 @@ export const SITE_LAUNCH_YEAR = 2024;
 export const PAGE_META = {
   home: {
     title:       "Hammayo's | Backend Software Engineer",
-    description: 'Portfolio site showcasing 20+ years of backend engineering across finance, justice, and public service.',
+    description: '20+ years of backend engineering across finance, justice, and retail — now writing about building software with AI, properly.',
   },
   about: {
     title:       "About | Hammayo's Portfolio",
