@@ -27,10 +27,10 @@ Assets have to exist before Next.js processes the MDX that references them. Page
 
 ## Local Development Modes
 
-| Mode | Command | Navigation | Search | Use case |
-|---|---|---|---|---|
-| **Dev** | `bun dev` | ✅ Full client-side routing | ❌ Unavailable | Feature development |
-| **Static export** | `bun run serve` | ⚠️ Direct URLs only | ✅ Works | Testing search, pre-deployment |
+| Mode              | Command         | Navigation                  | Search        | Use case                        |
+|-------------------|-----------------|-----------------------------|---------------|---------------------------------|
+| **Dev**           | `bun dev`       | ✅ Full client-side routing  | ❌ Unavailable | Feature development           |
+| **Static export** | `bun run serve` | ⚠️ Direct URLs only         | ✅ Works       | Testing search, pre-deployment |
 
 **Why `bun run serve` breaks client-side navigation:**
 
@@ -40,12 +40,12 @@ My static export produces pre-rendered HTML files plus RSC payload files (`.txt`
 
 Copy `.env.local.example` to `.env.local` and fill in what you need — I've kept all vars optional except where noted:
 
-| Variable | Required locally | CI behaviour | Purpose |
-|---|---|---|---|
-| `NEXT_PUBLIC_BASE_PATH` | No | Ignored (derived from `GITHUB_REPOSITORY`) | Override basePath for local static export sub-path testing |
-| `GITHUB_USERNAME` | For projects page | Set via repo secret | GitHub username for API calls |
-| `GITHUB_TOKEN` | For projects page | Set via repo secret | GitHub PAT — enables pinned repos via GraphQL |
-| `GA_MEASUREMENT_ID` | No | Set via repo secret | Google Analytics — omit to disable |
+| Variable                | Required locally  | CI behaviour                               | Purpose                                                    |
+|-------------------------|-------------------|--------------------------------------------|------------------------------------------------------------|
+| `NEXT_PUBLIC_BASE_PATH` | No                | Ignored (derived from `GITHUB_REPOSITORY`) | Override basePath for local static export sub-path testing |
+| `GITHUB_USERNAME`       | For projects page | Set via repo secret                        | GitHub username for API calls                              |
+| `GITHUB_TOKEN`          | For projects page | Set via repo secret                        | GitHub PAT — enables pinned repos via GraphQL              |
+| `GA_MEASUREMENT_ID`     | No                | Set via repo secret                        | Google Analytics — omit to disable                         |
 
 I hardcode `SITE_URL` (`https://hammayo.co.uk`) in `src/lib/constants.ts` — it's not an env var.
 

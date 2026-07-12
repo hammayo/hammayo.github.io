@@ -28,14 +28,14 @@ Everything goes through `pipeline.ts`. I made it the only place in the codebase 
 
 I validate frontmatter with Zod in `src/features/blogs/schema.ts`. Bad frontmatter blows up the build rather than shipping silently broken — I'd rather fix a typo in a field name before deploying than discover a post is missing its title in production.
 
-| Field | Required | Default | Notes |
-|---|---|---|---|
-| `title` | Yes | — | Post title |
-| `date` | Yes | — | `YYYY-MM-DD` format |
-| `summary` | Yes | — | Shown on list card and in RSS feed |
-| `tags` | No | `[]` | Lowercase array, e.g. `["next.js", "docker"]` |
-| `published` | No | `true` | Set `false` to draft — excluded from production builds, sitemap, and RSS |
-| `readingTime` | No | auto | Auto-calculated at 200 wpm if omitted |
+| Field         | Required | Default | Notes                                                                    |
+|---------------|----------|---------|--------------------------------------------------------------------------|
+| `title`       | Yes      | —       | Post title                                                               |
+| `date`        | Yes      | —       | `YYYY-MM-DD` format                                                      |
+| `summary`     | Yes      | —       | Shown on list card and in RSS feed                                       |
+| `tags`        | No       | `[]`    | Lowercase array, e.g. `["next.js", "docker"]`                            |
+| `published`   | No       | `true`  | Set `false` to draft — excluded from production builds, sitemap, and RSS |
+| `readingTime` | No       | auto    | Auto-calculated at 200 wpm if omitted                                    |
 
 `published: false` posts appear in `bun dev` but are filtered out in production builds.
 

@@ -53,10 +53,12 @@ next-env.d.ts
 .superpowers/
 .playwright-mcp/
 .obsidian/
-_docs/
 .agents/
 .claude/*
 !.claude/commands/
+_docs/
+/_docs/archive/
+/scripts/blog-automation/
 
 # Blog automation — ephemeral cache, never commit
 scripts/blog-automation/.last-briefing.json
@@ -68,4 +70,3 @@ public/blog-assets/
 
 # Keep screenshots for README.md
 !public/screenshots/
-
