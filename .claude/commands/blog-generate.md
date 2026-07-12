@@ -1,7 +1,7 @@
 Generate a full blog post draft + social posts for hammayo.co.uk from the last research briefing.
 
 Arguments: $ARGUMENTS
-Expected format: --topic <1-4> [--context "extra notes"] [--date YYYY-MM-DD]
+Expected format: --topic <1-4> [--context "extra notes"] [--date YYYY-MM-DD] [--redo-social <slug>]
 
 ## Steps
 
@@ -9,6 +9,15 @@ Expected format: --topic <1-4> [--context "extra notes"] [--date YYYY-MM-DD]
 - `--topic N` — which topic from the last briefing (1-indexed). Default: 1.
 - `--context "..."` — optional extra context from Hammy (real experience to weave in).
 - `--date YYYY-MM-DD` — post date. Default: today's date.
+- `--redo-social <slug>` — regenerate only the social posts for an existing post. Slug is the folder name under `content/blogs/` (with or without the date prefix). If this flag is present, skip steps 2–4 and 6 and jump straight to the social post generation step.
+
+### 1a. Redo-social shortcut (only when `--redo-social` is provided)
+
+- Find the matching folder under `content/blogs/` — accept the full folder name (e.g. `2026-05-25-my-post`) or just the slug portion (`my-post`); glob if needed.
+- Read the existing `index.mdx` to extract the title, tags, date, and full post content.
+- Derive `slug` (strip the date prefix), `date`, and blog URL: `https://hammayo.co.uk/blogs/{slug}/`
+- Go directly to **step 5** to rewrite `_social.md`, then go to **step 7** (skip steps 2, 3, 4, 6).
+- In step 7 confirmation, note that only social posts were regenerated.
 
 ### 2. Load inputs
 - Read persona from `scripts/blog-automation/persona.md`
