@@ -27,21 +27,21 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Local Testing Modes
 
-| Mode | Command | Navigation | Search | Use Case |
-|---|---|---|---|---|
-| **Dev** | `bun dev` | ✅ Full client-side routing | ❌ Unavailable | Development, testing features |
-| **Static export** | `bun run serve` | ⚠️ Direct URLs only* | ✅ Works | Testing search, pre-deployment |
+| Mode              | Command         | Navigation                  | Search          | Use Case                       |
+|-------------------|-----------------|-----------------------------|-----------------|--------------------------------|
+| **Dev**           | `bun dev`       | ✅ Full client-side routing | ❌ Unavailable  | Development, testing features  |
+| **Static export** | `bun run serve` | ⚠️ Direct URLs only*        | ✅ Works        | Testing search, pre-deployment |
 
 \* In `bun run serve`, clicking links doesn't navigate (static export limitation). Direct URL access works fine (`/about/` loads the About page). This doesn't affect GitHub Pages — production uses direct URL access.
 
 ## Technical Notes
 
-| Topic | Notes |
-|---|---|
-| Architecture & configuration | [_notes/architecture.md](_notes/architecture.md) |
-| Design system | [_notes/design-system.md](_notes/design-system.md) |
-| Blog engine & SEO | [_notes/blog-engine.md](_notes/blog-engine.md) |
-| Development & CI/CD | [_notes/development.md](_notes/development.md) |
+| Topic                        | Notes                                              |
+|------------------------------|----------------------------------------------------|
+| Architecture & configuration | [_notes/architecture.md](_notes/architecture.md)   |
+| Design system                | [_notes/design-system.md](_notes/design-system.md) |
+| Blog engine & SEO            | [_notes/blog-engine.md](_notes/blog-engine.md)     |
+| Development & CI/CD          | [_notes/development.md](_notes/development.md)     |
 
 ## Writing a Blog Post
 
@@ -80,14 +80,14 @@ const example = true;
 
 **Frontmatter fields:**
 
-| Field | Required | Notes |
-|---|---|---|
-| `title` | Yes | Post title |
-| `date` | Yes | `YYYY-MM-DD` format |
-| `summary` | Yes | Shown on list card and in RSS |
-| `tags` | No | Lowercase array, e.g. `["next.js", "docker"]` |
-| `published` | No | Defaults to `true`. Set `false` to draft |
-| `readingTime` | No | Auto-calculated if omitted (200 wpm) |
+| Field         | Required | Notes                                         |
+|---------------|----------|-----------------------------------------------|
+| `title`       | Yes      | Post title                                    |
+| `date`        | Yes      | `YYYY-MM-DD` format                           |
+| `summary`     | Yes      | Shown on list card and in RSS                 |
+| `tags`        | No       | Lowercase array, e.g. `["next.js", "docker"]` |
+| `published`   | No       | Defaults to `true`. Set `false` to draft      |
+| `readingTime` | No       | Auto-calculated if omitted (200 wpm)          |
 
 ### 3. Add images or media (optional)
 
@@ -128,11 +128,11 @@ Set `published: false` to keep a post out of production builds, the sitemap, and
 
 ## Customisation
 
-| What | Where |
-|---|---|
-| Name, title, social links | `src/lib/constants.ts` |
-| Colour schemes | `src/design/schemes.ts` |
-| Blog tag order | `content/blogs.ts` → `pinnedTags` |
-| Navigation links | `src/features/shared/header.tsx` |
-| Global CSS, fonts | `src/app/globals.css` |
-| MDX element overrides | `src/features/blogs/mdx-components.tsx` |
+| What                      | Where                                   |
+|---------------------------|-----------------------------------------|
+| Name, title, social links | `src/lib/constants.ts`                  |
+| Colour schemes            | `src/design/schemes.ts`                 |
+| Blog tag order            | `content/blogs.ts` → `pinnedTags`       |
+| Navigation links          | `src/features/shared/header.tsx`        |
+| Global CSS, fonts         | `src/app/globals.css`                   |
+| MDX element overrides     | `src/features/blogs/mdx-components.tsx` |

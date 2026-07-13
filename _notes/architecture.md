@@ -36,12 +36,12 @@ Everything that could be a magic string in a component lives in `src/lib/constan
 
 `src/lib/env.ts` validates all environment variables with Zod at startup. Missing or malformed values log clearly rather than surfacing as a cryptic runtime crash three steps into a build.
 
-| Variable | Required locally | Purpose |
-|---|---|---|
-| `NEXT_PUBLIC_BASE_PATH` | No | Override basePath for local static export sub-path testing |
-| `GITHUB_USERNAME` | For projects page | GitHub username for API calls |
-| `GITHUB_TOKEN` | For projects page | GitHub PAT — enables pinned repos via GraphQL |
-| `GA_MEASUREMENT_ID` | No | Google Analytics — omit to disable |
+| Variable                | Required locally  | Purpose                                                    |
+|-------------------------|-------------------|------------------------------------------------------------|
+| `NEXT_PUBLIC_BASE_PATH` | No                | Override basePath for local static export sub-path testing |
+| `GITHUB_USERNAME`       | For projects page | GitHub username for API calls                              |
+| `GITHUB_TOKEN`          | For projects page | GitHub PAT — enables pinned repos via GraphQL              |
+| `GA_MEASUREMENT_ID`     | No                | Google Analytics — omit to disable                         |
 
 In CI, `basePath` is derived from `GITHUB_REPOSITORY` automatically. `env.ts` ignores `NEXT_PUBLIC_BASE_PATH` when `GITHUB_ACTIONS=true`.
 

@@ -8,6 +8,12 @@ export const PostSchema = z.object({
   tags:        z.array(z.string()).default([]),
   published:   z.boolean().default(true),
   readingTime: z.number().optional(),
+  series: z
+    .object({
+      name: z.string(),
+      part: z.number().int().positive(),
+    })
+    .optional(),
 });
 
 export type PostFrontmatter = z.infer<typeof PostSchema>;

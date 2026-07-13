@@ -43,15 +43,15 @@ Static exports create pre-rendered HTML files + RSC payload files (`.txt` files 
 
 `SchemeProvider` (`src/providers/scheme-provider.tsx`) resolves a scheme from visitor local time and injects CSS custom properties onto `:root`. Components never hardcode colours — they reference these vars.
 
-| Variable | Source | Notes |
-|---|---|---|
-| `--scheme-from/via/to` | `schemes.ts` | Gradient stop hex values |
-| `--scheme-accent` | `schemes.ts` | Raw accent hex — use for backgrounds, borders |
-| `--scheme-accent-text` | `globals.css` | Text-safe accent — darkened in light mode (`color-mix(… 60%, #000)`), full accent in dark mode. **Always use this for text/links, never `--scheme-accent` directly** |
-| `--scheme-glow` | `schemes.ts` | rgba for box-shadow |
-| `--scheme-border` | `schemes.ts` | rgba for borders |
-| `--scheme-button-from/via/to` | `schemes.ts` | Darker gradient for CTA buttons |
-| `--scheme-transition` | `schemes.ts` | Crossfade duration ms |
+| Variable                      | Source        | Notes                                                                                                                                                                |
+|-------------------------------|---------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `--scheme-from/via/to`        | `schemes.ts`  | Gradient stop hex values                                                                                                                                             |
+| `--scheme-accent`             | `schemes.ts`  | Raw accent hex — use for backgrounds, borders                                                                                                                        |
+| `--scheme-accent-text`        | `globals.css` | Text-safe accent — darkened in light mode (`color-mix(… 60%, #000)`), full accent in dark mode. **Always use this for text/links, never `--scheme-accent` directly** |
+| `--scheme-glow`               | `schemes.ts`  | rgba for box-shadow                                                                                                                                                  |
+| `--scheme-border`             | `schemes.ts`  | rgba for borders                                                                                                                                                     |
+| `--scheme-button-from/via/to` | `schemes.ts`  | Darker gradient for CTA buttons                                                                                                                                      |
+| `--scheme-transition`         | `schemes.ts`  | Crossfade duration ms                                                                                                                                                |
 
 Time-of-day mapping: `silver` 06–11, `glass` 12–17, `nebula` 18–21, `violet-blue` 22–05.
 
@@ -111,20 +111,20 @@ Without `GITHUB_TOKEN` and `GITHUB_USERNAME`, the projects page builds but shows
 
 ### Key files
 
-| File | Purpose |
-|---|---|
-| `src/lib/constants.ts` | `SITE`, `SOCIAL`, `SITE_URL`, `PAGE_META` — import from here for all site-wide strings |
-| `src/lib/env.ts` | Zod-validated env, exports `basePath`, `assetPrefix`, `isGithubActions` |
-| `src/lib/github.ts` | GitHub API client — REST + GraphQL; used by the projects page at build time |
-| `src/design/schemes.ts` | Colour scheme definitions and `SCHEME_MODE` toggle |
-| `src/design/variants.ts` | CVA variants used site-wide |
-| `src/features/shared/` | Header, footer, animated background, analytics, error boundary |
-| `src/features/blogs/pipeline.ts` | All blog data access — the only place that reads `content/blogs/` |
+| File                                    | Purpose                                                                                         |
+|-----------------------------------------|-------------------------------------------------------------------------------------------------|
+| `src/lib/constants.ts`                  | `SITE`, `SOCIAL`, `SITE_URL`, `PAGE_META` — import from here for all site-wide strings          |
+| `src/lib/env.ts`                        | Zod-validated env, exports `basePath`, `assetPrefix`, `isGithubActions`                         |
+| `src/lib/github.ts`                     | GitHub API client — REST + GraphQL; used by the projects page at build time                     |
+| `src/design/schemes.ts`                 | Colour scheme definitions and `SCHEME_MODE` toggle                                              |
+| `src/design/variants.ts`                | CVA variants used site-wide                                                                     |
+| `src/features/shared/`                  | Header, footer, animated background, analytics, error boundary                                  |
+| `src/features/blogs/pipeline.ts`        | All blog data access — the only place that reads `content/blogs/`                               |
 | `src/features/blogs/mdx-components.tsx` | Custom MDX renderers: `CodeBlock` (copy-to-clipboard on hover), images, links, headings, tables |
-| `content/about.ts` | About-page and homepage bio content — edit here, not in components |
-| `content/blogs.ts` | Blog config: `pinnedTags` order for filter chips |
-| `content/contact.ts` | Contact page copy and availability data |
-| `content/cv.ts` | CV page data: skills, roles, education |
+| `content/about.ts`                      | About-page and homepage bio content — edit here, not in components                              |
+| `content/blogs.ts`                      | Blog config: `pinnedTags` order for filter chips                                                |
+| `content/contact.ts`                    | Contact page copy and availability data                                                         |
+| `content/cv.ts`                         | CV page data: skills, roles, education                                                          |
 
 ### ESLint config
 
