@@ -81,4 +81,8 @@ export const PAGE_META = {
     title:       "Spec-Driven | Hammayo's Portfolio",
     description: 'Spec-Driven: AI development that actually ships. A series on using AI coding tools with twenty years of engineering judgement.',
   },
+  services: {
+    title:       "Services | Hammayo's Portfolio",
+    description: 'Small systems built properly, websites built and maintained, and AI-workflow consulting — from an SC-cleared engineer with 20+ years across finance, justice, and retail.',
+  },
 };

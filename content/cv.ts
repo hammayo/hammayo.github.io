@@ -9,9 +9,9 @@ export const cv = {
   placeholderText: 'Full CV coming soon — view my LinkedIn profile in the meantime.',
 
   skills: {
-    languages: ['Go', 'C#', '.NET', 'TypeScript', 'SQL', 'Python'],
+    languages: ['C#', '.NET', 'TypeScript', 'SQL', 'Python'],
     platforms: ['Azure', 'Kubernetes', 'Docker', 'GitHub Actions', 'AWS'],
-    tools:     ['Kafka', 'Redis', 'PostgreSQL', 'Terraform', 'Grafana'],
+    tools:     ['Redis', 'PostgreSQL', 'RabbitMQ', 'Kafka', 'Grafana'],
   },
 
   roles: [
