@@ -6,7 +6,7 @@
 export const series = {
   slug:    'spec-driven',
   name:    'Spec-Driven',
-  title:   'Spec-Driven: AI development that actually ships',
+  title:   'Spec-Driven: Building Software with Coding Agents in Production',
   tagline: 'Using AI coding tools with twenty years of engineering judgement.',
   description: [
     'Most AI-coding content is written by people who have never had to live with software for a decade. This series is the other perspective: what changes — and what absolutely does not — when an engineer with twenty years across payment systems, prison software, and retail infrastructure hands the typing over to a machine.',
