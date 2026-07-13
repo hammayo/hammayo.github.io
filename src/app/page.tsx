@@ -3,6 +3,7 @@ import { Hero } from '@/features/home/hero';
 import { HomepageBio } from '@/features/home/homepage-bio';
 import { SkillsStrip } from '@/features/home/skills-strip';
 import { CTARow } from '@/features/home/cta';
+import { SeriesStrip } from '@/features/home/series-strip';
 import { PageTransitionWrapper } from '@/features/shared/page-transition-wrapper';
 import { PageViewEvent } from '@/features/shared/analytics-event';
 import { about } from '../../content/about';
@@ -26,6 +27,9 @@ export default function HomePage() {
           </div>
           <div className="opacity-0 animate-fade-in animate-delay-300">
             <SkillsStrip skills={cv.skills} />
+          </div>
+          <div className="opacity-0 animate-fade-in animate-delay-300">
+            <SeriesStrip />
           </div>
           <div className="opacity-0 animate-fade-in animate-delay-400">
             <CTARow />

@@ -1,0 +1,91 @@
+---
+title: "Spec-Driven, Part 3: The PRD Is the Program — Running Agents in a Loop with Ralph TUI"
+date: "2026-07-13"
+summary: "What happens when your PRD stops being a briefing document and becomes an executable artefact — running Claude Code through a task list autonomously with Ralph TUI, and why Karpathy's autoresearch repo suggests this is where the whole industry is heading."
+tags: ["ai", "productivity", "tooling", "automation", "architecture"]
+series:
+  name: "Spec-Driven"
+  part: 3
+published: true
+---
+
+A few Saturdays ago I kicked off an agent run on a side project — a small .NET webhook relay I've been building outside work — went out for a long walk, and came back to fourteen completed tasks, a green build, and a session log I could scroll through like a flight recorder. No prompting between tasks. No babysitting. A tool called Ralph TUI had taken my PRD, broken it into a task list, and run Claude Code through it in an **autonomous agent loop**: pick a task, build a prompt from the spec, execute, check completion, move to the next.
+
+That afternoon changed how I think about what a PRD actually is. In [Part 1](/blogs/how-i-use-claude/) I wrote about moving past prompt-tinkering and giving Claude real structure and context. In [Part 2](/blogs/claude-code-vs-rest-what-actually-ships/) I compared the agentic tools and looked at which of them actually ship working code. This post is about the next step: what changes when the PRD stops being something an agent *reads once* and becomes something a loop *executes repeatedly*. Your spec quietly stops being documentation and starts being a program.
+
+## From one-shot spec to executable artefact
+
+The workflow I described in the first two parts is fundamentally interactive. You write the spec, hand it to the agent, watch it work, review the diff. One task, one session, one human in the chair.
+
+The loop pattern removes the chair. Ralph TUI (`github.com/subsy/ralph-tui`, MIT-licensed, open source) is an orchestrator: it connects a coding agent — Claude Code in my case, though it supports several — to a task tracker, then cycles. Select the highest-priority task. Build a prompt from the task plus your project context. Execute the agent. Detect completion. Repeat until the list is empty or the iteration cap hits.
+
+The idea descends from Geoffrey Huntley's "Ralph Wiggum loop" — run the agent in a loop until the work is done — but with the pieces you'd actually want in practice: session persistence so you can pause and resume, a real-time TUI so you can watch what's happening, iteration limits, and a sandbox mode that boxes the agent in at the OS level.
+
+The part that matters for this series: **the input to the loop is a PRD.** You can hand it a `prd.json` task list directly, or use its interactive PRD-creation mode, or — my preference — write the PRD in markdown and convert it. Everything I've said in this series about specs being the real work still holds. It just holds harder, because now nobody is watching between tasks to catch a bad inference.
+
+## Decomposition is the new skill
+
+Here's the mistake I made in my first week with the loop, and it's the weak-vs-better contrast that anchors this whole post.
+
+Weak version — what I did first:
+
+> One task: "Implement the webhook relay per the attached PRD."
+
+I pointed the loop at a single giant task containing my whole spec. The agent ran for one enormous iteration, made forty files' worth of decisions, and marked itself done. The build passed. Half the acceptance criteria were interpreted loosely, and untangling which decision happened where meant reading one monolithic transcript. I'd built a loop and then given it nothing to loop over.
+
+Better version — what I do now:
+
+> Task 1: Add `WebhookEvent` entity + EF Core migration. Soft-delete flag per project convention. Done when: migration applies cleanly, `dotnet test` green.
+> Task 2: Idempotent ingestion endpoint, deduped on `EventId`. Done when: duplicate POST returns 200 without a second insert, covered by an integration test.
+> Task 3: Polly retry policy on outbound delivery — exponential backoff, honours `CancellationToken`. Done when: transient-failure test passes, no retry on 4xx.
+
+Each task is one iteration's worth of work. Each has a **machine-checkable done condition** — the loop detects completion, so "done" has to be something the agent can verify by running a command, not something that needs my eyes. And each restates the invariants that matter for that task, because iteration seven doesn't reliably remember what iteration two was told.
+
+This is the shift: in interactive spec-driven work, the craft is writing context and constraints. In loop-driven work, the craft is *decomposition* — slicing the PRD into tasks that are small enough to complete in one iteration, ordered so dependencies resolve, and specified so completion is checkable without a human. Ralph TUI supports dependency-aware trackers precisely because this ordering problem is real: task three genuinely cannot start before the migration in task one exists.
+
+If you haven't already got the habit of explicit non-goals in your spec, the loop will teach it to you the hard way. In a single session, scope creep produces one oversized diff you catch in review. In an autonomous agent loop, an unsanctioned assumption in iteration two becomes load-bearing by iteration nine. An explicit non-goals section in your spec goes from good hygiene to structural necessity.
+
+## You program the markdown, not the code
+
+While I was settling into this workflow, Andrej Karpathy published a repo called autoresearch (`github.com/karpathy/autoresearch`) that crystallised the pattern better than anything I'd read. The setup: a single-GPU LLM training script, and an agent that runs overnight modifying it — train for a fixed five minutes, check whether the validation metric improved, keep or discard, repeat. The README estimates roughly a hundred experiments while you sleep.
+
+The detail that stopped me: the repo has one Python file the agent edits, and one markdown file the *human* edits. Karpathy's framing is that you're no longer touching the Python at all — you're programming `program.md`, the instructions that set up your "autonomous research org". The human's job is to iterate on the markdown that steers the loop; the loop iterates on the code.
+
+That's an ML research context, nothing like my world of .NET services and message queues. But strip the domain away and it's the same architecture as my Saturday afternoon: **a fixed harness, an agent in a loop, and a markdown file as the human's entire control surface.** The spec is the program. The natural-language artefact — the PRD, the `program.md`, whatever your version is — becomes the thing you version, refine, and debug, because it's the thing that determines what the loop produces.
+
+I find this genuinely clarifying for where the effort goes. When my loop produces a bad result, my instinct used to be to fix the code it wrote. Increasingly the right move is to fix the *task definition* that produced it, discard the code, and re-run. The code became cheap. The spec became the asset.
+
+## What a loop-ready task actually contains
+
+Concretely, here's what I now put in every task before it goes anywhere near the loop, refined from a few weeks of watching where iterations go wrong:
+
+- **A completion command.** `dotnet build && dotnet test`, a specific test filter, a migration apply — something executable that defines done. If I can't write one, the task isn't ready for autonomous execution and stays in my interactive workflow.
+- **Restated invariants.** Soft deletes, idempotency keys, "never touch the retry policy in `DeliveryService`" — repeated per task, even when it feels redundant. Iterations don't share memory the way a human session does; cross-iteration context tools help, but I don't lean on them for anything load-bearing.
+- **An explicit scope boundary.** Which files or projects this task may touch. Ralph TUI's sandbox handles the OS level; the task spec handles the codebase level.
+- **A size sanity-check.** If I can't imagine a competent mid-level engineer finishing it in a focused hour or two, I split it. Oversized tasks are where completion detection gets flaky and diffs get unreviewable.
+
+None of this is exotic. It's the same spec discipline the rest of this series is built on, with the acceptance criteria hardened from "a human will check this" to "a command will check this". That hardening is most of the work.
+
+## Where it falls over
+
+Plenty of places, and I'd rather you hear them from me than discover them at 2am.
+
+**Completion detection is the weak joint.** The loop trusts the agent's signal that a task is done. I've had iterations marked complete where the tests were green because the agent had quietly weakened an assertion. The fix is boring: acceptance criteria phrased as commands the harness runs, and treating "the agent says done" as a claim, not a fact.
+
+**The review gate doesn't disappear — it batches.** Fourteen tasks completed overnight is fourteen diffs waiting for me in the morning. Everything still goes through a normal PR, human review, and CI, same as any other change. The loop compresses the *writing*; it does nothing to compress the *reviewing*, and if I'm honest, reviewing a large batch cold is harder than reviewing incrementally. I've started capping runs at five or six tasks partly for this reason.
+
+**Ambiguity is fatal, not friction.** Interactively, an agent hitting an ambiguous requirement produces a wrong turn you correct in minutes. In a loop, it produces a wrong turn that three subsequent tasks build on. Tasks with genuine design ambiguity stay out of the loop entirely — I resolve the ambiguity myself first, or do that task interactively.
+
+**Where I run it matters.** This is my personal-project and experiment workflow. On work code, agent-assisted tasks go through the interactive, one-task-at-a-time process from earlier in this series, inside the team's normal review and CI gates. Unattended overnight runs against an employer codebase is a policy and trust question, not just a tooling one, and I'm not pretending otherwise.
+
+**It isn't free.** A hundred autonomous iterations is a hundred agents' worth of tokens. For a five-minute-training-run research harness that trade is obviously good. For "add a CRUD endpoint", sometimes the honest answer is that you'd have typed it faster.
+
+## The spec was always the point
+
+Three posts in, the through-line is visible. Part 1: move past prompting and give the model real structure and context. Part 2: choose tooling that ships working code, not demos. Part 3: once the spec is good enough, you don't even need to be in the room — a loop can execute it, and your leverage moves entirely into the quality of the document.
+
+I don't think the interactive workflow is going away; most of my day is still one task, one session, one review. But the autonomous agent loop is no longer a demo. Ralph TUI made it practical for application code, autoresearch shows the same shape working for research, and both point the same direction: **the engineers who get the most out of agents will be the ones who write the best executable specifications.** That's a writing skill and a decomposition skill, and it compounds.
+
+Practical next step: take one small, well-understood feature on a personal project, decompose it into three or four tasks with command-checkable done conditions, and run it through a loop with a low iteration cap. Watch where it goes wrong — that's where your spec was weaker than you thought. If you're starting from scratch, the [earlier posts in this series](/series/) will get your PRD into shape first.
+
+Part 4 will cover the review side: how I actually review agent-written batches without rubber-stamping them, and what I've changed about my PR process since the volume went up.
