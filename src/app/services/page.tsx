@@ -8,7 +8,11 @@ import { SOCIAL } from '@/lib/constants';
 import { createPageMetadata } from '@/lib/metadata';
 import { services } from '../../../content/services';
 
-export const metadata: Metadata = createPageMetadata('services', '/services');
+export const metadata: Metadata = {
+  ...createPageMetadata('services', '/services'),
+  // Unlisted page — shared by direct link, kept out of search results.
+  robots: { index: false, follow: true },
+};
 
 export default function ServicesPage() {
   return (
