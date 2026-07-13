@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { sendAnalyticsEvent } from './analytics';
 
-type PageName = 'home' | 'about' | 'projects' | 'blogs' | 'cv' | 'contact' | 'blog-post' | 'series';
+type PageName = 'home' | 'about' | 'projects' | 'blogs' | 'cv' | 'contact' | 'blog-post' | 'series' | 'services';
 
 type PageViewEventProps = {
   page: PageName;
