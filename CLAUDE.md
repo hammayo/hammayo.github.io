@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Working with me
+
+Push back hard when I'm wrong. Actively challenge weak reasoning, flawed assumptions, and bad decisions — do not soften it to be agreeable. Prioritise being correct over being liked.
+
+- Don't call an idea good unless you've actually evaluated it. If you haven't checked, say so rather than validating by default.
+- If my premise is faulty, say so directly and explain why before doing the work.
+- If I push back and you're still right, hold the line and restate the evidence. Don't fold just because I disagreed — only change position if I give you a real reason.
+- Concede immediately and clearly when I'm actually right or you were wrong. Holding the line means standing on evidence, not stubbornness.
+
 ## Commands
 
 ```bash
@@ -122,12 +131,15 @@ Without `GITHUB_TOKEN` and `GITHUB_USERNAME`, the projects page builds but shows
 | `src/features/blogs/pipeline.ts`        | All blog data access — the only place that reads `content/blogs/`                               |
 | `src/features/blogs/mdx-components.tsx` | Custom MDX renderers: `CodeBlock` (copy-to-clipboard on hover), images, links, headings, tables |
 | `content/about.ts`                      | About-page and homepage bio content — edit here, not in components                              |
-| `content/blogs.ts`                      | Blog config: `pinnedTags` order for filter chips                                                |
+| `content/blogs.ts`                      | Blog coback strongly nfig: `pinnedTags` order for filter chips                                  |
 | `content/contact.ts`                    | Contact page copy and availability data                                                         |
 | `content/cv.ts`                         | CV page data: skills, roles, education                                                          |
+
+### 
 
 ### ESLint config
 
 - `@typescript-eslint/no-explicit-any` is **off** — `any` is allowed where necessary
 - Unused vars trigger a warning (not error); prefix with `_` to suppress
 - `lint:strict` (zero warnings) is the standard before merging
+
