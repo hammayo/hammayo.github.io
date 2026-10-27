@@ -1,0 +1,96 @@
+---
+title: "Messages That Survive, Part 2: Every Message Arrives Twice"
+date: "2021-03-16"
+summary: "Kafka promises your message will arrive. It doesn't promise it'll arrive once. Here's how we made the second delivery harmless with an inbox table keyed by message ID, why the order of two lines matters more than it looks, and the kind of duplicate an inbox can't catch."
+tags: ["dotnet", "kafka", "microservices", "reliability"]
+series:
+  name: "Messages That Survive"
+  part: 2
+published: true
+---
+
+Picture an account credited twice for the same thing. Not a huge amount, and probably caught quickly. But it's the kind of bug that makes people stop trusting a system, and on a case-management platform for the justice sector, trust is most of the job.
+
+Nothing would even be broken, exactly. Kafka would have done what it promises: the message arrived. It just arrived twice.
+
+In [Part 1](/blogs/messages-that-survive-part-1-kafka-was-down-and-nobody-noticed/) I wrote about the outbox, which makes sure every event is sent even when the broker is down. The outbox has a catch I mentioned at the end: it guarantees at least once, not exactly once. This post is the other half. **Assume every message will arrive twice, and make the second one do nothing.**
+
+## Why you get duplicates
+
+It isn't one edge case, it's several ordinary ones.
+
+A consumer reads a message, processes it, and crashes before it tells Kafka it's done. On restart, Kafka hands it the same message again. A consumer group rebalances while a message is in flight, and another instance picks it up. The outbox publisher from Part 1 sends a message and dies before marking it sent, so it sends it again.
+
+None of these are bugs in Kafka. They're the price of at-least-once delivery, which is what you want, because the alternative is at-most-once, where you lose messages instead.
+
+## The weak fix: be careful in each handler
+
+The first instinct is to make each handler check before it acts. Before crediting an account, look for a credit with the same reference. Before creating a booking, check one doesn't exist.
+
+That's not wrong, and some handlers need it anyway. But as the only defence, it means every developer writing every handler has to remember, and has to get the check right under concurrency. Two copies of the same message processed at the same moment on two instances can both pass the "does it exist?" check before either writes.
+
+It pushes a transport problem into business code, one handler at a time.
+
+## The better fix: an inbox, keyed by message ID
+
+We solved it once, in the shared messaging library, with an inbox table in each service's database.
+
+When a message arrives, the consumer does as little as possible: record the message in the inbox, then commit the offset. If a row with that message ID is already there, it skips it. Ours checked for the ID and then inserted. If I were writing it again, I'd make the check and the insert a single statement, like this:
+
+```sql
+INSERT INTO MessageInbox (MessageId, Topic, Payload, Status, ReceivedUtc)
+SELECT @MessageId, @Topic, @Payload, 'Pending', SYSUTCDATETIME()
+WHERE NOT EXISTS (SELECT 1 FROM MessageInbox WITH (UPDLOCK, HOLDLOCK)
+                  WHERE MessageId = @MessageId);
+```
+
+A separate processor reads pending rows from the inbox and calls the right handler. A duplicate never becomes a row, so it never reaches a handler. Add a unique index on the message ID as a backstop and two instances racing on the same message can't both win. A separate check followed by an insert leaves a small window where they can, which is exactly the kind of gap that only shows up under load.
+
+For this to work, the message ID has to be stable. It must be set by the producer when the message is created, which the outbox already does, and carried with the message. An ID generated on receipt would be different every time and would de-duplicate nothing.
+
+## The order of two lines
+
+This is the bit that took me longest to properly appreciate. The consumer does two things: write to the inbox, and commit the offset. The order matters.
+
+```csharp
+var result = consumer.Consume(ct);
+
+await _inbox.InsertIfNewAsync(result.Message, ct);  // 1. store it
+consumer.Commit(result);                            // 2. then acknowledge it
+```
+
+If the process crashes between the two, Kafka hasn't been told, so the message comes back. The inbox sees the ID it already has and ignores it. No harm done.
+
+Swap them round, commit first and then insert, and a crash in between means Kafka thinks you have the message and you don't. It's gone.
+
+When you can't avoid a gap, choose the side of it you can recover from. A duplicate you can absorb. A lost message you can't.
+
+## The duplicate an inbox can't catch
+
+The inbox has a blind spot, and it's worth knowing before it bites.
+
+It de-duplicates on the message ID. So it catches the same message delivered twice. It can't catch the same request sent twice as two different messages. A user double-clicks, a producer retries at the business level rather than the transport level, or two services both decide to ask for the same thing. Each of those produces a new message with a new ID, and the inbox happily lets both through.
+
+The answer is the same idea one level up: give the business operation its own identity and make creating it idempotent. A payment has a payment reference, a booking has a booking reference, and inserting one that already exists does nothing.
+
+That's the distinction I now say out loud in design reviews. **The inbox de-duplicates deliveries. It doesn't de-duplicate intentions.** If the same business request can arrive in more than one message, the business operation needs its own guard.
+
+## What it costs
+
+A table per service, which needs cleaning up. We keep successful messages for a few days and failed ones for a week.
+
+A stable ID on every message, which every producer has to get right. We didn't have a test that checked producers kept the same ID across their own retries, and I'd add one.
+
+And handlers still need thought. The inbox guarantees a handler won't run twice for the same message. It doesn't undo a handler that failed halfway through. So a retried handler should check before it creates, and prefer updates over inserts where it can.
+
+## How to test it
+
+The test I'd make standard for any handler that creates or moves something is simple: deliver every message twice and assert the outcome is the same as delivering it once. Then kill the consumer between the insert and the offset commit and check nothing is lost.
+
+If both pass, duplicates are just noise.
+
+## The takeaway
+
+**Design for the second delivery from the start.** Store the message before you acknowledge it, de-duplicate on an ID the producer sets, and remember that some duplicates are business requests, not deliveries.
+
+Coming next in Messages That Survive: retry, back off, then stop. What to do with a message that fails every single time.
