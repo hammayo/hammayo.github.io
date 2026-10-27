@@ -1,0 +1,110 @@
+---
+title: "Access Control in Layers, Part 4: Service-to-Service Tokens Are Your Most Powerful Credentials"
+date: "2022-04-12"
+summary: "Internal tokens skip the user-level checks that protect everything else, which makes them more dangerous than any user's. Here's why services need them, what a leaked one can do, and how scoping, short lifetimes and careful issuing keep them in proportion."
+tags: ["dotnet", "security", "authentication", "operations"]
+series:
+  name: "Access Control in Layers"
+  part: 4
+published: true
+---
+
+A nightly job ran at two in the morning. It read data from several services, combined it and wrote a summary somewhere else. No person was involved. There was nobody to sign in, nobody to ask for a permission, and nobody's identity to act on behalf of.
+
+To make the calls at all, the job needed a credential, and that credential had to work without a user. So it did. It was a token that the services accepted as coming from a trusted part of the system, and that skipped the checks designed for people.
+
+This is Part 4 of the series, after [Part 3](/blogs/access-control-in-layers-part-3-staff-and-self-service-users-are-different-users/). It's about the least glamorous and most powerful credentials in a system: **service-to-service tokens**.
+
+## Why they exist
+
+User-level checks assume a user. The scope check from Part 1 asks which branch a person belongs to. The privilege lookup from Part 2 asks what a person can do. A scheduled job, a message consumer or a service calling another has no such person.
+
+So internal calls need another way to be recognised. The common answer is a token that identifies the calling service, not a user, and that the receiving service accepts as proof that the call is from within the system.
+
+That is a reasonable design, and often unavoidable. The trouble is what it implies.
+
+## What skipping user checks means
+
+A token that doesn't represent a user can't be subject to a user's limits. It has no branch, no role and no scope, so the checks that rely on them are bypassed.
+
+Often that's deliberate. The nightly job needs to read everything, and a branch filter would give it a fragment. But the effect is that a service token can frequently see and do far more than any single user.
+
+It follows that **a service token is usually the most powerful credential in the system.** More powerful than the administrator's, because the administrator's is still bound by audit, by scope and by the fact that a person is attached to it.
+
+## What a leaked one can do
+
+Imagine one of these tokens escapes. It might be committed to a repository by mistake, printed in a log, copied into a support ticket or taken from a compromised machine.
+
+Whoever holds it can call any API that trusts it, with the full reach of the service it represents. There's no user to be locked out, no password to reset and no second factor to defeat. And depending on how it was issued, it may stay valid for months.
+
+It also leaves a thin trail. Calls made with it appear to come from the service. Telling a legitimate nightly run from an intruder using the same token may be impossible from the logs alone.
+
+This is why internal credentials need more care than user ones, not less. The usual instinct, that internal traffic is safe because it's internal, gets the risk backwards.
+
+## Scope them
+
+The first control is to give each token only what its job needs.
+
+The nightly job reads from three services. Its token should be accepted by those three, for read operations, and refused everywhere else. It should not be able to write, and it should not be accepted by the service that manages user accounts.
+
+```csharp
+var claims = new[]
+{
+    new Claim("sub", "svc-nightly-summary"),
+    new Claim("aud", "orders-api reporting-api customers-api"),
+    new Claim("scope", "orders:read reporting:read customers:read")
+};
+```
+
+Each receiving service checks the audience and the scope, not just that the signature is valid. A token meant for the reporting API shouldn't work at the customers API merely because both trust the same signer.
+
+One token per service, and ideally per purpose, is far safer than one shared token that everything uses. When a shared token leaks, everything has to rotate. When a narrow one leaks, the damage is limited to what it could do.
+
+## Short lifetimes
+
+The second control is to make tokens expire quickly.
+
+A token that lives for a year is a standing credential, and one that leaks stays dangerous for a year. A token that lives for minutes or an hour is useless to someone who finds it later.
+
+For this to be practical, services must be able to get new tokens automatically. A job requests a fresh token at the start of each run, from an issuer, using a secret it holds. The token it receives is short-lived.
+
+```csharp
+var token = await _issuer.GetTokenAsync(
+    clientId: "svc-nightly-summary",
+    scopes: new[] { "orders:read", "reporting:read", "customers:read" },
+    lifetime: TimeSpan.FromMinutes(15), ct);
+```
+
+That moves the long-lived secret to a single place, the client credential that proves the job is the job, and keeps the thing that travels around brief.
+
+## Where they're issued
+
+The third control is about the issuer, because everything depends on it.
+
+A central issuer, with its own access controls and audit, decides which services can obtain which tokens. A service asks for a token and is given one only if its identity and the request match what has been configured.
+
+That makes the issuer the most sensitive component of all. Protect its signing keys as you would the keys to the building. Log every issue. Alert on unusual requests, such as a service asking for scopes it has never used.
+
+And keep the client secrets out of code and out of logs. They belong in a secret store, injected at run time, and rotated on a schedule and whenever someone with access leaves.
+
+## Treat the logs as part of the control
+
+Because a service token has no person behind it, the log is the only way to recover what happened. Record, for each call, which service made it, which token identifier was used and what was done.
+
+A token identifier in the logs lets you answer "was this call made with the token that was leaked?" Without it, you can only say that some call came from the service.
+
+## Where it falls over
+
+All of this adds work. Scopes need to be designed and kept up to date. Issuers need to be run and secured. Short lifetimes mean token refresh code, and bugs in it show up as outages at the worst times.
+
+Scoping is also only as good as its granularity. A scope called `everything` is a standing invitation. The temptation to widen scopes whenever a call fails with a permission error is strong, and each widening should be a conscious decision.
+
+And none of it helps if the service itself is compromised. An attacker inside the nightly job's process can ask for its token like the job does. Narrow scopes limit what they can reach. They don't stop the attempt.
+
+## The takeaway
+
+**Tokens that skip user checks need more care than any user's, not less.** Scope each token to its job and audience, keep lifetimes short, issue them from one well-protected place, and log enough to tell a legitimate call from a stolen one.
+
+List the service-level credentials in your system, and for each, write down what it can do and how long it lasts. The ones that surprise you are the ones to fix first.
+
+Coming next in Access Control in Layers: opt-in security checks get forgotten.

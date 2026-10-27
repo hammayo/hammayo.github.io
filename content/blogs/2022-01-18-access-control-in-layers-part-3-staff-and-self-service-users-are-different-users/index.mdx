@@ -1,0 +1,105 @@
+---
+title: "Access Control in Layers, Part 3: Staff and Self-Service Users Are Different Users"
+date: "2022-01-18"
+summary: "Squeezing very different kinds of user into one role model makes both worse. Here's why library staff and patrons at a self-service terminal want separate front doors, what the narrow API for self-service users looks like, and why the split makes each model simpler."
+tags: ["dotnet", "security", "api-design", "authentication"]
+series:
+  name: "Access Control in Layers"
+  part: 3
+published: true
+---
+
+A library had two kinds of people using its system. Staff could search every member, issue and renew loans, waive fines and edit records. Members, at a self-service terminal in the entrance, could check what they had out, renew their own loans and reserve a book.
+
+The first version modelled both as users with roles. Staff roles had lots of privileges. Member roles had a few. One user table, one role model, one API. It was tidy on the whiteboard.
+
+It got less tidy over time. Every new staff feature needed a check that it wasn't reachable by members. Every new member feature needed a check that it only touched the member's own records. The two kinds of person shared a door, and the door needed guards on both sides.
+
+This is Part 3 of the series, following [Part 2](/blogs/access-control-in-layers-part-2-keep-privileges-out-of-the-token/). The idea is simple: **staff and self-service users are different users**, and they should have separate front doors.
+
+## Why a shared model strains
+
+The two groups differ in more than their privileges.
+
+**Who they are.** Staff are employees, with accounts someone administers. Members are the public, in numbers you don't control, perhaps with no account of their own and identified by a card or a code.
+
+**How they prove it.** Staff sign in with a managed identity, perhaps with a second factor. A self-service terminal may identify someone with a card and a PIN, or a one-time code. The mechanisms differ, and so do the failure modes.
+
+**What they should ever reach.** A member should only ever reach their own records. Not "mostly", not "with checks": never. A staff member may reach most of the system, within scope.
+
+**Who is on the other end.** Staff use a full application. Members use a narrow, constrained interface that may be on a shared device in a public place.
+
+Forcing these into one role model means the model has to express both, and it ends up doing neither well.
+
+## The risk of one door
+
+The sharper problem is what happens when something goes wrong. In a shared model, a member's request and a staff member's request arrive at the same endpoints. The difference between them is a role claim.
+
+If a check is missed on a staff endpoint, which in a big system will eventually happen, the only thing between the public and the staff functionality is whatever the role system does by default. A privilege escalation bug in a shared model is a bug that touches the public.
+
+Separating the doors changes that. A member's request simply isn't able to reach staff endpoints, because it never arrives at them.
+
+## Give self-service its own narrow API
+
+The better design is a separate API for self-service users, that does only what they need.
+
+It exposes a short list of operations: show my loans, renew my loan, reserve this item. Nothing in it takes a member ID as a parameter, because the member is whoever is signed in, and it can only ever act for them.
+
+```csharp
+[ApiController]
+[Route("self-service")]
+public class SelfServiceController : ControllerBase
+{
+    [HttpGet("loans")]
+    public Task<IReadOnlyList<LoanDto>> MyLoans(CancellationToken ct) =>
+        _loans.ForMemberAsync(User.MemberId(), ct);
+
+    [HttpPost("loans/{loanId}/renew")]
+    public Task Renew(Guid loanId, CancellationToken ct) =>
+        _loans.RenewAsync(User.MemberId(), loanId, ct);
+}
+```
+
+The member's identity comes from the authenticated principal, never from the request. The second method also checks, inside, that the loan belongs to that member. The scope check from [Part 1](/blogs/access-control-in-layers-part-1-two-checks-on-every-request-action-and-scope/) is built into the shape of the API.
+
+The staff API remains rich and powerful. It never needs to worry about members, because they can't call it.
+
+## Separate authentication too
+
+The split should reach authentication as well. Self-service users authenticate through their own mechanism, against their own store, and get tokens that only the self-service API accepts.
+
+That way a token from one door doesn't work at the other, even if someone tries. The audience of each token names where it can be used, and each API refuses tokens meant for the other.
+
+It also lets each side change independently. You can tighten staff sign-in with a second factor without touching the terminal. You can change how members identify themselves without risk to the staff application.
+
+## What a self-service user can ever reach
+
+It helps to write down, for the self-service API, an explicit list of what it can touch. Loans for the signed-in member. Reservations for the signed-in member. Search over the public catalogue.
+
+Everything not on the list is not reachable. The API doesn't have an endpoint for it, so there is nothing to forget to protect. That is a much stronger guarantee than a role that is denied access to a long list of staff operations.
+
+It's also easy to review. A short, fixed set of operations can be read in full and tested thoroughly. A reviewer can answer "can a member do X?" by looking at one controller.
+
+## Why both models get simpler
+
+The surprise is that splitting reduces the work. Each model only has to describe one kind of user.
+
+The staff model can focus on roles, scopes and the finer privileges that staff need, without carrying a public-facing special case. The self-service model barely needs roles at all: everyone using it is a member acting for themselves.
+
+New features follow the same shape. A staff feature goes in the staff API and is checked against staff rules. A member feature goes in the narrow API and is, by construction, about the signed-in member. Nobody has to ask which of two audiences a change might leak to.
+
+## Where it falls over
+
+Two APIs mean two things to build, deploy and monitor. Some logic, such as how a renewal works, is needed by both, and you have to share it in the layer underneath without sharing the doors on top.
+
+The line between the groups isn't always as clean as a library. Some users are both: a staff member who is also a member, or a user who starts as one and becomes the other. You need a way to hold two identities without mixing their privileges, rather than one account that quietly gains both.
+
+It also needs vigilance at the boundary. The shared layer beneath both APIs must not assume which door a call came through. If it does, a mistake there can reintroduce the very mixing the split was meant to prevent.
+
+## The takeaway
+
+**Don't squeeze very different users into one role model; give them separate front doors.** A narrow API for self-service, separate authentication and tokens, an explicit list of what each can reach, and shared logic only below the doors.
+
+Look at your own system and ask whether your least-trusted users and your most-trusted users arrive at the same endpoints. If they do, list what stops one from reaching the other's operations.
+
+Coming next in Access Control in Layers: service-to-service tokens are your most powerful credentials.
