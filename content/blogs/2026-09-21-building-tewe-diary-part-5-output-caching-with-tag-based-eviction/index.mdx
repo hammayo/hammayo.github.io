@@ -1,0 +1,88 @@
+---
+title: "Building Tewe Diary, Part 5: Output Caching with Tag-Based Eviction"
+date: "2026-09-21"
+summary: "Cache reads, and tie eviction to writes instead of guessing how long data stays fresh. Here's the output cache policy in my movie diary API, the tag that every write evicts, the endpoint the import pipeline calls, and why this only works on a single instance."
+tags: ["dotnet", "caching", "performance", "api-design"]
+series:
+  name: "Building Tewe Diary"
+  part: 5
+published: true
+---
+
+The list of movies is the most requested thing in my movie diary API, and it changes rarely. That is the textbook case for a cache, and also the textbook way to end up with a screen that shows a film you deleted five minutes ago.
+
+The question isn't whether to cache. It's how you decide when a cached answer stops being true. I decided it by tying eviction to writes, not to a guess about how long data stays fresh.
+
+This is Part 5 of **Building Tewe Diary**, following [Part 4](/blogs/building-tewe-diary-part-4-integration-tests-against-a-real-postgres/). It's about **ASP.NET Core output caching with tag-based eviction**, and about the limit I haven't hit yet.
+
+## The weak version: a time-to-live
+
+The easy cache is a short expiry. Cache the response for a minute and accept that someone might see old data.
+
+It's not wrong, but it's a guess. Too short and the cache does little. Too long and a user edits a movie and the list still shows the old title. Worse, there's no relationship between the guess and the thing that actually makes the data stale, which is a write.
+
+## The better version: evict on write
+
+The data only becomes stale when something changes it. So the cache is told, at that moment, to forget.
+
+Output caching in ASP.NET Core lets you attach tags to cached responses and evict by tag. I register one named policy, and every cached read carries the same tag:
+
+```csharp
+services.AddOutputCache(x =>
+{
+    x.AddBasePolicy(c => c.Cache());
+    x.AddPolicy("MovieCache", c =>
+        c.Cache()
+            .Expire(TimeSpan.FromMinutes(1))
+            .SetVaryByQuery(new[] { "title", "year", "sortBy", "page", "pageSize" })
+            .Tag("movies"));
+});
+```
+
+The policy varies by the query values that change the answer, so a request for page two doesn't get page one. The expiry is there as a backstop. The tag is the real mechanism.
+
+Every write then evicts the tag:
+
+```csharp
+await outputCacheStore.EvictByTagAsync("movies", token);
+```
+
+That line sits in the create, update and delete handlers for both API versions. After a write, the next read is a miss, hits the database and repopulates. Correctness comes from the eviction. The one-minute expiry only limits how long a missed eviction could linger.
+
+## Why a tag and not a key
+
+Evicting by key means knowing every key that might hold the changed movie. A movie appears in many lists: filtered by title, sorted by year, on page one and on page three. Working out which cached responses mention it is a problem I don't want.
+
+A tag sidesteps it. Every cached read of movies shares one tag, so one eviction clears all of them. It's blunt. A single edit throws away every cached list. For a catalogue that changes rarely, blunt is fine, and simple beats a clever invalidation scheme that is wrong once a quarter.
+
+## The endpoint the pipeline calls
+
+There's one more way the data changes, and it doesn't go through the API. The import pipeline loads new films straight into the database. The cached responses can't know.
+
+So there's an admin endpoint that evicts the tag on demand, protected by the API key from Part 3. The pipeline calls it after an import. It's the same eviction, triggered from outside, and it exists because the cache has to be told about writes it didn't see.
+
+That endpoint is only on version 1. The pipeline is its only caller, and it doesn't need a second copy.
+
+## Both versions, one tag
+
+The v2 endpoints, which are Minimal APIs, share the same cache policy and the same tag as the v1 controllers. A write through either version evicts the cache for both.
+
+That matters more than it sounds. If v2 had its own tag, a movie edited through v2 would stay stale in v1 reads. There are tests that check writes and signed-in reads behave the same through both versions, because this is exactly the sort of thing that drifts.
+
+## Where it falls over
+
+This cache is in memory, in one process. That is fine with one instance and wrong with two. A write on instance A evicts instance A's cache, and instance B keeps serving the old list until its one-minute expiry. So the expiry is quietly doing more work than I said above.
+
+I haven't hit this, because the app runs as one instance. It's a limit I know about, and Part 14 returns to it.
+
+Eviction on write is also coarse. A busy catalogue with constant edits would keep the cache nearly empty, and you'd want finer tags, perhaps per movie.
+
+And caching responses means caching what the caller was allowed to see. The policy varies by query values only. A response that depended on who was asking would need to vary by user, or not be cached at all. Signed-in reads are covered by their own tests for that reason.
+
+## The position
+
+**Tie eviction to writes, not to guesses about how long data stays fresh.** One tag on every cached read, one eviction on every write, an endpoint for the writes the app didn't see, and a short expiry as a safety net.
+
+If you cache with a time-to-live, ask what event makes the data stale. If you can name it, evict on that event.
+
+Next in Building Tewe Diary: the schema owned by migrations, with a separate database role for each job. The rest of the series is on [the blog](/blogs/).

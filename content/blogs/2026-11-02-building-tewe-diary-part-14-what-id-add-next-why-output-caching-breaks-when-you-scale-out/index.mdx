@@ -1,0 +1,84 @@
+---
+title: "Building Tewe Diary, Part 14: What I'd Add Next, Why Output Caching Breaks When You Scale Out"
+date: "2026-11-02"
+summary: "My movie diary API runs as one instance, which is why its in-memory output cache works. Here's exactly what breaks with a second instance, the three ways I'd fix it, and what splitting v2 into its own host would do to the same problem."
+tags: ["dotnet", "caching", "scaling", "azure"]
+series:
+  name: "Building Tewe Diary"
+  part: 14
+published: false
+---
+
+My movie diary API caches its movie reads in memory and clears that cache whenever a movie changes. It works, and I've tested it. It also only works because there is exactly one copy of the app running.
+
+This post is about what happens when there isn't. It describes a limit I know about and haven't hit, and a fix I haven't built. As with Part 13, it's a "what I'd add next" post, and it says so.
+
+It's Part 14 and the last of **Building Tewe Diary**, following [Part 13](/blogs/building-tewe-diary-part-13-what-id-add-next-where-an-outbox-would-go/). It builds directly on [Part 5](/blogs/building-tewe-diary-part-5-output-caching-with-tag-based-eviction/), so it helps to have read that.
+
+## What works today
+
+ASP.NET Core output caching stores responses in the memory of the process that served them. Reads carry a tag, and every write evicts that tag, so the next read goes to the database and refills the cache.
+
+With one process, that's complete. The write and the cache are in the same place, so a write clears everything there is to clear. The one-minute expiry is only a safety net.
+
+## What breaks with two instances
+
+Put a second instance behind a load balancer, and a write now lands on one of them.
+
+That instance evicts its own cache, correctly. The other instance never hears about it. It still holds the old list, and it serves it to anyone the load balancer sends its way until the entry expires. A user edits a movie, refreshes, and sees the old title half the time.
+
+The expiry is no longer a safety net. It's the only thing bounding the staleness, and it's a minute. For a catalogue that changes rarely, a minute might be tolerable. For anything where a user has just changed something and expects to see it, it isn't.
+
+## The pipeline makes it worse
+
+There's a second path to staleness. The import pipeline writes new films directly to the database, then calls an admin endpoint to evict the movie tag.
+
+That call goes through the load balancer too, so it reaches one instance. One instance forgets the old data and the other carries on serving it. The deploy step that was meant to guarantee freshness only guarantees it for whichever instance answered.
+
+## Three ways to fix it
+
+**1. Accept a shorter expiry.** Cut the cache lifetime to a few seconds and let staleness be bounded by that. It's one line, and it throws away most of the benefit of caching. It's an honest answer for a small system, and I'd say so in the decision log rather than pretend it's more.
+
+**2. Share the cache.** Move the output cache into a store all instances read, such as Redis. A write evicts the tag once and every instance sees it, because there's only one cache. ASP.NET Core output caching has a store abstraction for exactly this, so the policy and the tags in my code wouldn't change. The cost is a new service to run and pay for, and a network hop on every cached read, which is slower than memory.
+
+**3. Tell every instance.** Keep the local caches and broadcast the eviction. When a movie changes, an event goes out and each instance clears its own tag. This is where the outbox from [Part 13](/blogs/building-tewe-diary-part-13-what-id-add-next-where-an-outbox-would-go/) pays off, because it gives the cache a signal that can't be lost between the save and the send. Reads stay fast and in memory. The cost is a messaging path, and a short window while the message travels.
+
+My preference is the third, but only after the second was ruled out on cost. A shared cache is simpler to reason about, and it's what I'd choose if Redis were already in the stack. It isn't.
+
+## What the pipeline would do
+
+With a broadcast, the import pipeline's call changes meaning. Instead of "clear the cache on whichever instance you reach", it becomes "publish an eviction", and every instance acts on it. The admin endpoint can stay, but it would enqueue the signal and not clear a local cache.
+
+That's a nicer story than the current one, because it removes the dependence on which instance answered.
+
+## What splitting v2 would do
+
+The decision log says v2 should get its own host if it has to deploy or scale separately. That's a second source of the same problem.
+
+Today v1 and v2 share one process, so they share one cache and one tag. Split them, and a write through v1 must evict v2's cache, in another process. The tag no longer means anything across the boundary on its own. It would need the same shared store or broadcast as multiple instances do.
+
+It's a good example of how a decision made for one reason, a single host, was quietly holding up another. Splitting the hosts is the point at which that stops being true.
+
+## Scale to zero
+
+In Part 8 I wrote about an option with scale-to-zero. It makes this problem look different, not better. A cold start means an empty cache, which is harmless, but several instances starting and stopping at different times mean more separate caches at different ages.
+
+I haven't checked what instance limits my current hosting plan allows, and I'd do that before relying on scale-out at all.
+
+## What I haven't done
+
+I haven't run two instances. I haven't load tested anything. Everything above is reasoning about how in-memory caches behave, which I'm confident of, applied to my code, which I've read. A real test with two containers behind a proxy, rating and reading in turn, would show the stale reads in a minute, and I'd write that test before changing anything.
+
+## Where it falls over
+
+Each fix moves the problem rather than removing it. A shared cache is a new dependency that can fail. A broadcast can be missed. A short expiry trades speed for freshness. None of them is free, and for a portfolio project with one user, doing nothing is also a legitimate answer.
+
+It's also worth saying that caching isn't the only thing that assumes one instance. The decision log is a good place to look for others.
+
+## The position
+
+**An in-memory cache is a per-instance cache, and tag eviction is only as global as the process.** Know which assumptions hold up your design, write down the day they stop holding, and prefer a signal that can't be lost to a guess about time.
+
+If you cache in memory, ask what happens when you run two copies. If the honest answer is "I'm not sure", run two and find out.
+
+That's the end of Building Tewe Diary for now. The rest of the series is on [the blog](/blogs/).

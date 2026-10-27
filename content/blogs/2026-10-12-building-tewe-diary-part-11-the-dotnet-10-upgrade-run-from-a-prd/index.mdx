@@ -1,0 +1,82 @@
+---
+title: "Building Tewe Diary, Part 11: The .NET 10 Upgrade, Run From a PRD"
+date: "2026-10-12"
+summary: "A framework upgrade is the kind of change where 'no behaviour change' is easy to promise and hard to prove. Here's how I ran the .NET 10 move on my movie diary API from a written plan: a spike first, decisions I asked to be challenged, a pinned transitive package, and a guard test for the version."
+tags: ["dotnet", "upgrade", "spec-driven", "ai"]
+series:
+  name: "Building Tewe Diary"
+  part: 11
+published: true
+---
+
+.NET 9 stops getting security fixes on 10 November 2026. My movie diary API targeted it. A service meant to show a production shape, running on an unsupported runtime, defeats the point of the project.
+
+So the upgrade had a deadline and a rule. The deadline was to land before that date. The rule was that nothing about how the API behaves should change. The second one is easy to say and hard to prove, so I wrote it down as a requirement and then wrote down how I'd prove it.
+
+This is Part 11 of **Building Tewe Diary**, following [Part 10](/blogs/building-tewe-diary-part-10-v1-controllers-beside-v2-minimal-apis/). It's about running an **upgrade to .NET 10** from a PRD with a coding agent doing much of the typing, which is the same workflow as the Spec-Driven series, applied to a dull job.
+
+## Write the problem down first
+
+The PRD opens with the problem, the goals and the non-goals. The goals were short: the solution targets the new framework and builds, tests and ships as containers; v1 and v2 answer every request exactly as before; the change is small and reversible; and it lands before the deadline.
+
+The non-goals did as much work as the goals. No new framework features and no refactors on the way. No move to the built-in OpenAPI generator. No routine bump of every outdated package. No changes to the frontend, the schema or any API contract.
+
+A list of what you won't do is how a small upgrade stays small. Every temptation I had mid-way was already ruled out in writing.
+
+## A spike before the plan
+
+I didn't trust my understanding of what would break, so I tried it first. A throwaway branch, the new framework, build, and see what falls over. The results went back into the PRD.
+
+That changed the plan. The old package versions couldn't restore on the new framework at all, because a database library's new major version needs the matching framework packages. So the framework and the Microsoft packages had to move together, as one step, not two.
+
+A spike costs an hour and removes the part of the plan that was a guess.
+
+## Decisions I asked to be challenged
+
+The PRD has a table of decisions headed "my calls, please confirm in review". Two of them were interesting.
+
+**Keep the Swagger package where it is, and remove an unused reference.** The newer major version of the Swagger package moves to a different version of the OpenAPI types, and those types differ from the ones my code uses. That would be a change of its own and give the upgrade nothing. An unused package would also have pulled the newer types in and clashed, so it went.
+
+**Pin the vulnerable transitive package, don't suppress the warning.** The new SDK audits transitive packages. It warned about an old cryptography package pulled in by the migrations library, through a database client. Central transitive pinning plus one version line cleared it without hiding it and without adding a new reference. The decision log says when to drop the pin: when the migrations library updates its dependency.
+
+Both are the kind of choice that's easy to make silently. Writing them as decisions with reasons made them reviewable.
+
+## "No behaviour change" is tested, not assumed
+
+The most important line in the PRD says the existing tests and the version parity and cache suites pass unchanged, and an assertion may change only with a written reason.
+
+That gives the claim teeth. If an assertion has to change, I have to say why, and the "why" is the evidence that behaviour moved. The parity tests from Part 10 earned their keep here, because they compare the two versions against each other, and an upgrade is exactly when two code paths could diverge.
+
+## The live stack counts
+
+The tests use the in-process test host, not the Docker image. So a green suite doesn't prove the container runs.
+
+Done therefore includes running the rebuilt images and exercising them by hand. It's the step that's easiest to skip because the build is already green, and the one that catches a base image or a start-up problem the tests can't see.
+
+## One place for the version, and a test that checks
+
+A framework version appears in several places that don't read each other: the build properties, the SDK pin, and the Dockerfiles, which can't read either of those. They can drift.
+
+I set the version in three places on purpose, and added a guard test that fails if they disagree. Moving to the next version means changing three things and letting the test confirm it. It's the cheapest link between files that can't share a value.
+
+## The agent's part
+
+A coding agent did a lot of the work: the mechanical changes, the package moves, the documentation. My part was the PRD, the decisions, and reading the result. The plan, as a document, sits in my local working folder and isn't in the repo, which the PRD says openly so a reader doesn't go looking for it.
+
+The workflow only holds because the agent had something concrete to be held to. A PRD with a requirement of no behaviour change, and a test suite that can fail, is a better brief than "upgrade it".
+
+## Where it falls over
+
+A PRD for a small upgrade can be more ceremony than the work deserves. Mine was proportionate because there was a deadline and a rule to protect. For a patch bump it would be absurd.
+
+It also records what I decided, not whether I was right. The spike found one surprise. A different spike might have found another, and the PRD can't tell me what I didn't think to test.
+
+And the follow-ups are real. The Swagger and mocking library majors, and a routine dependency update, are deferred, not done. Deferring them in writing is honest. It's also debt.
+
+## The position
+
+**Run an upgrade from a written plan, with a spike first, a short list of decisions you invite challenge on, and a requirement you can fail.** The non-goals keep it small and the guard test keeps the version in one story.
+
+Before your next upgrade, write down the sentence "this must not change", and then the test that would fail if it did.
+
+Next in Building Tewe Diary: building the React frontend from a PRD. The rest of the series is on [the blog](/blogs/).

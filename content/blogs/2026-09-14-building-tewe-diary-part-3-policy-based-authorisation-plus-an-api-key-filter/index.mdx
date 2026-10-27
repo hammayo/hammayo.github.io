@@ -1,0 +1,100 @@
+---
+title: "Building Tewe Diary, Part 3: Policy-Based Authorisation Plus an API-Key Filter"
+date: "2026-09-14"
+summary: "A person and a pipeline are different callers and shouldn't be trusted the same way. Here's how my movie diary API authorises people with claims-driven policies and machines with a shared key, what each tier can do, and where the key approach is weakest."
+tags: ["dotnet", "security", "authorization", "api-design"]
+series:
+  name: "Building Tewe Diary"
+  part: 3
+published: true
+---
+
+My movie diary API has two completely different kinds of caller. One is a person who signs in, rates films and, if they have the right claim, edits the catalogue. The other is the import pipeline, which needs to tell the API to throw away its cache after it has loaded new data.
+
+If I had given both the same kind of credential, one of them would have been wrong. A pipeline has no user to hold a claim, and a person shouldn't be holding a shared key. So the API has two trust models, and this post is about why.
+
+It's Part 3 of **Building Tewe Diary**, after [Part 2](/blogs/building-tewe-diary-part-2-two-services-one-shared-signing-secret/). The subject is **policy-based authorisation in ASP.NET Core**, plus the API-key filter next to it.
+
+## Two kinds of caller
+
+User-facing actions are authorised on claims. The token the Identity service issues carries them, and the API reads them. If you can do something because of who you are, that fact belongs in your token.
+
+Machine and operations actions are authorised on a shared key. The cache-eviction endpoint isn't something a user does. It's something the deploy and import pipeline does, from a script, with no sign-in.
+
+Different trust models for different callers. That sentence is the whole decision.
+
+## The user tiers
+
+There are four levels, and each unlocks something specific.
+
+- **Anonymous:** browse the catalogue, filter, sort and page, and open a movie's detail.
+- **Any signed-in user:** rate and un-rate a movie, and see their own ratings.
+- **Trusted:** create and edit movies.
+- **Admin:** delete movies, and everything a trusted user can do.
+
+In code, two policies carry the weight, built from claims on the token:
+
+```csharp
+services.AddAuthorizationBuilder()
+    .AddPolicy(AuthConstants.AdminUserPolicyName,
+        p => p.RequireClaim(AuthConstants.AdminUserClaimName, "true"))
+    .AddPolicy(AuthConstants.TrustedMemberPolicyName,
+        p => p.RequireAssertion(c =>
+            c.User.HasClaim(m => m is { Type: AuthConstants.AdminUserClaimName, Value: "true" }) ||
+            c.User.HasClaim(m => m is { Type: AuthConstants.TrustedMemberClaimName, Value: "true" })));
+```
+
+The Trusted policy deliberately accepts an admin as well. An admin who couldn't do what a trusted member can would be a surprise nobody wants. Controllers and endpoints then ask for the policy by name, and the pipeline does the rest.
+
+Using named policies has a quiet benefit. The rule lives in one place. If "trusted" ever needs another condition, one definition changes, and every endpoint that asks for it follows.
+
+## The machine path
+
+The cache-eviction endpoint uses a different mechanism. A small filter reads an `x-api-key` header and compares it with a configured value:
+
+```csharp
+public void OnAuthorization(AuthorizationFilterContext context)
+{
+    if (!context.HttpContext.Request.Headers.TryGetValue(AuthConstants.ApiKeyHeaderName,
+            out var extractedApiKey))
+    {
+        context.Result = new UnauthorizedObjectResult("API Key missing");
+        return;
+    }
+
+    var apiKey = _configuration["API_KEY"]
+                 ?? throw new InvalidOperationException("API_KEY is not configured.");
+    if (apiKey != extractedApiKey)
+    {
+        context.Result = new UnauthorizedObjectResult("Invalid API Key");
+    }
+}
+```
+
+Like the signing secret, the key must be configured or the app throws. The endpoint isn't something a browser calls, which is also why it stays on version 1 only.
+
+The pipeline uses it after an import. New films have been loaded straight into the database, and the cached reads don't know. One authenticated call from the script clears the movie cache tag, which is the subject of Part 5.
+
+## Why not one mechanism?
+
+I could have given the pipeline a service token with an admin claim. That would be one mechanism instead of two.
+
+But then the pipeline would carry a user-shaped credential with the full power of an admin. If it leaked, the attacker would be an admin. A key that can do exactly one thing, clear a cache, has a far smaller blast radius if it leaks. The least-powerful credential that does the job is the right one.
+
+The same reasoning stops me putting a shared key in front of user actions. A key identifies nobody, so I couldn't tell whose rating it was.
+
+## Where it falls over
+
+The API key is a shared secret in a header. It's compared with a plain string comparison, it can't be scoped per caller, and rotating it means changing it everywhere it's used. For one endpoint behind HTTPS it's proportionate. For anything more sensitive I'd want a proper service identity and a constant-time comparison.
+
+Claims-driven policies are only as good as the token. There's no revocation here, so a token with an admin claim keeps it until it expires. That is the same limit as Part 2.
+
+And two mechanisms means two places to get wrong. The risk isn't either one in isolation. It's a future endpoint choosing the wrong one, or neither. The tiers are tested for that, but tests only cover the endpoints someone remembered.
+
+## The position
+
+**Different callers deserve different trust models.** Authorise people on claims through named policies, authorise machines on the narrowest credential that does the job, and keep the two apart so a leak in one can't be an escalation in the other.
+
+Look at the credentials your pipelines use. If any of them could do far more than their job needs, that's the one to narrow first.
+
+Next in Building Tewe Diary: integration tests against a real Postgres. The rest of the series is on [the blog](/blogs/).

@@ -1,0 +1,90 @@
+---
+title: "Building Tewe Diary, Part 2: Two Services, One Shared Signing Secret"
+date: "2026-09-10"
+summary: "Splitting token issuance from the API gives you a realistic boundary without a network call on every request. Here's the JWT setup in my movie diary API, why a shared symmetric secret is fine for now, and what would make me move to asymmetric keys."
+tags: ["dotnet", "security", "jwt", "architecture"]
+series:
+  name: "Building Tewe Diary"
+  part: 2
+published: true
+---
+
+My movie diary API is two services. One issues tokens and one serves movies. They share a secret, and I wrote that down as a decision with an expiry date on it.
+
+The reason is the same as the reason for the whole project: I wanted a real boundary to design around, without paying for infrastructure I don't need yet. Tewe Diary is a portfolio piece, and the boundaries are what I want a reader to see.
+
+This is Part 2 of **Building Tewe Diary**, following [Part 1](/blogs/building-tewe-diary-part-1-dapper-not-an-orm/). It covers **JWT with a shared signing secret** across a separate Identity service, and the day I'd change it.
+
+## Why two services for a small app
+
+I could have put token issuing inside the movies API. For an app this size, that would have been simpler.
+
+But the point of a boundary is that you decide who's allowed to cross it, and where. A separate `Identity.Api` has one job: take a request for a token and return a signed one. The Movies API has a different job: validate that token and act on it. Keeping them apart means the resource API never holds the code that mints tokens, and the Identity service never needs to know what a movie is.
+
+It's also the shape a real system takes sooner or later, so it's a better thing to practise on.
+
+## The shared secret
+
+Both services read the same three settings: a signing secret, an issuer and an audience. The Identity service uses them to sign. The Movies API uses them to check.
+
+```csharp
+services.AddAuthentication(x =>
+{
+    x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    x.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    x.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+}).AddJwtBearer(x =>
+{
+    var tokenSecret = config["JWT_TOKEN_SECRET"]
+                      ?? throw new InvalidOperationException("JWT_TOKEN_SECRET is not configured.");
+
+    x.TokenValidationParameters = new TokenValidationParameters
+    {
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(tokenSecret)),
+        ValidateIssuerSigningKey = true,
+        ValidateLifetime = true,
+        ValidIssuer = config["JWT_ISSUER"],
+        ValidAudience = config["JWT_AUDIENCE"],
+        ValidateIssuer = true,
+        ValidateAudience = true
+    };
+});
+```
+
+Two details matter more than they look. The app refuses to start if the secret isn't configured, with an exception that names the missing setting. A service that boots without its signing key and then rejects every request is a worse failure than one that won't boot. And every validation flag is switched on explicitly: signature, lifetime, issuer and audience. It's easy to leave one at a default you didn't mean.
+
+## What the shared secret buys
+
+Validation is local. The Movies API checks a token with a bit of maths against a key it already holds. There's no call to the Identity service on each request, no introspection endpoint, no cache of results to invalidate.
+
+That keeps the resource API fast and means it keeps working if the Identity service is briefly down. A token that's already been issued stays valid until it expires. For a small app, those are the properties I want.
+
+## What it costs
+
+The cost is that the secret is a shared secret. Every service that can validate a token can also mint one, because the key is the same. Today that's two services I run and trust, and one set of configuration values loaded from the environment or Key Vault.
+
+It also means rotation is a coordinated change. Change the secret in one place and tokens signed with the old one stop validating in the other. For a demo that's tolerable. For anything with more moving parts, it's the first thing that would hurt.
+
+## When I'd change it
+
+The log entry ends with a revisit-when line, and it's specific: when this goes multi-issuer or serves public clients.
+
+At that point I'd move to asymmetric keys. The Identity service holds a private key and signs. Everything else holds only the public key, published at a JWKS endpoint, so a service can validate tokens but can't forge them. Rotation becomes publishing a second key and retiring the first, with no shared secret to change in lockstep.
+
+Doing that now would be building for a problem I don't have. Writing down the trigger means I'll know when it arrives.
+
+## Where it falls over
+
+A symmetric secret in an environment variable is only as safe as everywhere that variable lives. A leaked secret lets someone mint a token for any user, with any claim, and nothing in the validation will object.
+
+There's no revocation. A token is valid until it expires, and a stolen one is valid too. Short lifetimes shorten that window without closing it. Anything that needs instant revocation needs a different design, which is a topic in its own right.
+
+And I'm trusting my own configuration hygiene. The secrets live outside the repo, in a local environment file and in Key Vault when deployed, and the app won't start without them. That's discipline, and discipline is the weakest control on the list.
+
+## The position
+
+**Split token issuance from the API, validate locally, and write down the day you'd outgrow the shared secret.** A symmetric key is a perfectly good start. It becomes a problem at a known point, and the useful thing is to name that point in advance.
+
+Look at your own services and ask which of them can mint tokens. If the answer is more than one, check that each one needs to.
+
+Next in Building Tewe Diary: policy-based authorisation, and an API-key filter for the ops-only endpoint. The rest of the series is on [the blog](/blogs/).

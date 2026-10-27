@@ -1,0 +1,100 @@
+---
+title: "Building Tewe Diary, Part 1: Dapper, Not an ORM"
+date: "2026-09-07"
+summary: "When the SQL is the logic, I want to see it. Here's why my movie diary API uses Dapper over Npgsql with hand-written SQL, what that looks like in a repository, the small habits that keep it safe, and the point at which I'd reach for an ORM instead."
+tags: ["dotnet", "dapper", "postgres", "architecture"]
+series:
+  name: "Building Tewe Diary"
+  part: 1
+published: true
+---
+
+The first real decision in my movie diary API wasn't the framework or the auth. It was how the code would talk to the database.
+
+I chose Dapper over Npgsql, with hand-written SQL, and I wrote that choice down as a one-paragraph decision with a line saying when I'd change my mind. That's the shape of this whole series. Tewe Diary is a portfolio project: a small .NET movie diary where you browse films imported from TMDB, rate the ones you've seen and get your ratings back. The films are the excuse. The engineering is the point, and so are the reasons behind each choice.
+
+This is Part 1 of **Building Tewe Diary**, a series on the decisions in that repo. It starts with **Dapper vs an ORM**, because everything else sits on top of it.
+
+## What I wanted from the data layer
+
+The queries in this app are simple and explicit. List movies with a title and year filter, sort and page. Fetch one by id or slug. Insert a movie and its genres. Upsert a rating. None of them needs an object graph, and none of them benefits from a change tracker deciding what to write.
+
+What I did want was to see each statement. When a query is slow or wrong, the first question is always "what SQL actually ran?", and with hand-written SQL the answer is in the repository, in plain text, next to the code that uses it.
+
+I also wanted the schema to be somewhere else entirely. An ORM often wants to own the shape of your tables as well as your queries. Here the schema is owned by migrations, which is Part 6, and I didn't want a second tool with opinions about it.
+
+## What it looks like
+
+A repository method is a few lines of C# around a block of SQL. This is the create, trimmed slightly:
+
+```csharp
+public async Task<bool> CreateAsync(Movie movie, CancellationToken token = default)
+{
+    using var connection = await _dbConnectionFactory.CreateConnectionAsync(token);
+    using var transaction = connection.BeginTransaction();
+
+    var result = await connection.ExecuteAsync(new CommandDefinition("""
+        insert into movies (id, slug, title, yearofrelease)
+        values (@Id, @Slug, @Title, @YearOfRelease)
+        """, movie, transaction, cancellationToken: token));
+
+    if (result > 0)
+    {
+        foreach (var genre in movie.Genres)
+        {
+            await connection.ExecuteAsync(new CommandDefinition("""
+                insert into genres (movieId, name)
+                values (@MovieId, @Name)
+                """, new { MovieId = movie.Id, Name = genre }, transaction, cancellationToken: token));
+        }
+    }
+    transaction.Commit();
+
+    return result > 0;
+}
+```
+
+There's nothing clever here, and that's deliberate. The transaction is explicit, so a movie and its genres go in together or not at all. Every call takes a cancellation token. The raw string literal means the SQL reads as SQL.
+
+## The weak spot: strings that become SQL
+
+Hand-written SQL has one classic hazard, and it shows up the moment you add sorting. A caller says `sortBy=title`, and the tempting thing is to put that into the `order by` clause.
+
+I don't. The repository keeps a small allow-list:
+
+```csharp
+private static readonly IReadOnlyDictionary<string, string> SortableColumns =
+    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["title"] = "title",
+        ["yearofrelease"] = "yearofrelease"
+    };
+```
+
+The caller's value is only ever a key into that dictionary. What goes into the query is the trusted column name on the right, never the caller's text. There's a comment above it saying why: the value stays out of the SQL even if request validation is bypassed. Validation is the first line of defence and this is the second.
+
+Parameters handle everything else. Dapper turns `@Title` into a real parameter, so values are never concatenated.
+
+## What you give up
+
+Be honest about the trade. An ORM would give me less typing for the boring cases. Dapper makes me write the insert for genres by hand, map a reader by hand when a query joins tables, and keep the SQL and the C# model in step myself.
+
+There are no compile-time guarantees either. If I rename a column in a migration and forget a query, I find out when a test runs, not when the build runs. That's a real cost, and it's one reason the data layer is tested against a real database, which is Part 4.
+
+What I don't give up is the thing I care about: the query path has no change tracking and no migration magic in it. What runs is what I wrote.
+
+## Where it falls over
+
+Dapper is a poor fit once the domain grows aggregates with complex object graphs. If saving one thing meant working out which of twelve related rows changed, I'd be rebuilding an identity map and a change tracker by hand, badly. That's exactly the plumbing an ORM exists to remove.
+
+It also doesn't scale to a large team without conventions. Hand-written SQL scattered across fifty files by ten people becomes a maintenance problem of its own. Here, it's one repository per aggregate and one person.
+
+So the decision in the log ends with a revisit-when line: when the domain grows aggregates where an ORM's identity map and change tracking would genuinely reduce the plumbing. Until then, Dapper.
+
+## The position
+
+**When the SQL is the logic, keep it visible.** Use a thin tool for the queries, give the schema to something else, and put a trusted allow-list between any caller's text and your `order by`.
+
+If you're about to add an ORM to a small service, write down what it will save you and what you'd have to do without it. If the second list is short, you may not need it yet.
+
+Next in Building Tewe Diary: two services and one shared signing secret. The rest of the series is on [the blog](/blogs/).

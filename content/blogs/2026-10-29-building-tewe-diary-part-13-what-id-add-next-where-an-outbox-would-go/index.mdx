@@ -1,0 +1,130 @@
+---
+title: "Building Tewe Diary, Part 13: What I'd Add Next, Where an Outbox Would Go"
+date: "2026-10-29"
+summary: "My movie diary API doesn't publish any events today. Here's the design for the first one, a rating being saved: where an outbox table would sit in the existing Postgres, how it would be written, who would consume it, and why I haven't built it."
+tags: ["dotnet", "postgres", "event-driven", "architecture"]
+series:
+  name: "Building Tewe Diary"
+  part: 13
+published: false
+---
+
+Nothing in my movie diary API publishes an event. A rating is saved, the request returns, and that's the end of it. No broker, no queue, no consumer.
+
+This post is about what I would add first, and where. It isn't built. I'm saying so up front, because the series so far has described code you can read in the repo, and this part describes a design that isn't there yet. It's a "what I'd add next" post, and the honest version of one.
+
+It's Part 13 of **Building Tewe Diary**, after [Part 12](/blogs/building-tewe-diary-part-12-building-the-react-frontend-from-a-prd/). The topic is the **transactional outbox in .NET with Postgres**, applied to a rating.
+
+## Why a rating
+
+The smallest meaningful event in this app is a user rating a film. It's a real write, it touches one table, and other parts of a bigger system would plausibly care: something that keeps averages, something that recommends, something that tells other instances to forget a cached list.
+
+Today the rating is saved with a single upsert:
+
+```csharp
+var result = await connection.ExecuteAsync(new CommandDefinition("""
+    insert into ratings(userid, movieid, rating) 
+    values (@userId, @movieId, @rating)
+    on conflict (userid, movieid) do update 
+        set rating = @rating
+    """, new { userId, movieId, rating }, cancellationToken: token));
+```
+
+One statement, one table. Rating the same film twice replaces the first rating. If I want to tell anyone about it, I now have two things to do, and that's where the trouble starts.
+
+## The gap between save and send
+
+Save the rating, then publish an event. Two systems, no shared transaction. If the process dies between the two, the rating exists and nobody was told. If I publish first and the save fails, I've announced something that didn't happen.
+
+Retrying harder doesn't close the gap, because the process can still die between the steps. The fix is the one I wrote about in the Messages That Survive series, starting with [the outbox post](/blogs/messages-that-survive-part-1-kafka-was-down-and-nobody-noticed/): write the message in the same database transaction as the change, and publish it later.
+
+## Where it would sit
+
+The database is already there, and it's Postgres. So the outbox would be a table in the same database, created by a new migration like any other.
+
+A sketch, and to be clear it's a sketch, not code in the repo:
+
+```sql
+create table outbox (
+    id          uuid primary key,
+    type        text not null,
+    payload     jsonb not null,
+    created_at  timestamptz not null default now(),
+    sent_at     timestamptz null
+);
+
+create index outbox_unsent_idx on outbox (created_at) where sent_at is null;
+```
+
+The partial index keeps the "what's left to send" query cheap however many rows have already gone.
+
+The rating write would become a short transaction with two inserts: the upsert, and a row in the outbox saying a rating was set.
+
+```csharp
+using var transaction = connection.BeginTransaction();
+
+await connection.ExecuteAsync(upsertRating, parameters, transaction);
+await connection.ExecuteAsync(insertOutbox, new
+{
+    Id = Guid.NewGuid(),
+    Type = "RatingSetV1",
+    Payload = JsonSerializer.Serialize(new { userId, movieId, rating })
+}, transaction);
+
+transaction.Commit();
+```
+
+Either both rows exist or neither does. The rating can't be saved without its event, and the event can't exist for a rating that wasn't saved.
+
+## The part that sends
+
+A background worker in the Movies API would poll for unsent rows, publish them, and mark them sent. With more than one instance, two workers could grab the same row, so the query would lock what it takes and skip what another worker already has:
+
+```sql
+select id, type, payload
+from outbox
+where sent_at is null
+order by created_at
+limit 50
+for update skip locked;
+```
+
+Publishing can fail, so the worker needs back-off and a limit, and it needs to be safe to run twice. That brings the rest of the earlier series along: at-least-once delivery means a consumer can see a message twice, so consumers need an inbox, and a failure that never succeeds needs somewhere to go.
+
+I'd call the event `RatingSetV1` from the first day. Putting the version in the type name costs nothing now and saves a migration later.
+
+## Who would consume it
+
+This is the awkward question, and the honest answer is: nobody yet. There is no second service in this repo.
+
+The first real consumer would be the one that fixes a problem I already have. The output cache from [Part 5](/blogs/building-tewe-diary-part-5-output-caching-with-tag-based-eviction/) lives in memory, per instance, and Part 14 is about why that breaks when you scale out. An event that says a movie's data changed is exactly what each instance needs to evict its own copy.
+
+So the outbox earns its place by giving the cache a signal, not by serving an imaginary recommendation engine. If a design needs a made-up consumer to justify itself, it's probably early.
+
+## What I'd decide before building
+
+**The broker.** I haven't chosen one. A broker is a new thing to run, and Part 8 was about keeping the bill near zero. Starting with the outbox table and an in-process dispatcher, and adding a broker only when a second process needs the events, is the smallest step that tells me something.
+
+**The write path.** The rating upsert is currently one statement without a transaction. Adding the outbox makes it two, so I'd also look at the delete path, because un-rating is an event too.
+
+**The tests.** The integration tests run against a real Postgres, so the outbox is testable the way everything else is: rate a movie, assert the row exists, run the dispatcher, assert it's marked sent.
+
+## Why I haven't built it
+
+Because it would be a solution looking for a problem. A portfolio repo that adds a broker, a worker and an outbox to publish an event nobody reads would be demonstrating a pattern, and not a decision.
+
+I'd rather write down when I'd build it. The entry in my decision log would say: publish rating events when a second consumer needs them, or when the cache has to be evicted across instances.
+
+## Where it falls over
+
+An outbox adds a table that grows, a worker that can hang invisibly, and polling latency measured in seconds. It also doesn't give exactly-once delivery, only at-least-once, so every consumer has to cope with repeats.
+
+A sketch is also not a test. I haven't run any of this, so the details, the locking query included, would need proving against the real database before I trusted them.
+
+## The position
+
+**Publishing an event needs the message written in the same transaction as the change.** Put the outbox in the database you already have, version the event from day one, and don't build it until something real needs to consume it.
+
+If you're about to add messaging to a small service, name the first consumer. If you can't, wait.
+
+Next in Building Tewe Diary: why output caching breaks when you scale out.

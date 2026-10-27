@@ -1,0 +1,90 @@
+---
+title: "Building Tewe Diary, Part 10: v1 Controllers Beside v2 Minimal APIs"
+date: "2026-10-08"
+summary: "A second API style can run beside the first if both share the same contracts, policies and cache tag. Here's how my movie diary API serves v1 controllers and v2 Minimal APIs from one host, how a parity test keeps them honest, and what would make me split them."
+tags: ["dotnet", "minimal-apis", "api-versioning", "testing"]
+series:
+  name: "Building Tewe Diary"
+  part: 10
+published: true
+---
+
+I wanted to show two ways of building the same API in .NET, in one repo, without pretending one replaces the other. Controllers for version 1. Minimal APIs for version 2. Both live, both tested, both on the same host.
+
+The risk with that is obvious. Two implementations of the same endpoints drift apart, and the version nobody calls most is the one that rots. The design answer is to share everything that matters and test the seam.
+
+This is Part 10 of **Building Tewe Diary**, after [Part 9](/blogs/building-tewe-diary-part-9-deployment-gotchas-and-the-switch-that-keeps-it-off/). It's about **running ASP.NET Core controllers and Minimal APIs side by side**.
+
+## Versioning from day one
+
+The versions are URL segments, `/api/v1/...` and `/api/v2/...`, using the standard versioning package. Version 1 is the default when none is given, the supported versions are reported in a response header, and there's one Swagger document per version.
+
+I did this from the start for a plain reason. Adding a version later means changing routes that clients already use. Putting the segment in from the first endpoint means the second version is an addition, not a migration.
+
+## One host, shared everything
+
+The v2 endpoints are Minimal APIs mapped beside the v1 controllers in the same application. A separate project would have duplicated startup, authentication, caching and validation, for no benefit while both versions deploy together.
+
+What they share is the important part. Both call the same service methods, so there is one implementation of what "get a movie by id or slug" means. Both use the same contracts for requests and responses. Both authorise through the same policies and cache through the same tag.
+
+A v2 endpoint is thin because the work is elsewhere:
+
+```csharp
+app.MapGet(ApiEndpoints.Movies.Get, async (string idOrSlug, HttpContext context,
+        IMovieService movieService, TmdbUrlBuilder urls, CancellationToken token) =>
+    {
+        var movie = await movieService.GetByIdOrSlugAsync(idOrSlug, context.GetUserId(), token);
+
+        return movie is null ? V2Problems.NotFound() : Results.Ok(movie.MapToResponse(urls, null));
+    })
+    .WithName(Name)
+    .HasApiVersion(2.0)
+    .WithTags("Movies")
+    .CacheOutput("MovieCache")
+    .Produces<MovieResponse>()
+    .Produces(StatusCodes.Status404NotFound);
+```
+
+One class per endpoint, a static class with a mapping method, grouped by area and registered through a single version set. It follows the layout from the Minimal API course I took, which is worth saying, because the point of this version is to practise the pattern and not to invent one.
+
+## Matching the errors on purpose
+
+There's a trap in running two styles together. Controllers marked as API controllers return a standard problem-details body for a missing resource and for a request that fails to bind. Minimal APIs don't, by default.
+
+So v2 returns the same shapes deliberately: a problem helper for not-found, and an exception handler for bad requests. A client moving from v1 to v2 shouldn't discover that error handling changed along with the style. Where behaviour is meant to be the same, it should be the same by construction.
+
+## A test that compares them
+
+Sharing code reduces drift. It doesn't eliminate it. So there are tests whose only job is to compare the two versions.
+
+The parity test sends the same request to both and compares the status, the content type and the shape of the body. Unknown ids, malformed bodies, the wrong role: the awkward cases where two implementations would diverge. A second set checks that writes and signed-in reads behave identically through either version, including the cache. Each v2 endpoint also has a twin of the v1 test.
+
+This is the part I'd recommend to anyone running two surfaces. A comment saying "keep these in step" does nothing. A test that fails when they aren't does.
+
+## What v2 leaves out
+
+v2 mirrors eight of the nine v1 endpoints. The ninth is the admin cache evict, which only the pipeline calls and which lives on v1. There's no reason for a second copy.
+
+The route names carry the version, so a link built for a v2 response points at v2. The self links on list items are generated from the route and the version being served.
+
+## When I'd split them
+
+The decision log has a revisit-when line, and it names three triggers. When the parked browse design makes v2 genuinely differ from v1, with cards, a genre filter and search. When v2 has to deploy or scale separately, at which point it becomes its own host. And when the framework version changes, which is a separate concern with its own guard.
+
+Until one of those happens, a single host is simpler and the shared code is an asset.
+
+## Where it falls over
+
+Two surfaces are twice the surface to maintain. Every change to a contract has to be considered for both, and the parity tests only catch what they were written to catch.
+
+The shared service methods can also hide a problem. If v2 wants to behave differently, the shared code becomes a constraint. At that point, the cost of sharing shows up as an awkward conditional in a service.
+
+And because they deploy together, a bad v2 change can take v1 down. The single host that saves duplication also removes the isolation a separate service would give.
+
+## The position
+
+**A second API style can run beside the first, if both share the same contracts, policies and cache tag.** Version by URL from the start, share the services underneath, match the errors on purpose, and write the test that compares them.
+
+If you maintain two versions of anything, check whether a test fails when they disagree. If not, they're drifting already.
+
+Next in Building Tewe Diary: upgrading to .NET 10 from a written plan. The rest of the series is on [the blog](/blogs/).

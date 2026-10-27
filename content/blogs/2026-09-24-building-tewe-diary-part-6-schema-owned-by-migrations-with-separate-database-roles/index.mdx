@@ -1,0 +1,95 @@
+---
+title: "Building Tewe Diary, Part 6: Schema Owned by Migrations, With Separate Database Roles"
+date: "2026-09-24"
+summary: "One thing owns the schema, and each job that touches the database gets the least privilege it needs. Here's how my movie diary API uses FluentMigrator as the only owner of DDL, keeps import scripts data-only, and splits the database into migrate, import and runtime roles."
+tags: ["dotnet", "postgres", "migrations", "security"]
+series:
+  name: "Building Tewe Diary"
+  part: 6
+published: true
+---
+
+My movie diary API started with a startup initialiser: when the app booted, it ran a block of `create table if not exists` statements. It worked, and it's the way a lot of small projects begin.
+
+It also meant the web app, running with whatever permissions it had, was the thing that decided the shape of the database. That's two jobs in one place, and a very wide set of permissions for a process that only needs to read and write rows.
+
+This is Part 6 of **Building Tewe Diary**, after [Part 5](/blogs/building-tewe-diary-part-5-output-caching-with-tag-based-eviction/). It covers **database migrations with FluentMigrator** and the three database roles I ended up with.
+
+## One owner for the schema
+
+The decision is stated plainly in the log: the migrations folder is the single owner of DDL. The data scripts and the command-line import are data-only.
+
+The reasoning is about drift. If the schema can be changed by a migration, an import script and a startup routine, then the shape of the database depends on which ran last. With one owner, the shape is whatever the migrations say, in order, and there's a record of how it got there.
+
+## The baseline, taken from the old code
+
+I didn't rewrite the schema when I moved to migrations. The first migration is a verbatim port of the old startup DDL, kept as raw SQL so SQL stays the source of truth for what exists.
+
+```csharp
+[Migration(1)]
+public class M0001_InitialSchema : Migration
+{
+    public override void Up()
+    {
+        Execute.Sql("""
+            create table if not exists movies (
+                id UUID primary key,
+                slug TEXT not null,
+                title TEXT not null,
+                yearofrelease integer not null);
+
+            create unique index if not exists movies_slug_idx
+                on movies using btree(slug);
+            """);
+    }
+}
+```
+
+The `if not exists` makes it a safe no-op against a database that the old initialiser had already created. Later migrations use the fluent syntax. There was one change from the old DDL, and it's the sort of detail that only shows up when you try it: the unique index is created without `concurrently`, because that option can't run inside the transaction FluentMigrator wraps each migration in.
+
+## Three roles, three jobs
+
+The more interesting change was permissions. A single database user doing everything is convenient and wrong. There are three distinct jobs, and each gets its own role.
+
+**The migration role** can change the schema. It runs in the pipeline, and nowhere else.
+
+**The runtime role** is what the web app connects as. It can select, insert, update and delete on the application tables, and nothing more. It can't create or drop anything.
+
+**The import role** loads the film catalogue. It needs to write to the movies and metadata tables, and create temporary tables for staging. It does not touch ratings at all, and the setup script says so in a comment, because a bulk import has no business near user data.
+
+```sql
+grant connect on database :"dbname" to movies_importer;
+grant temporary on database :"dbname" to movies_importer;
+grant usage on schema public to movies_importer;
+grant select, insert, update, delete on movies, genres, movie_metadata to movies_importer;
+```
+
+If the web app were compromised, the attacker would hold the runtime role: read and write rows, no schema changes. If the import script went wrong, it couldn't alter or drop a table. The damage each job can do is the limit of what it was given.
+
+## Who runs migrations
+
+In local development the app can migrate on startup, behind a setting. In Azure that setting is off, and the pipeline runs a small command-line tool that does the migrating and importing instead.
+
+That keeps the privileged role out of the running service. The app that takes traffic never holds the ability to change its own schema. A tool that runs for a minute in a pipeline does.
+
+## What goes wrong at the seams
+
+The roles bring one real problem, and I hit it on the first deployment. Migrations run as the DDL role and create the tables after the setup step. A `grant ... on all tables` run during setup applies to zero tables, because none exist yet, and default privileges set without naming the role only cover the admin's own future objects.
+
+The result was a runtime role that got permission denied on tables it should have been able to use. Part 9 has the fix. The lesson belongs here: separate roles are only as good as the grants that connect them, and those grants have to account for tables that don't exist yet.
+
+## Where it falls over
+
+Three roles means three sets of credentials, three connection strings and more setup. For a demo, that's real overhead, and I've scripted most of it to keep it bearable.
+
+Migrations bring their own risk. Once a migration has run in a shared database, it can't be edited, only followed by another. And deploying without zero-downtime means a brief window where the new schema meets the old image, so migrations have to be backward-compatible: add the column first, use it later, drop the old one afterwards.
+
+None of this stops someone with the DDL role doing something unwise. It narrows who can, and records what happened.
+
+## The position
+
+**One owner for the schema, and the least privilege for each job.** Migrations do the DDL, imports only move data, the app only reads and writes rows, and the privileged role lives in the pipeline, not the service.
+
+List the processes that connect to your database and what each can do. Anything with more power than its job needs is a risk you've chosen to carry.
+
+Next in Building Tewe Diary: the ADR habit that holds all of this together. The rest of the series is on [the blog](/blogs/).
