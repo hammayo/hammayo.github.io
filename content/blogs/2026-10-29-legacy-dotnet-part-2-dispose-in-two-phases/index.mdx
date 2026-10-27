@@ -1,0 +1,166 @@
+---
+title: "Legacy .NET That Still Pays, Part 2: Dispose in Two Phases"
+date: "2026-10-29"
+summary: "The framework I work in splits disposal into two phases: release the things that can fire, then break the references. It's a small idea that stops shutdown crashes, and it only works if every class in the hierarchy plays along."
+tags: ["dotnet", "csharp", "architecture", "reliability"]
+series:
+  name: "Legacy .NET That Still Pays"
+  part: 2
+published: false
+---
+
+The framework I work in splits disposal into two phases, and it does it for one reason: so an event can't fire into a half-disposed object. Phase one releases the things that can fire, like timers, connections and cancellation sources. Phase two unhooks events and breaks references. Every layer of the class hierarchy gets a turn at each phase, in order.
+
+It sounds like ceremony. It's the difference between a service that shuts down quietly and one that throws a `NullReferenceException` from a timer callback every time someone stops it. This post walks through the **two-phase dispose pattern**, why the order matters, and the ways it quietly breaks when one class in the chain doesn't play along.
+
+This is Part 2 of Legacy .NET That Still Pays. [Part 1](/blogs/legacy-dotnet-part-1-dont-build-the-log-line-you-wont-write/) covered the logging base class. The pattern here also comes from the framework we build on rather than from me, and the names below are neutral.
+
+## The standard pattern, briefly
+
+Most .NET developers have met the standard dispose pattern. A public `Dispose()` calls a protected `Dispose(bool disposing)`, then calls `GC.SuppressFinalize(this)` so the garbage collector doesn't run the finaliser as well. The finaliser, if there is one, calls `Dispose(false)`, and the `disposing` flag tells the method whether it's safe to touch other managed objects.
+
+That pattern answers "how do I make sure cleanup runs once, and not from the finaliser thread?". It doesn't say anything about the order of cleanup inside `Dispose(true)`. That's left to whoever writes the method, which usually means it's in whatever order they thought of things.
+
+For a class that owns one stream, order doesn't matter. For a worker that owns a timer, a connection, a few event subscriptions and a list of child workers, it matters a great deal.
+
+## The weak version: one method, any order
+
+Here's a worker's disposal the way it tends to get written, with neutral names:
+
+```csharp
+protected override void Dispose(bool disposing)
+{
+    if (disposing)
+    {
+        _device.MessageReceived -= OnMessageReceived;
+        _children.Clear();
+        _children = null;
+        _timer.Dispose();
+        _cts.Dispose();
+    }
+    // base.Dispose(disposing) forgotten
+}
+```
+
+Look at the order. The children list is nulled while the timer is still running. If the timer ticks in that window, and its callback walks the children, it walks a null. On a busy service, that window is small but real, and the result is an exception during shutdown that nobody can reproduce on demand.
+
+And the base class never gets called, so anything the base class owned, its own timer or its own subscriptions, is never cleaned up at all. Nothing warns you. The service still stops, just not cleanly.
+
+## The better version: two phases, every layer
+
+The framework's version takes the ordering decision away from each class. The base class owns `Dispose`, and it calls two virtual methods in a fixed order:
+
+```csharp
+public void Dispose()
+{
+    GC.SuppressFinalize(this);
+    Dispose(true);
+}
+
+private void Dispose(bool disposing)
+{
+    if (Disposed || !disposing)
+        return;
+
+    LogDeferred(LogLevel.Debug, "Begin", () => new[] { "Disposing" });
+
+    ReleaseResources();     // phase 1: timers, connections, cancellation sources, streams
+    UnhookReferences();     // phase 2: events, collections, references to other objects
+
+    Disposed = true;
+    LogDeferred(LogLevel.Debug, "End", () => new[] { "Disposed" });
+}
+
+protected virtual void ReleaseResources() { }
+protected virtual void UnhookReferences() { }
+```
+
+A derived class overrides whichever phases it needs, puts each piece of cleanup in the right one, and calls the base at the end of each:
+
+```csharp
+protected override void ReleaseResources()
+{
+    _timer?.Dispose();
+    _cts?.Dispose();
+    base.ReleaseResources();
+}
+
+protected override void UnhookReferences()
+{
+    _device.MessageReceived -= OnMessageReceived;
+    _children?.Clear();
+    _children = null;
+    base.UnhookReferences();
+}
+```
+
+**Stop the things that can fire, then break the references.** That's the whole rule, and it's easy to apply, because each piece of cleanup obviously belongs in one phase or the other.
+
+### Why that order
+
+Phase one stops new work arriving. Once the timer is disposed and the connection is closed, nothing owned by this object should start a new callback. Only then does phase two start clearing lists and unhooking events, which is exactly the kind of change that makes a half-finished callback crash.
+
+If you reverse the order, you get the weak version's bug on purpose: references cleared while the sources are still live. The two-phase split makes the right order the default, instead of something each author has to think about.
+
+Phase two also prevents the classic .NET event leak. If this object subscribes to an event on something that lives longer than it does, the publisher holds a reference to the subscriber through the delegate. Forget to unhook, and the "disposed" object stays alive for as long as the publisher does. Giving unhooking its own phase makes it much harder to forget.
+
+### Every layer gets a turn
+
+The hierarchy is several layers deep. A base logging class, then the disposal class, then a worker class, then a connectable worker, and so on. Each layer can add cleanup in either phase and call the base.
+
+The worker layer, for example, clears its list of registered child workers in phase two. The connection layer releases its connection in phase one. A concrete worker adds its own timer and events. When the service shuts down, each object runs every layer's phase one, then every layer's phase two, and the result is consistent across many different workers without anyone coordinating it.
+
+The order across objects is a separate question: which worker disposes first. The two phases don't decide that, the parent or the container does. That's where the debug lines at Begin and End earn their keep, because they show the order objects actually went in, not the order you assumed.
+
+There's a guard, too. `Disposed` flips to true at the end, and a second call to `Dispose` does nothing. Derived classes can check it to refuse work after disposal, so a late call to start a disposed worker fails cleanly instead of resurrecting half an object.
+
+The debug log lines at the start and end are cheap, thanks to the deferred logging from Part 1. They're also the most useful lines you'll have when a shutdown hangs, because the last "Begin" without a matching "End" tells you which object got stuck.
+
+## What goes in which phase
+
+When I'm not sure where a piece of cleanup belongs, I ask one question: can this thing call me back? If it can, it goes in phase one.
+
+- Phase one: timers, cancellation token sources, network connections, streams, database connections, anything that owns a thread or a callback
+- Phase two: event unsubscriptions, clearing collections, nulling references to other objects, releasing child workers from a list
+
+A cancellation source is the one people most often put in the wrong place. Cancelling and disposing it in phase one tells any in-flight work to stop before phase two starts taking its state away.
+
+## Three ways to break it
+
+The pattern is robust as long as everyone follows it. Here are three ways it stops working.
+
+The first is forgetting the base call. A derived class overrides phase one, disposes its stream and returns. Every layer above it loses its phase-one cleanup, silently.
+
+The second is putting cleanup in the wrong phase. Disposing a timer in phase two means it's still ticking while phase two clears the references its callback depends on. It's the weak version's bug, reintroduced inside the pattern that exists to prevent it.
+
+The third is hiding `Dispose` with `new`. A derived class declares its own `public new void Dispose()` and does its cleanup there. That method only runs when the caller holds a reference typed as the derived class. A `using` block over the interface, or a container disposing everything it created, calls the base implementation instead, so the derived cleanup runs sometimes, depending on how the object was referenced.
+
+## Testing it
+
+Disposal is one of the least tested parts of most codebases, because nothing visibly breaks when it's wrong. The service still stops. It's worth a small test per worker type anyway.
+
+The test I'd write disposes a worker, then checks three things: its timer no longer fires, its event handlers are gone from the publisher, and a call to start it again fails cleanly. The first two catch cleanup in the wrong phase or missing entirely. The third catches a missing disposed guard.
+
+A base-class test double can go further. If the test version of each base phase sets a flag, a test can dispose any derived worker and assert both flags were set, which catches the forgotten base call directly.
+
+## The modern equivalent
+
+The same idea exists in modern .NET's async disposal guidance. The recommended pattern for `IAsyncDisposable` has a public `DisposeAsync` that calls a protected virtual `DisposeAsyncCore`, so derived classes add their cleanup and chain the base. It's the same shape as the two phases: the base class owns the entry point and the order, and each layer contributes its part.
+
+## Where it falls over
+
+**Nothing enforces the base call.** The pattern depends on every override in every layer calling the base in both phases, and the compiler is perfectly happy if one doesn't. Review catches most of them. An analyser rule, or a unit test that disposes each worker and checks the base cleanup ran, would catch the rest, and we don't have either.
+
+Disposing a timer doesn't stop a callback that's already running. `System.Threading.Timer.Dispose()` returns straight away, and a callback that started just before can still be executing while phase two clears the references it's using. So the two phases shrink the window a great deal without closing it completely. If a callback touches something phase two will clear, it needs its own disposed check, or the timer needs disposing with a wait handle so phase one blocks until in-flight callbacks finish.
+
+The base class also has a finaliser, which means every instance of every derived class is finalisable. The runtime has to track each one from allocation, and an instance that's never disposed survives an extra garbage collection before its memory is reclaimed.
+
+The finaliser calls `Dispose(false)`, which does nothing here, so for classes with no unmanaged resources it's all cost and no benefit. A derived class that adds its own finaliser on top makes it worse. If I were designing this fresh, I'd leave the finaliser to the few classes that genuinely hold unmanaged handles.
+
+## Put the order in the base class
+
+My position: the order of cleanup matters as soon as a class owns something that can call it back, and that decision shouldn't be left to each class's author. Stop the sources, then break the references, and have the base class run both phases for every layer.
+
+If your services have workers with timers, connections and event subscriptions, look at how they dispose. If the order varies from class to class, a small base class with two virtual phases and a disposed guard will fix it for all of them. Then write one test that disposes each worker and checks the base cleanup ran, because the pattern is only as strong as the one override that forgets to call the base.
+
+Next in the series: changing configuration without a restart, and the cache setting that has to read itself. The rest of my writing is on [the blog](/blogs/).

@@ -1,0 +1,112 @@
+---
+title: "Engineering Habits, Part 4: The Call You Can't Deny"
+date: "2026-11-30"
+summary: "The obvious way to add a restricted mode to an admin UI would have denied the very call that tells the UI it's restricted. Before you lock a client down, check it can still ask the question that tells it to lock down."
+tags: ["angular", "security", "architecture", "typescript"]
+series:
+  name: "Engineering Habits"
+  part: 4
+published: false
+---
+
+Some forecourts run unattended, and our service has a config flag for it. When the flag is on, the admin web UI should turn into a cut-down version for site staff: admin tabs gone, the pumps tab read-only. When it's switched off, the full UI should come back, live, without a reload.
+
+The ticket's wording pointed at the obvious approach. When the flag is on, switch the UI over to the restricted staff key from the access work in [Part 3](/blogs/engineering-habits-part-3-deny-by-default-fail-at-start-up/), and let the server enforce the rest. It would have locked the UI out of its own mode. This post is about the habit that caught it: **trace the bootstrap call** before you restrict a client.
+
+This is Part 4 of Engineering Habits. I mentioned this one briefly in the Spec-Driven series, as something the analysis step caught before any code existed. Here's the whole story.
+
+## Trace the first call
+
+Before designing anything, I traced how the UI finds out which mode it's in. It reads the flag from the advanced config call, the same call that fills the page header on start-up.
+
+That call is admin-only. The staff key is denied on it, deliberately, because advanced config is exactly what staff shouldn't touch.
+
+So follow the obvious design through.
+
+The flag goes on. The UI switches to the staff key. The next time it asks "which mode am I in?", it gets a 401. It can't know it's in restricted mode, because it has just locked itself out of the answer.
+
+The trace itself is quick. Find the very first request the UI makes on start-up; the browser's network tab will show it. Then look up which roles the controller behind that request allows. If the role you're about to switch to isn't on the list, you've found the problem before writing any code.
+
+**Before you lock a client down, make sure it can still ask the question that tells it to lock down.** That's the whole habit. It's cheap to check and expensive to miss, and it's easy to miss because the bootstrap call is the one nobody thinks about once it works.
+
+## The weak design and the better one
+
+The weak design swaps in the restricted key and lets the UI discover its mode. It fails in a way that's confusing rather than loud: a 401 on start-up, a UI that doesn't know what to show, and probably a support call.
+
+My first pass was deliberately simple: restrict the UI only, keep the admin key throughout, and leave the real key swap for later. As the design firmed up in the requirements I wrote for it, that became a proper rule instead.
+
+The UI always uses the admin key for the one bootstrap call. Once it knows the mode, it switches to the right key for everything else. When a live config change arrives, it switches again. The key is decided by the mode, not worked out per request.
+
+Here's the shape of it, simplified:
+
+```typescript
+// Show the least until we know more.
+readonly mode$ = new BehaviorSubject<'restricted' | 'full'>('restricted');
+
+async bootstrap(): Promise<void> {
+  try {
+    // The one call that decides the mode always uses the admin key.
+    const config = await this.api.getAdvancedConfig({ key: 'admin' });
+    this.applyMode(config.unattended ? 'restricted' : 'full');
+  } catch {
+    this.applyMode('restricted');   // can't read the flag: stay cut down
+  }
+}
+
+private applyMode(mode: 'restricted' | 'full'): void {
+  this.keys.use(mode === 'restricted' ? 'staff' : 'admin');
+  this.mode$.next(mode);
+}
+```
+
+Switching back without a reload works the same way. The service already pushes config changes to the UI over its live connection, so when the flag changes, the UI calls the same method to apply the new mode and swap keys. There's one code path for "mode changed", whether it's start-up or a live update.
+
+## Two defaults that look like a contradiction
+
+That design has two defaults that seem to disagree, and both are deliberate.
+
+The UI defaults restrictive. The mode starts as restricted and only flips to full once a successful fetch says the flag is off. So during start-up, the route guard never flashes an admin page at a member of staff.
+
+The key for the bootstrap call defaults to admin. The one call that decides the mode has to succeed, or nothing else can be decided.
+
+If the config can't be read at all, the UI falls back to the restricted view. The safer failure is an admin briefly seeing the cut-down view during a backend blip. The other way round, staff briefly see admin tabs. I logged that as a known trade-off.
+
+**Show the least until you know more.** It's the client-side version of deny by default from Part 3.
+
+## Don't invent the rules twice
+
+The next question was which tabs to hide. The tempting answer is a list in the UI, written from what seems sensible.
+
+I didn't invent it.
+
+I derived it from the server-side access rules from the earlier work. If the controller behind a tab denies the staff role everywhere, the tab is hidden and route-guarded. If it allows everything, the tab is untouched; staff editing fuel prices is intended. Pumps is the only partial tab, because its controller is the one that splits by action: reads allowed, writes denied.
+
+That way the UI and the server agree by construction, rather than by two people keeping two lists in step.
+
+On the pump page, the form in each pump card contains only controls that change things. So the whole form is gated as one region rather than hiding each control, which also covers controls someone adds later. The tests still assert each control is absent by name, so a template refactor can't quietly bring one back.
+
+Hiding a nav item isn't enough on its own, because anyone can type a URL. Each admin route also has a guard that redirects to the pumps tab.
+
+## The escape hatch
+
+There's one way back. The header already showed an icon when unattended mode is on, and the admin config tab holding the toggle is hidden in that mode. So the icon became clickable, to turn the mode off.
+
+If a member of staff clicks it, the server refuses their key with a 401, and it surfaces as an error message. Nothing succeeds silently, and nothing pretends to.
+
+The design went in as eleven small stories, built one at a time through the agent loop I've written about elsewhere, with build, lint and tests as the gate on every story. The result still went through a normal pull request and human review, and it's shipped.
+
+## Where it falls over
+
+**All of this is client-side.** Both keys ship in the JavaScript bundle, so anyone with the browser's developer tools can read the admin key. The restricted mode is a better experience for site staff, not a security boundary, and the design says so plainly. The real protection needs server-side identity, which is separate work behind a password prompt.
+
+"Always bootstrap with the admin key" is exactly the kind of exception I'd like to remove later. It's the price of the mode flag living behind an admin-only endpoint. A small, unauthenticated or staff-readable endpoint that only reports the mode would remove the need for it.
+
+And the habit only works if you trace the right call. Here it was the first request the UI makes. In another system it might be a token refresh, a health check or a feature-flag fetch. The question is always the same: which call does the client need to succeed in order to know what it's allowed to do?
+
+## Give the bootstrap its own access story
+
+My position: any client that changes its behaviour based on what the server tells it has a bootstrap call, and that call needs its own access story. Restrict everything else as tightly as you like, but make sure the question "what mode am I in?" can always be answered.
+
+Before your next change that restricts a client, trace the very first call it makes on start-up and check which roles can make it. Default the client to its most restrictive view until it knows otherwise. And derive what it hides from the server's own rules, so the two can't drift.
+
+Next in the series: testing a failure path on the build customers actually run, instead of a special broken one. The rest of my writing is on [the blog](/blogs/).

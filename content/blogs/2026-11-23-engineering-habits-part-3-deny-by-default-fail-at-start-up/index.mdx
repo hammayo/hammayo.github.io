@@ -1,0 +1,109 @@
+---
+title: "Engineering Habits, Part 3: Deny by Default, Fail at Start-Up"
+date: "2026-11-23"
+summary: "Adding a role check is easy. Adding one without breaking the clients that already relied on open access is the job. Restrict at class level, opt in the few safe reads, test allow and deny for each role, and refuse to start if a secret is missing."
+tags: ["dotnet", "security", "architecture", "testing"]
+series:
+  name: "Engineering Habits"
+  part: 3
+published: false
+---
+
+Our service has a web API that the admin UI, the tills and a few integrations all call. Each kind of caller has an API key that maps to a role. Site staff had exactly two options: the admin key, which let them reconfigure terminals and connections, or nothing at all.
+
+Retailers wanted their staff to change fuel prices, run shift ends and look at transactions, without being able to break the forecourt. So I added a new, restricted role. Adding a role check is easy. Adding one without breaking every client that already relied on the old access is the actual job, and this post is about the two habits that made it safe: **deny by default**, and fail at start-up rather than run without auth.
+
+This is Part 3 of Engineering Habits. [Part 2](/blogs/engineering-habits-part-2-the-reviewer-deleted-my-fix/) was about taking review well. This one had some of the best review comments I've had, and I'll get to them.
+
+## Map everything before changing anything
+
+Before writing a single attribute, I mapped all 21 controllers: which roles each one allowed today, and which the new role should get. That audit decided the whole design.
+
+Most controllers were easy. A handful of business areas gave the new role full access, and everything admin-only simply didn't list it. One controller was awkward: pumps. Staff should see pump status, but not open, close or reconfigure a pump.
+
+Only the audit showed that pumps was the one controller needing a split by action, rather than a single rule. Without it, I'd have found out one endpoint at a time.
+
+## The weak version: protect endpoints one at a time
+
+The obvious way to handle pumps is an attribute on every action, listing who's allowed. Reads get the new role, writes don't.
+
+It works on the day you write it.
+
+The problem is next year, when someone adds a new write action to the pump controller. If protection is opt-in per action, the new action is only safe if its author remembers to protect it. Most of the time they will. The one time they don't, site staff can change something they shouldn't, and nothing tells anyone.
+
+## The better version: restrict the class, opt in the reads
+
+So I left the pump controller admin-only at class level, and opted in exactly the few read-only actions the new role needed. Here's the shape, with neutral names:
+
+```csharp
+[RequireRoles(Roles.Admin, Roles.Engineer)]              // class level: everyone else is denied
+public class PumpsController : ApiController
+{
+    [HttpGet, AlsoAllowRoles(Roles.SiteStaff)]           // explicit read-only opt-in
+    public IHttpActionResult GetPumpStatus(int id) => ...
+
+    [HttpPost]                                           // no opt-in: admin and engineer only
+    public IHttpActionResult ClosePump(int id) => ...
+}
+```
+
+In ASP.NET Web API that's a class-level authorise attribute plus the framework's method-level override. There was already a precedent for it in another controller, so it wasn't a new pattern in the codebase.
+
+**Opt in, don't opt out.** A new write action added next year is locked down without anyone remembering anything, because the class default already denies it.
+
+I also moved the role names from raw strings to constants, and built the combinations from them. A typo in a string role name doesn't fail to compile; it just silently locks that role out of an endpoint, and you find out from a support call.
+
+## Don't break the clients you already have
+
+The part that made this safe to ship was keeping every existing caller exactly where it was. Their keys and roles didn't change, so nothing they could do changed either.
+
+I shipped it in two pull requests. The first proved the whole path, from key to role to endpoint, on the simplest controller, fuel prices, with tests. The second rolled it across the rest.
+
+The tests are the bit I'd insist on. For each role, integration tests check both sides: what must be allowed, and what must be refused. "Staff can read pump status" is only half the contract. "Staff cannot close a pump" is the half that matters if someone gets the attributes wrong.
+
+The key lookup got simpler along the way. Before, adding a key meant editing two parallel switch statements and a list, three places that had to agree. Now there's one table mapping role to key, which the service inverts into a dictionary once at start-up. One place to change, and nothing to keep in step.
+
+## Fail at start-up, not at the first request
+
+An automated review on the first PR flagged something bigger than the ticket: the API keys lived as constants in source control. That became my follow-up.
+
+I moved the keys out of source control into a protected configuration store, seeded once on first start. And I made the service refuse to start if the keys aren't there:
+
+```csharp
+var roleKeys = LoadRoleKeys();
+if (roleKeys.Count == 0)
+    throw new InvalidOperationException(
+        "No API keys configured. Refusing to start without authentication.");
+```
+
+A service that won't start sounds harsh. The alternative is one that installs cleanly and then quietly runs with broken or missing auth. **A loud failure at install time gets fixed by whoever's doing the install. A silent one gets found by a customer.**
+
+The seeding is idempotent, too. It inserts or updates rather than inserting blindly, so if it fails halfway and someone runs it again, the second run finishes the job instead of tripping over the first run's rows. Anything that runs at install time should be safe to run twice, because sooner or later it will be.
+
+## The review comments I'd frame
+
+Two of the best changes came from the reviewer, and both were about not hiding failure.
+
+I'd guarded the key dictionary against being null, defensively. The reviewer pointed out that if it's null, nothing works anyway, and my guard just turned a clear start-up failure into a confusing auth failure later. I took it out. Defensive code that swallows an impossible state doesn't make the system safer; it makes the failure harder to find.
+
+They also asked for the clean-up of the seed material to go in a `finally` block. If the database write failed halfway through seeding, my version would have left the seed data sitting on disk. With `finally`, it's removed whether the seed succeeds or not.
+
+The same review caught that my tests used the real deployment keys. The tests only check format and uniqueness, so I swapped in arbitrary test values. Real secrets have no business in a test file, even an internal one.
+
+## Where it falls over
+
+**It's still a shared secret per role, not per person.** There's no record of who changed a fuel price, and keys don't expire. That's the next step, and it's a much bigger change than this ticket: real per-user identity.
+
+Unknown key and wrong role both return the same 401, because the existing middleware doesn't distinguish them. "Who are you?" and "you can't do that" are different problems to debug, and returning Forbidden for the second would help. I wrote both options down and recommended staying consistent for now, but I'd still like the split.
+
+The service's real-time hubs, which push live updates to the UI, have no role checks at all. They rely on the service sitting on the site's own network. That's a reasonable assumption for a forecourt, and it's still an assumption rather than a control.
+
+And the keys story hasn't settled. A later decision is to move the keys back into code, alongside a restricted mode for the web UI, so what I describe here is what's on the main branch today, not necessarily the final design. That's how real systems go, and I'd rather say so than pretend the first design was the last.
+
+## Make the safe path the default one
+
+My position: access control should fail closed. Restrict at the widest level you can, class or controller or route group, and opt in the specific things a role may do. Test the denies as carefully as the allows. And treat a missing secret as a reason not to start, not a condition to work around.
+
+Before your next access-control change, map every endpoint and every role first, so the awkward cases show up before the code does. Then look for any guard in your start-up code that turns "misconfigured" into "running anyway", and ask whether a loud failure would serve you better.
+
+Next in the series: a restricted mode for the admin web UI, and the one call it couldn't be denied. The rest of my writing is on [the blog](/blogs/).

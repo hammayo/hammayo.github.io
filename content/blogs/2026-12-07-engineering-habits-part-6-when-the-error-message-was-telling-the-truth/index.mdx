@@ -1,0 +1,92 @@
+---
+title: "Engineering Habits, Part 6: When the Error Message Was Telling the Truth"
+date: "2026-12-07"
+summary: "A mobile fuel app kept failing with 'pump in use', across a lot of sites, and it was reported as our bug. Every trace I followed said the pump really was in use. The error was correct, the count was inflated by retries, and proving 'no bug' still didn't fix anything for the customer."
+tags: ["debugging", "architecture", "productivity", "reliability"]
+series:
+  name: "Engineering Habits"
+  part: 6
+published: false
+---
+
+Customers using a mobile fuel app kept getting "pump in use" when they tried to reserve a pump, across a lot of sites, and the provider behind the app reported it to us as a fault. The numbers looked bad. The error came from our side of the integration, so the natural reading was that our service was refusing pumps it shouldn't.
+
+Every trace I followed said the pump really was in use. This post is about the habit that got me there, **line up each failure with the state at that moment**, and about the uncomfortable ending: proving there's no bug doesn't make anyone's morning at the pump any better.
+
+This is Part 6 of Engineering Habits, and the last in this run.
+
+## The weak investigation: assume the error is the bug
+
+The weak way to investigate a reported error is to assume the error is the bug, and go looking for the code path that produces it wrongly. It's a natural starting point. Someone's unhappy, the message came from you, so find out why you're sending it.
+
+It's also a way to spend a long time looking for a fault that isn't there. If you start from "why are we wrong?", every log line reads as evidence of how. You stop asking whether you might be right.
+
+I wrote about the mirror image of this in [the loudest log line wasn't the bug](/blogs/spec-driven-part-9-the-loudest-log-line-wasnt-the-bug/). There, a loud pattern was innocent noise. Here, the loud error turned out to be the truth. Different outcome, same discipline: check the claim against the state before you build a story on it.
+
+## The better investigation: what was the pump doing?
+
+So I took each failure and asked one question: at the instant the app asked to reserve this pump, what was the pump actually doing?
+
+Our service's reserve check is a straight state test. If the pump is already authorised for another sale, typically a walk-in customer who has prepaid at the till, it can't be reserved for a mobile customer, and the service says so. If the pump is free, the reservation goes through.
+
+For every failure I could trace in the logs, the pump was already authorised for another sale at that moment. The service's own log line said so, naming the state that blocked the reservation. **The error message was telling the truth**, every time I checked.
+
+The contrast mattered just as much. At the same sites, on the same day, the app reserved free pumps without any trouble. That's the evidence that the service wasn't broken: it refused busy pumps and accepted free ones, which is exactly its job.
+
+### Always find one that worked
+
+The success at the same site is the part people skip, and it's the part that settles the argument. A column of failures on its own proves only that something failed. A success on a free pump, at the same site, on the same day, through the same integration, proves the path works. Every "it's broken" investigation deserves one "and here's it working" to compare with.
+
+## Why the numbers looked so bad
+
+That still left the volume. If every failure was a genuinely busy pump, why were there so many?
+
+Lining the failures up in time answered it. On one site, a single customer's attempt to reserve a busy pump turned into several logged failures within a couple of minutes, evenly spaced, and then the requests moved on to a different pump. The spacing was regular because the provider's side was retrying the reservation on a fixed timer, and each retry went out as a brand-new request.
+
+So one real event, "this pump was busy", appeared in the provider's reporting as several separate failures. The provider was treating "pump in use" as something worth retrying, rather than as a final answer to show the driver.
+
+Collapsing the retries back into events is simple once you know to do it:
+
+```csharp
+// Group failures by pump, and treat any run of failures closer together
+// than the retry window as one real "pump was busy" event.
+var events = failures
+    .OrderBy(f => f.At)
+    .GroupBy(f => f.Pump)
+    .SelectMany(g => SplitOnGaps(g, maxGap: TimeSpan.FromMinutes(2)))
+    .ToList();
+
+// failures.Count is what the report said; events.Count is what happened.
+```
+
+**Count events, not requests.** A retry loop turns one refusal into a column of failures, and a report that counts requests will overstate the problem by whatever the retry count happens to be.
+
+To be fair to the ticket, that hypothesis was already written on it before I started. My part was confirming it against the logs, one failure at a time, so it stopped being a theory.
+
+I started with the clearest case, the site where the logs showed the whole sequence from first request to the traffic moving on. Once the mechanism was clear there, the other traces were confirmation rather than discovery. Starting with the clearest case is a habit too: it's much easier to recognise a pattern in messy logs once you've seen it clean.
+
+## A time-zone trap worth mentioning
+
+One small thing nearly tripped me up, and it's a habit in its own right. The log lines were stamped in local time, while the timestamps inside the messages were in UTC. During British Summer Time, those differ by an hour.
+
+Folder names on the captures used one clock and the log bodies used the other. If I'd lined up a customer's report against the wrong one, every failure would have landed on the wrong pump state, an hour out, and the story would have fallen apart. Check which clock each source uses before you line anything up.
+
+## Where it falls over
+
+**Proving there's no bug doesn't make the customer's experience better.** A driver standing at a pump, being told it's in use by an app that then silently retries, is having a bad time whether or not our service is correct. "Working as designed" is an answer for engineers, not for them.
+
+The useful output of the investigation wasn't a code fix. It was a recommendation: treat "in use" as a final answer and tell the driver, or offer a way to wait for the pump, or pick another. Those are product decisions on the provider's side, not changes I could make, and whether they happen isn't up to me.
+
+The evidence also had limits. I traced every failure I could find in the logs that had been captured, which covered some of the affected sites, not all of them. The pattern was consistent everywhere I could see it, and I said "every failure I traced", not "every failure", because that's what I actually know.
+
+If I were writing the integration contract, I'd make that explicit. A refusal that depends on the pump's state, like "in use", is a final answer for this request. Retrying it is a decision for the driver, who can see the pump, not for a timer that can't. A retry policy that can't tell a busy pump from a dropped connection will always inflate one into looking like the other.
+
+There's a risk in this habit, too. Once you've proved an error is correct a few times, it's tempting to assume it's correct next time. The next "pump in use" report might be a real fault, and it deserves the same check, not a shortcut based on the last one.
+
+## Believe the error until the state says otherwise
+
+My position: when a reported error comes from your system, start by checking whether it's true, not by hunting for why it's wrong. Line up each failure with the real state at that moment, find a success to compare it with, and count distinct events rather than raw requests.
+
+On your next "we're getting loads of errors" report, pick three failures and reconstruct what the system was actually doing at each one. Check the clocks first. If the errors are correct, say so with evidence, work out what's inflating the count, and then ask the more useful question: what should the person on the other end be told instead?
+
+That's the end of this run of Engineering Habits: grep every caller, take the smaller fix, deny by default, trace the bootstrap call, break the real build, and believe the error until the state says otherwise. The rest of my writing is on [the blog](/blogs/).

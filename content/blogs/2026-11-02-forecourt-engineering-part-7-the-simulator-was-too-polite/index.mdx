@@ -1,0 +1,154 @@
+---
+title: "Forecourt Engineering, Part 7: The Simulator Was Too Polite"
+date: "2026-11-02"
+summary: "I designed a payment-host simulator to answer straight away and send the receipt afterwards, because that seemed sensible. Real captures showed real hosts hold the payment response until the receipt is acknowledged. A capture beats a design decision, even one you've already written down."
+tags: ["dotnet", "testing", "payments", "architecture"]
+series:
+  name: "Forecourt Engineering"
+  part: 7
+published: false
+---
+
+We have a simulator that stands in for a mobile payment host, so we can test pay-by-phone at the pump without a real provider on the other end. The ticket asked for one small thing: when the simulator handles the final payment message for a sale, have it send a receipt to the till as well. One extra message.
+
+I designed it the sensible way. Answer the payment straight away, then push the receipt out in the background. I even wrote that ordering into the design notes as a decision.
+
+Then I read captures from live sites, and the real hosts did it the other way round. This post is about **simulator fidelity**: why a simulator that's politer than the real system hides the bugs it exists to find, and why a real capture beats a design decision. It's Part 7 of Forecourt Engineering, and the last in this run.
+
+## How the simulator fits
+
+It helps to know which way the connections go. The simulator is the listener, and our service dials in to it, the same way it would dial a real host. Most messages start from our side: signing in, sending site information, heartbeats, and the payment messages for each sale.
+
+A few are pushed by the host instead, like reserving a pump for a mobile sale or aborting one. The receipt joins that group. That's why the ordering question matters at all: the host decides when to push it, relative to everything else it's doing.
+
+## Tickets with that shape
+
+I've learnt to distrust tickets that say "one extra message". The shape is always the same: a small, clear request that sits on top of assumptions nobody wrote down, because the person writing it already knows them.
+
+So before planning anything, I went looking for what the ticket didn't say. It's the same habit as [making the assistant interview me before it builds anything](/blogs/spec-driven-part-4-interview-first-code-second/): restate what's asked, then ask what consumes it, what the real system does, and whether the linked work says what the ticket says.
+
+The first question found a gap straight away. Nothing on our service's side consumed the receipt yet. The handler that would receive it was a stub, waiting on a separate ticket. So I couldn't prove anything end to end, and the simulator's behaviour had to stand on its own tests.
+
+That's worth knowing before you start, not after. It changes what "done" can mean for the ticket.
+
+## The polite version
+
+Here's roughly the design I wrote down first, as generic C#:
+
+```csharp
+public async Task HandleFinalPaymentAsync(PaymentMessage message, CancellationToken ct)
+{
+    await SendPaymentResponseAsync(message, ct);
+
+    // Receipt afterwards, in the background. Seems harmless.
+    _ = Task.Run(() => SendReceiptAsync(message, ct), ct);
+}
+```
+
+The fire-and-forget call is a smell in its own right. An exception inside that background task goes nowhere: no caller awaits it, so a failed receipt would vanish without a trace. Even if the ordering had been right, that line would have deserved a second look.
+
+It looks reasonable. The payment is what matters, so answer it first. The receipt is a courtesy, so send it when you can. If the receipt fails, the payment has still gone through.
+
+And that's the problem. It's what seems sensible to someone building a simulator. It isn't necessarily what a real host does, and a simulator's whole job is to behave like the real host, including in the ways that are inconvenient.
+
+## What the captures said
+
+Before building it, I read captures from live sites, one for each of the two host brands we support. They agreed with each other and disagreed with me.
+
+In both, the receipt went first. The till acknowledged it. Only then did the host send the payment response. The real hosts treat the receipt and the response as one unit: no acknowledged receipt, no response.
+
+**A capture beats a design decision, even one you've already written down.** The decision in my notes was a guess dressed as a conclusion, and the capture was evidence. I changed the design and the notes.
+
+The captures settled two smaller questions for free. Both brands used the same receipt layout, so there was no need for a per-brand version. And the request identifiers followed our service's own rolling counter format, not the simulator's, so I matched that instead of inventing a scheme.
+
+## The honest version
+
+The simulator now sends the receipt, waits for the till's acknowledgement, and only then sends the payment response. If the acknowledgement never arrives, the response is never sent. Here's the shape:
+
+```csharp
+public async Task HandleFinalPaymentAsync(PaymentMessage message, CancellationToken ct)
+{
+    var receipt = BuildReceipt(message);
+    var acknowledged = await SendAndWaitForAckAsync(receipt, _ackTimeout, ct);
+
+    if (!acknowledged)
+    {
+        // A real host never sends the response without an acknowledged receipt.
+        _log.Warning("No receipt acknowledgement; payment response withheld");
+        return;
+    }
+
+    await SendPaymentResponseAsync(message, ct);
+}
+```
+
+That's less convenient for our service, which is exactly the point. Our service now has to cope with the wait, and with the response never arriving, because that's what a real host would put it through. A simulator that answers straight away would let our service pass tests it would fail on a live site.
+
+The till's reply is matched to the receipt on several fields, including a request id, so a late or stray acknowledgement can't release the wrong payment. And the wait itself happens inside a task: the receipt goes out, the task waits, and the payment response is sent from the success path only.
+
+The receipt is only sent after a successful payment. A failed or timed-out payment releases the sale with no receipt, which matches an earlier change on that path.
+
+## What "polite" usually means
+
+This isn't only a payments problem. Most simulators, mocks and test doubles I've seen are polite in the same handful of ways.
+
+They answer instantly. They never time out. They never send things in an awkward order, never send the same thing twice, and never go quiet halfway through.
+
+Each of those is a real behaviour of real systems, and each one is a place where the code under test has a path that never runs in testing. If your simulator can't be slow, your timeout handling is untested. If it can't withhold a response, your "no response" path is untested. The simulator decides which of your failure paths get exercised, whether you meant it to or not.
+
+## The small things that bite
+
+Most of the work was small, and most of the small things had a trap in them.
+
+The simulator already had send-and-wait plumbing for the other messages a host pushes, so I reused it rather than writing a second version. The new pieces were a model for the receipt, one routing arm, the send logic, and one case in the message parser so the till's reply would be recognised.
+
+That parser case matters more than its size. Without it, the reply fell through as an unknown message, and the waiter simply timed out. The symptom would have been "the till never acknowledges", when in fact the till had answered and we hadn't understood it. That's a nasty way to find out you've missed a case.
+
+The card number isn't on the final payment message at all. It's held on the connection from an earlier step in the sale, so the receipt builder reads it from there and masks everything except the last four digits:
+
+```csharp
+static string MaskCardNumber(string cardNumber)
+{
+    if (string.IsNullOrEmpty(cardNumber))
+        return string.Empty;
+
+    var visible = Math.Min(4, cardNumber.Length);
+    // cardNumber[^4..] would be neater, but ranges need types .NET Framework 4.8 doesn't ship.
+    return new string('*', cardNumber.Length - visible)
+         + cardNumber.Substring(cardNumber.Length - visible);
+}
+```
+
+That comment is there because the project targets .NET Framework 4.8, and the C# range operator needs runtime types that aren't there. It's the kind of thing that compiles in your head and fails in the build.
+
+If the card number is missing, I followed the simulator's existing habit of seeding sensible defaults, so the receipt still goes out with an empty masked line rather than being suppressed. A simulator that silently skips a message when data is missing is another kind of polite.
+
+## Checking the links, too
+
+The same instinct came from an earlier test ticket, where the linked work turned out to be about something else entirely. The ticket linked two pieces of work that looked related and weren't. Now, when a ticket looks small, one of my first checks is whether its links actually say what the ticket says.
+
+## Tests for both brands, and what I did with the duplication
+
+I wrote tests for both brands. A successful payment sends the receipt; a failed one doesn't. On one brand, I also tested the gate and the timeout: no acknowledgement, no response.
+
+The two brands' test files came out almost identical. I didn't hide that behind a clever shared base class. I wrote the duplication up, so whoever decides how this flow should be tested can see it and choose, rather than inheriting an abstraction I'd guessed at.
+
+I also didn't build a per-brand hook for the receipt. Both captures agreed on the layout, so there's one builder. If a third brand ever differs, that builder is the one place to change, and building an extension point for a difference nobody has seen would have been speculation dressed as design.
+
+## Where it falls over
+
+**I wrote the ordering down as a decision before I'd looked at a real capture.** The captures caught it before it mattered, but only because I read them before building. Next time I'm simulating someone else's system, I'll ask for a capture first and write the design second.
+
+The end-to-end path still isn't proven. The side of our service that consumes the receipt lives on another ticket, so the simulator's behaviour has only been checked by its own tests, not by the thing it's meant to exercise.
+
+And those tests are skipped today. They're parked until there's a wider decision on how this whole flow should be tested, so I didn't keep building on a test shape that might change. That means the gate has no running test right now. I'd want them back on before anyone relies on the simulator for this flow, and I'd say so to anyone who asked.
+
+## Copy the wire, not the intuition
+
+My position: a simulator is only useful if it's as awkward as the real thing. When you simulate someone else's system, copy what it does on the wire, not what seems sensible, because the gaps between the two are exactly where your service's bugs live.
+
+Before you design a simulator, a mock or a test double for an external system, get a real capture of the flow you're simulating and read it end to end. Match its ordering, its waits and its failure behaviour, even when they're inconvenient. Then write down which parts of the real system you haven't copied yet, so nobody mistakes your simulator's politeness for the real host's.
+
+The same applies to the mocks in your unit tests, just on a smaller scale. If every mocked dependency returns instantly and successfully, your tests are describing a world your code will never run in. Make at least one test per external dependency slow, silent or out of order, and see what your code does.
+
+That's the end of this run of Forecourt Engineering: pre-authorisation, hidden side effects, reconnect storms, quiet sockets, duplicate timers, start-up windows and polite simulators. The rest of my writing is on [the blog](/blogs/).

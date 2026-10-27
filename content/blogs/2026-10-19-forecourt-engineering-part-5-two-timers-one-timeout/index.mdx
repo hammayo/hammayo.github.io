@@ -1,0 +1,131 @@
+---
+title: "Forecourt Engineering, Part 5: Two Timers, One Timeout, and the One That Always Wins"
+date: "2026-10-19"
+summary: "A settings change only took effect on the third button press, and the value in the database was right the whole time. Two components were each running a timer for the same thing, and the shorter one always wins."
+tags: ["dotnet", "architecture", "debugging", "reliability"]
+series:
+  name: "Forecourt Engineering"
+  part: 5
+published: true
+---
+
+On a pay-at-pump terminal there's a button that hands the pump over to the shop for a while, so the customer can fuel and pay inside. How long the terminal waits is a setting in our admin page. QA raised it from a short value to a much longer one, and the terminal kept using the old value.
+
+The report said the new value kicked in on the second press. It was the third. And the value in the database was right the whole time.
+
+This post is about **duplicate timers**: what happens when two components each run their own timer for the same timeout, why the shorter one always wins, and why the fix was one shared calculation rather than two careful ones. It's Part 5 of Forecourt Engineering.
+
+## Second press or third press?
+
+The ticket's count was the first thing I got wrong, and I want to own that up front, because it's the most reusable lesson here.
+
+I started from the ticket's description and went looking for a bug that would make the second press work. Then I lined up our service log against the terminal's own log and timed each press. The first two both timed out at the old value. The third ran the full new length.
+
+That one-press difference changed the diagnosis. A fix that works on the second press points at one stale read. A fix that works on the third means there's more than one thing going on, and something on the second press was actively putting the old value back.
+
+So I should have asked for both logs first, and lined them up before forming any theory. The ticket's count was an honest summary by a busy tester. It just wasn't evidence.
+
+### How I line up two logs now
+
+The method is simple and I use it every time now. Pick one event both sides log, like the button press arriving at our service and the terminal logging the same press. Work out the offset between the two clocks from that event, because they're never quite in sync.
+
+Then walk forward through both logs together and time each step. It's tedious, and then the story either matches the ticket or it doesn't. In this case it didn't, and that was the most useful step of the whole ticket.
+
+## The first bug: tell them before it's ready
+
+The first problem was an ordering one. When the setting changed, our service told the terminals "new config waiting" before it had rebuilt the config object. The terminal did exactly what it should: it asked straight away, and got the old value.
+
+It's a classic race. You publish "something's changed" before the something has actually changed, and the fastest reader loses. The terminal picks up the right value on the next config cycle, so on its own it's a delay rather than a failure.
+
+If that had been the only bug, the second press would have worked. It didn't, so it wasn't.
+
+## The second bug: a copy that only refreshed in one mode
+
+Here's the one that really hurt. Our service doesn't just send the kiosk timeout to the terminal. It runs its own copy of that timer, so it can take the pump back if the kiosk hand-over runs too long.
+
+That service-side value was only refreshed inside one branch of the code, for one terminal mode, a mode that's rarely used. Nearly every terminal runs in the everyday mode, and in that mode the service's copy never refreshed.
+
+So after the change, the terminal had the new, longer value and our service still had the old, shorter one. When the customer pressed the button, both timers started. Ours fired first, and it did what it was built to do: it switched the pump back, overriding the terminal's perfectly correct timer.
+
+**Two timers for one timeout means the shorter one wins.** It doesn't matter which one is right. Whichever fires first acts, and the other never gets the chance.
+
+### Why it took three presses
+
+The three presses played out like a small state machine, which is why the ticket's count mattered.
+
+On the first press, the terminal still had the stale config from the ordering race, and our copy was stale too. Both said old value. Pressing the button briefly moved the pump into the rare mode, which did refresh our copy, but our timer had already started with the old value.
+
+After the first timeout, the terminal fetched config again, got the new value, and went through a sign-out and sign-in. That sign-in ran the refresh code in the everyday mode, which put our copy back to its default.
+
+So on the second press the terminal said new and we said old, and our timer won. Only after another trip through the rare mode, with no sign-in to undo it, did both sides agree. Third press.
+
+The fix for this one was small once I understood it: refresh the service's kiosk timeout for every mode, not just the rare one. One assignment moved out of a switch statement.
+
+## The twin: same shape, different timer
+
+Testing that fix on a different rig turned up a twin, which I wouldn't have spotted as quickly if I hadn't just mapped the timeout flow end to end.
+
+Some terminals serve more than one pump, and those get an extra allowance added to their payment timeout. On one of those, the "take fuel" screen timed out after about 23 seconds, when it should have allowed somewhere between 50 and 70.
+
+Our service added the multi-pump allowance to its own timers. But when it built the terminal's config, it sent the raw values, without the allowance. So the service and the device disagreed about the same timeout, and this time the device's shorter timer won.
+
+This time the device won because its timer was the shorter one. In the first bug our service's timer was shorter, so ours won. Same shape, opposite winner, and in both cases the winner was wrong.
+
+This one wasn't a regression from my first fix. It had been there in earlier releases. It just took someone looking at timeouts with both logs side by side to see it.
+
+## The weak fix and the better one
+
+My first version of the fix sent the terminal the adjusted value, using two new methods, one per mode. It worked. Review pushed back, and they were right.
+
+The weak shape is two places that each work out the same number:
+
+```csharp
+// Service-side timer
+var serviceTimeout = modeTimeout
+    + (terminal.ServesMultiplePumps ? multiPumpAllowance : TimeSpan.Zero);
+
+// Terminal config builder, somewhere else entirely
+config.PaymentTimeout = modeTimeout;   // raw: the allowance never reaches the device
+```
+
+Neither copy was wrong when it was written. The allowance was added to the service's timers by someone thinking about the service, and the config builder was written by someone thinking about the device. Each was reasonable in its own file. The bug lived in the gap between two files that never referred to each other.
+
+The better shape is one shared method that every consumer of the number calls:
+
+```csharp
+public static TimeSpan EffectiveTimeout(
+    bool servesMultiplePumps, TimeSpan modeTimeout, TimeSpan multiPumpAllowance) =>
+    servesMultiplePumps ? modeTimeout + multiPumpAllowance : modeTimeout;
+```
+
+I used it in the config builder and, just as importantly, in the check that decides whether the config has changed. That second use is the one people miss. If the change check compared raw values while the builder sent adjusted ones, the service would either miss real changes or keep pushing config that hadn't really changed.
+
+And as [Part 3](/blogs/forecourt-engineering-part-3-when-every-client-reconnects-at-once/) showed, pushing config that hasn't changed isn't free. Every push makes terminals sign out and back in.
+
+**One number, one method, every reader.** Two copies of one sum is exactly how the service and the terminal ended up disagreeing in the first place.
+
+I deliberately left the kiosk value raw in what we send, because the service-side kiosk timer already carries the allowance. That's a decision with a reason, which is different from an inconsistency, and it's written down in the notes so nobody "fixes" it later.
+
+### The test I'd add
+
+If I were adding one test to protect all of this, it wouldn't test either timer on its own. It would build the config for every terminal mode and every pump arrangement, and assert that the timeout the service uses and the timeout the terminal receives agree.
+
+That's a test about a relationship between two components, not about either one. It's exactly the kind of test that's missing when two teams, or two parts of one codebase, each own half of the same number.
+
+## Where it falls over
+
+**The stale-config race is still there.** We still mark terminals for a config refresh before rebuilding the config, so the first fetch after a change can be stale. It's harmless now that our own timer is right, because the terminal gets the right value on the next cycle. But it's the kind of race I'd rather close than explain, and one day something else will depend on the first fetch being right.
+
+The service still works out "mode timeout plus multi-pump allowance" for its own timers in a different place from the shared method the config uses. So there are still two sums in the codebase, not one. I'd fold the service-side calculation into the same method, and until I do, the lesson of this post applies to the fix itself.
+
+And I should have asked for both logs first. The second-versus-third-press detail came from lining them up, and it changed the whole diagnosis. Next time I'd start there instead of trusting the ticket's count, however reasonable it sounds.
+
+## When two things time the same thing
+
+My position: any time two components each run a timer for the same event, you have a race, and the shorter timer will win whether it's right or not. A correct value in the database means nothing if the timer that fires first reads a stale copy.
+
+The .NET versions of this are everywhere once you look. An HttpClient timeout shorter than the server's own request timeout, so the client gives up on work the server is still doing. A resilience policy's timeout wrapped around a call that already has its own. A background job's cancellation window that's shorter than the lock it's waiting on.
+
+Look for timeouts that are enforced in more than one place: the client and the server, the device and the service, the API gateway and the handler behind it. Make sure they're computed by one shared piece of code from one source of truth, and that anything deciding "has this changed" uses the same calculation. And when a bug report gives you a count, line up the logs yourself before you believe it.
+
+Next in the series: an empty window at start-up, where the pump list was cleared before the thing that would refill it had even connected. The rest of my writing is on [the blog](/blogs/).
