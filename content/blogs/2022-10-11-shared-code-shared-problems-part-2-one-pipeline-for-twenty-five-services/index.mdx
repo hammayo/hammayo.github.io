@@ -1,0 +1,87 @@
+---
+title: "Shared Code, Shared Problems, Part 2: One Pipeline for Twenty-Five Services"
+date: "2022-10-11"
+summary: "When about twenty-five services build, version and deploy the same way, a fix to one step is a fix for all of them. Here's what we standardised, how versions get allocated, and the lockstep that caught people out."
+tags: ["dotnet", "java", "ci-cd", "devops"]
+series:
+  name: "Shared Code, Shared Problems"
+  part: 2
+published: true
+---
+
+A build step had a small flaw. It wasn't dramatic: a cache that sometimes held a stale layer, so a service now and then shipped with a dependency one version behind what its project file said. Someone noticed it in one service and fixed it there.
+
+Then the awkward question came up, the same one as in [Part 1](/blogs/shared-code-shared-problems-part-1-shared-code-as-packages-not-copied-source/): how many other services have this? When every service has its own build definition, the answer takes an afternoon of reading pipelines. When they share one, the answer is one.
+
+This part is about a **shared CI/CD pipeline** across about twenty-five services, in a mix of .NET and Java, and the compromises that made it work.
+
+## Why one pipeline
+
+A team with a handful of services can get away with a hand-written pipeline for each. At about twenty-five, that stops being true.
+
+Each hand-written pipeline is a place for variation. One runs the tests twice. One skips the linter because someone was in a hurry. One tags images differently, so the deployment tooling needs a special case for it. None of those is a disaster. Together they mean you can't make a statement about how the system is built, because there isn't one way.
+
+What we wanted was dull and valuable: every service builds the same way, produces the same kind of artefact, and travels through the same stages. The differences should be the ones that matter, which is the language and the tests, and nothing else.
+
+## What we standardised
+
+**One container image per service.** The output of every build is an image, whatever is inside it. That means the deployment side never needs to know whether a service is .NET or Java. It handles an image.
+
+**A quality gate.** Every build passes the same checks before an image is allowed out: tests, static analysis and a coverage check. A service can't opt out by editing its own pipeline, because the stages aren't defined there.
+
+**Centrally allocated versions.** Nobody types a version number. The pipeline allocates it, in a predictable format, and stamps it on the image and the package. Two builds can't produce the same version, and "which build is this?" has an answer everywhere.
+
+**Pipelines as code, held in a shared library.** A service's own pipeline definition is a few lines that say what kind of service it is and call the shared library. The steps themselves live in one place.
+
+```groovy
+// A service's whole pipeline definition.
+standardPipeline(
+    language: 'dotnet',
+    imageName: 'orders-service',
+    testProject: 'tests/Orders.Tests'
+)
+```
+
+Everything else, including checkout, restore, build, test, scan, image, tag and push, is in the library.
+
+## The payoff: fix one step, fix them all
+
+Back to the stale cache. With the shared library, the fix was one change to one step. The next build of every service picked it up, with nobody having to remember to apply it.
+
+That's the whole argument in one example. The same applies to adding a security scan, changing how images are tagged, or moving to a new base image. The cost is paid once, and the benefit is proportional to the number of services.
+
+It also changes who can do the work. A person who understands pipelines can improve the build for everyone. A team that just wants to ship doesn't need to become a pipeline expert to do it.
+
+## Mixed .NET and Java
+
+The mixed stack is where the idea gets tested. The two ecosystems restore, build and test differently, and a pipeline that pretends otherwise falls apart.
+
+We handled that by sharing the shape and not the contents. Every pipeline has the same stages in the same order, and each stage has a .NET implementation and a Java implementation behind it. The service says which one it needs, and the library picks the right one.
+
+This keeps the useful property, which is that every service has the same stages. It avoids the useless one, which would be forcing both languages through one awkward set of commands.
+
+## The lockstep that caught people out
+
+Here's the honest part. The shared library is versioned, and so are the services that use it. Early on, the library and the pipelines it served moved in step, and that caused trouble.
+
+A change to the library could alter how a service built without the service changing at all. A service that hadn't been touched for a month suddenly failed to build, because the library moved underneath it. Nobody had edited anything, so nobody knew where to look.
+
+There was a related trap with versions. Because they were allocated centrally, a service that skipped a few builds could end up with a version number that looked odd next to its neighbours, and people read meaning into it that wasn't there.
+
+The fix for the first was to treat the pipeline library like any other dependency. Services pin the version of the library they use, and upgrade deliberately. A pipeline change is released, noted and adopted, not slipped in.
+
+## Where it falls over
+
+A shared pipeline is a single point of failure. A mistake in the library breaks every build at once, and the blast radius is the whole system. That's why the pinning matters, and why changes to it need more care than a change to any single service.
+
+It also takes away freedom, which some teams reasonably resent. A service with an unusual need, such as a slow integration step or a special build tool, is pushed into a standard that wasn't designed for it. The library needs escape hatches, and a way to say no that doesn't leave people feeling ignored.
+
+And it needs an owner. A shared pipeline nobody looks after drifts into the same state as the pipelines it replaced, with one more layer to understand. Someone has to be responsible for its health.
+
+## The takeaway
+
+**If every service builds, versions and deploys the same way, a fix to one step is a fix for all of them.** One image per service, a quality gate that can't be skipped, versions allocated centrally and pipelines held in a shared library you pin and upgrade deliberately.
+
+To see whether it applies to you, pick any build step and ask how many pipelines would need to change to alter it. The bigger the number, the stronger the case.
+
+Coming next in Shared Code, Shared Problems: the HttpClient race.

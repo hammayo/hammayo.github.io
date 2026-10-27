@@ -1,0 +1,122 @@
+---
+title: "Shared Code, Shared Problems, Part 7: Your Background Service Doesn't Have a Request"
+date: "2023-06-13"
+summary: "'Cannot access a disposed object' in a message handler usually means a scoped service lives in something that outlives its scope. Here's why hosted services have no request scope, the per-message scope that fixes it, and why the fix belongs in the shared library."
+tags: ["dotnet", "dependency-injection", "ef-core", "background-services"]
+series:
+  name: "Shared Code, Shared Problems"
+  part: 7
+published: true
+---
+
+The message handler had been running for weeks. Then, one evening, it started failing with an error that reads like a riddle: "Cannot access a disposed object". It wasn't failing on every message. It failed on some, in clusters, and then carried on as if nothing had happened.
+
+The handler updated orders using Entity Framework Core. Nothing in the logic was wrong. What was wrong was the lifetime of the thing it used to talk to the database.
+
+This last part of the series, after [Part 6](/blogs/shared-code-shared-problems-part-6-the-403-that-kept-coming-back/), is about a **scoped service in a background worker**, and why the answer is a scope per unit of work, built into the shared library so that no service has to remember it.
+
+## Where the scope comes from
+
+In a web application, dependency injection has a convenient rhythm. A request arrives, the framework creates a scope for it, and anything registered as scoped lives for exactly that request. When the request ends, the scope is disposed and so is everything in it.
+
+The database context is the classic example. It's registered as scoped, so each request gets its own, and it's cleaned up at the end. That fits the way the context is meant to be used: short-lived, one unit of work, no sharing between threads.
+
+The convenience is easy to forget, because it happens invisibly. You write a constructor that asks for a database context and one arrives.
+
+## A background service has no request
+
+A hosted service, the kind that consumes messages in a loop, isn't started by a request. It's started once, when the application starts, and lives until the application stops.
+
+The framework creates it as a singleton, effectively, and gives it dependencies at that moment. If one of those dependencies is a scoped service, there is no request scope to hand over. Depending on how it's wired, you'll get an error at start-up, or you'll get an instance created in a scope that is later disposed while your worker is still holding it.
+
+That's the second case, and it's what we had. The context was created early, kept for the lifetime of the worker, and disposed by the container at a moment the worker didn't control. After that, every attempt to use it failed.
+
+## The weak fix: keep one context for ever
+
+The first instinct is to make the context live as long as the worker. If the worker is long-lived, give it a long-lived context.
+
+It looks like it solves the error. It creates worse ones. A context is not designed to live for hours. It tracks every entity it loads, so memory grows. It caches data, so it serves stale values. A failure in one save can leave it in a state where later saves also fail. And it isn't thread-safe, so any concurrency in the worker turns into corruption.
+
+A long-lived context turns a loud error into a slow, strange one.
+
+## The better fix: a scope per unit of work
+
+The right shape matches what the web framework does for you: create a scope for each unit of work, use it, and throw it away. In a message consumer, the unit of work is a message.
+
+The worker holds a factory for scopes, not the scoped services themselves.
+
+```csharp
+public sealed class OrderUpdatedConsumer : BackgroundService
+{
+    private readonly IServiceScopeFactory _scopes;
+    private readonly IMessageSource _messages;
+
+    public OrderUpdatedConsumer(IServiceScopeFactory scopes, IMessageSource messages)
+    {
+        _scopes = scopes;
+        _messages = messages;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        await foreach (var message in _messages.ReadAsync(stoppingToken))
+        {
+            using var scope = _scopes.CreateScope();
+            var handler = scope.ServiceProvider.GetRequiredService<IOrderUpdatedHandler>();
+            await handler.HandleAsync(message, stoppingToken);
+        }
+    }
+}
+```
+
+Each message gets a fresh scope, and with it a fresh database context. When the message is done, the scope is disposed and everything goes with it. A failure in one message can't leak into the next.
+
+The handler itself looks like any other class. It asks for what it needs in its constructor and doesn't know whether it's running in a web request or a worker. The scope is the worker's responsibility.
+
+## Why the fix belongs in the shared library
+
+Every service with a message consumer has this exact choice to make, and the wrong answer compiles and works for weeks. It's the kind of mistake that is easy to make once in each of many services.
+
+So the shared messaging library should do it. The consumer base class creates the scope, resolves the handler and disposes the scope, and a service author only writes the handler. There is nothing to forget, because there's no decision to take.
+
+This is the argument from [Part 1](/blogs/shared-code-shared-problems-part-1-shared-code-as-packages-not-copied-source/) at its strongest. A subtle lifetime rule is exactly what you want implemented once, by someone who knows it, and tested once.
+
+It also gives you somewhere to put the rest of the per-message set-up, such as setting the current user for the message, or starting a trace, so those are tied to the scope as well.
+
+## Why mocks hide this bug
+
+The nasty feature of this problem is that tests rarely catch it. A unit test for the handler creates the handler, passes in a mock or an in-memory context, calls it, and checks the result. All of that works, because nothing in the test disposes anything.
+
+The bug lives in the wiring: how the worker obtains its dependencies and how long they live. That's precisely the part a mocked unit test replaces.
+
+To catch it you need a test that builds the real container, hosts the real consumer, sends it several messages in a row, and checks that each one is processed. Better still, one message whose handling deliberately fails, followed by one that must succeed.
+
+```csharp
+[Fact]
+public async Task A_failed_message_does_not_poison_the_next_one()
+{
+    using var host = TestHost.WithRealContainer();
+
+    await host.Send(OrderUpdated.ThatFails());
+    await host.Send(OrderUpdated.ThatSucceeds());
+
+    await host.WaitForProcessed(2);
+    Assert.Equal(1, host.SuccessfulCount);
+}
+```
+
+A single long-lived context fails that test. A scope per message passes it.
+
+## Where it falls over
+
+A scope per message has a cost. Creating a scope and a context for every message adds work, and for a very high-volume consumer that overhead is measurable. Batching several messages into one scope is an option, but then a failure inside the batch has a larger blast radius, and you have to decide what happens to the rest.
+
+It also doesn't remove the need to think about transactions. A scope gives you a clean context, not a correct unit of work. Whether a message's changes commit together is a separate decision, and it interacts with the outbox and inbox patterns from earlier in this series.
+
+And the integration-style test is slower and more awkward than a unit test. It's worth the trouble for the wiring, but you wouldn't write one for every handler.
+
+## The takeaway
+
+**Scoped services like a database context don't belong in long-lived workers; create a scope per unit of work.** Hold a scope factory, not the scoped service, put that logic in the shared library so services can't get it wrong, and test with the real container instead of mocks.
+
+That closes this series. Between the seven parts: share code as versioned packages, build it all one way, create clients safely, test shared code as its consumers use it, check the status before the payload, keep per-request state off shared objects, and give background work a scope of its own. The earlier posts are on [the blog](/blogs/) if you're catching up.

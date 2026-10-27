@@ -1,0 +1,143 @@
+---
+title: "Shared Code, Shared Problems, Part 3: The HttpClient Race"
+date: "2022-12-13"
+summary: "A shared HTTP client is shared mutable state, and the first place that shows is in how it's created. Here's what goes wrong when two callers build a client at the same moment, and how to make creation safe and testable."
+tags: ["dotnet", "httpclient", "concurrency", "testing"]
+series:
+  name: "Shared Code, Shared Problems"
+  part: 3
+published: true
+---
+
+Under light load, the pricing client worked every time. Under heavy load, a small fraction of calls failed in ways that made no sense: an exception from inside the client's own set-up code, on a line that had never been a problem before. It happened rarely, it never happened in a debugger, and it went away when the service restarted.
+
+That combination, load-dependent, unreproducible and fixed by a restart, points at one thing. Two pieces of code were doing the same job at the same moment and getting in each other's way.
+
+This part is about the **HttpClient race condition**, which comes from how a shared client is created, not how it's used. It follows [Part 2](/blogs/shared-code-shared-problems-part-2-one-pipeline-for-twenty-five-services/) in a series about the problems of shared code.
+
+## A client is shared state
+
+The usual advice is to create one `HttpClient` and reuse it, because creating one per request exhausts sockets. That advice is right. It also means the client is now shared across every request your service handles, and a shared object needs the rules a shared object always needs.
+
+Creating the client is the first of those. Somebody has to do it, once, before anyone uses it. When many requests arrive at once and the client doesn't exist yet, every one of them may decide to be the one.
+
+## The weak version: check, then create
+
+The code that causes this looks harmless. It's the lazy-initialisation pattern most of us have written:
+
+```csharp
+public class PricingClient
+{
+    private HttpClient _client;
+
+    private HttpClient GetClient()
+    {
+        if (_client == null)
+        {
+            _client = new HttpClient { BaseAddress = _baseAddress };
+            _client.DefaultRequestHeaders.Add("Accept", "application/json");
+        }
+        return _client;
+    }
+}
+```
+
+On a single thread this is fine. Under load, two requests can both see `null`. Both create a client. Both write to `_client`. One of them is now configuring a client that another thread is already using, and adding a header to a collection that isn't safe to modify while it's being read.
+
+The failure depends on timing, which is why it appears only under load, only occasionally, and never when you're watching.
+
+## The better version: make creation happen once
+
+There are two honest fixes, and the second is the better one.
+
+The first is to make the creation itself safe, so it can only happen once however many callers arrive together.
+
+```csharp
+public class PricingClient
+{
+    private readonly Lazy<HttpClient> _client;
+
+    public PricingClient(Uri baseAddress)
+    {
+        _client = new Lazy<HttpClient>(() =>
+        {
+            var client = new HttpClient { BaseAddress = baseAddress };
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+            return client;
+        }, LazyThreadSafetyMode.ExecutionAndPublication);
+    }
+
+    private HttpClient Client => _client.Value;
+}
+```
+
+`Lazy<T>` with that mode guarantees the factory runs once, and that nobody sees the client until it has been fully configured. The window in which a half-built client was visible no longer exists.
+
+## Better still: let the framework own it
+
+The second fix is to stop creating clients by hand. `IHttpClientFactory` exists precisely because this is hard to get right. It manages the underlying connections, handles their lifetimes, and builds clients configured in one place at start-up.
+
+```csharp
+services.AddHttpClient<IPricingClient, PricingClient>(client =>
+{
+    client.BaseAddress = new Uri(options.PricingBaseAddress);
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+});
+```
+
+Configuration runs once, at the point the application is set up, long before any request arrives. There is no lazy creation to race on.
+
+In a shared library, this matters even more. The library can't know how many callers it will have, or how concurrent they'll be. Offering a registration method that does the right thing means services get it for free and can't get it wrong by accident.
+
+## Why the shared library is where this belongs
+
+The race in our case sat in shared code, which is what made it expensive. Every service using that client inherited it, and every one of them could fail in its own time, under its own load.
+
+That's the double edge from [Part 1](/blogs/shared-code-shared-problems-part-1-shared-code-as-packages-not-copied-source/). A fix made once reaches everyone. A flaw made once reaches everyone too.
+
+It's also a reason to be particularly careful about what shared code does at start-up and on first use. Behaviour that is tolerable in one service with modest load becomes a defect when it's copied into twenty with different ones.
+
+## Testing it properly
+
+A race is hard to catch with an ordinary test, because ordinary tests call the code once. You have to make it happen deliberately.
+
+The test is simple in principle: many callers, released at the same moment, all asking for the client.
+
+```csharp
+[Fact]
+public async Task Concurrent_callers_get_the_same_fully_configured_client()
+{
+    var sut = new PricingClient(new Uri("https://pricing.example"));
+    var gate = new ManualResetEventSlim(false);
+
+    var tasks = Enumerable.Range(0, 50).Select(_ => Task.Run(() =>
+    {
+        gate.Wait();
+        return sut.ClientForTest;
+    })).ToArray();
+
+    gate.Set();
+    var clients = await Task.WhenAll(tasks);
+
+    Assert.Single(clients.Distinct());
+    Assert.True(clients[0].DefaultRequestHeaders.Contains("Accept"));
+}
+```
+
+Nothing guarantees the weak version fails this test every run, and that's the point of running it in a loop. A test that exposes a race a fraction of the time is still worth having. It turns "rare and unreproducible" into "fails about once in a few hundred runs", which is something you can work with.
+
+## Where it falls over
+
+Making creation thread-safe doesn't make use thread-safe. The client itself is designed to be shared for sending requests, but mutating its settings after creation, changing a header or a timeout per request, is a different problem, and a worse one. That's a story for a later part.
+
+The factory also changes the shape of your code. Registration moves to start-up, tests need to build a container or fake the factory, and anyone used to calling a constructor has something new to learn.
+
+And a test with fifty threads on a developer machine can pass because the machine is quiet. Races are about timing, and timing on a laptop is not timing in production. Treat a passing test as good evidence, not proof.
+
+## The takeaway
+
+**A shared client is shared mutable state, starting with how it's created.** Never check-then-create on a field. Either make creation run exactly once, or let `IHttpClientFactory` own it, and write a test that releases many callers at the same moment.
+
+If you have a lazily created client in a long-running service, search for it today. The bug is rare enough to have survived this long, which is the reason to look.
+
+Coming next in Shared Code, Shared Problems: when a framework upgrade broke our cache.

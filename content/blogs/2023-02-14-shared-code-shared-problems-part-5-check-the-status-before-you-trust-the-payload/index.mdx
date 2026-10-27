@@ -1,0 +1,108 @@
+---
+title: "Shared Code, Shared Problems, Part 5: Check the Status Before You Trust the Payload"
+date: "2023-02-14"
+summary: "A failure that deserialises into an empty success is worse than a crash. Here's how a shared HTTP client turned rejected requests into confident-looking results, why it showed up as two different symptoms, and how fixing it in one place fixed every caller."
+tags: ["dotnet", "http", "error-handling", "api-design"]
+series:
+  name: "Shared Code, Shared Problems"
+  part: 5
+published: true
+---
+
+A kiosk showed a green tick and the word "Booked". The booking hadn't happened. The booking service had rejected the request, and the kiosk had no idea.
+
+Nothing had crashed and nothing had been logged as an error. The person standing at the kiosk walked away believing they had a place, and the system believed it had told them so.
+
+This is **deserialising an HTTP response without checking the status**, and it's one of the most expensive small mistakes in service-to-service code. This is Part 5 of the series, after [Part 4](/blogs/shared-code-shared-problems-part-4-fix-once-break-everywhere-when-a-framework-upgrade-broke-our-cache/), and it's another case where the right place for the fix was the shared client.
+
+## How a failure becomes a success
+
+The client code is only a few lines, and it looks reasonable:
+
+```csharp
+public async Task<BookingResult> BookAsync(BookingRequest request, CancellationToken ct)
+{
+    var response = await _http.PostAsJsonAsync("bookings", request, ct);
+    return await response.Content.ReadFromJsonAsync<BookingResult>(cancellationToken: ct);
+}
+```
+
+It sends the request, reads the body and turns it into an object. What it doesn't do is look at whether the call worked.
+
+When the booking service rejects a request, it returns an error status and a body that describes the error. That body doesn't look like a `BookingResult`. Deserialising it into one doesn't fail, because most serialisers are forgiving. Properties that don't match are ignored, and the ones that don't exist are left as their defaults.
+
+So you get a `BookingResult` with nothing in it. No booking reference, no error, an empty object that the calling code is happy to treat as a result.
+
+## Two symptoms, one cause
+
+What made this hard to recognise is that it didn't show up the same way twice.
+
+**Sometimes it was a 500.** If the calling code then dereferenced something that was missing, the null reference blew up further along, in a place that looked unrelated. The error pointed at the kiosk's own logic, not the call that had actually failed.
+
+**Sometimes it was a false success.** If the calling code only checked that it had received an object, which is the natural thing to check, it carried on. A rejected booking became a confirmed one.
+
+The second is the worse of the two, and it's why the principle in the title matters. A crash is a loud, honest report that something is wrong. An empty success is a lie, delivered politely.
+
+## The weak fix: patch the caller
+
+The kiosk was the one in front of people, so that was where the bug was noticed and where the first fix went. Check for an empty reference before showing the tick.
+
+It worked, for that one screen. Every other caller of the same client was still exposed, and any new caller would be exposed too. The shape of the bug, an unchecked call, was in the client, not the kiosk.
+
+## The better fix: read the error, not the payload
+
+The fix goes in the shared client, and it follows a simple order. Look at the status first. If it's a success, read the payload. If it isn't, read the error wrapper that the service sends back, and turn that into a failure the caller can't miss.
+
+```csharp
+public async Task<BookingResult> BookAsync(BookingRequest request, CancellationToken ct)
+{
+    var response = await _http.PostAsJsonAsync("bookings", request, ct);
+
+    if (!response.IsSuccessStatusCode)
+    {
+        var error = await response.Content.ReadFromJsonAsync<ApiError>(cancellationToken: ct);
+        throw new ServiceCallException(response.StatusCode, error?.Code, error?.Message);
+    }
+
+    return await response.Content.ReadFromJsonAsync<BookingResult>(cancellationToken: ct)
+        ?? throw new ServiceCallException(response.StatusCode, "empty-body", "The service returned no content.");
+}
+```
+
+Two things happen here. A rejected call now raises a specific, readable exception that carries the status and the service's own explanation. And even a successful status with no body is treated as a problem, not silently turned into an empty object.
+
+Because this lives in the shared client, every caller gets the behaviour at once. The kiosk shows a proper message. Every other screen that used the same client stops being able to show a false success, without anyone editing it.
+
+## Don't change the contract while you're in there
+
+The temptation, once you're fixing a client, is to tidy everything. Rename a method, change a return type, restructure the errors.
+
+We held back on that deliberately. The fix needed to change behaviour in the failure case and nothing else. Callers that handled success correctly shouldn't need to change, and callers that had been quietly relying on empty results shouldn't be surprised by a different type.
+
+Keeping the signature stable meant the change could ship as a small, low-risk package release that services could adopt without a code change. A fix that forces edits in every caller is a fix that waits months to land.
+
+The new exception is the one visible change, and it's the point. Some callers will now see an error where they used to see an empty object. That is the bug being fixed, so the release notes say it plainly.
+
+## Test the failure, not just the success
+
+The tests for the old client covered the happy path, and that's why the bug lived there. Nothing had ever asked what the client does when the service says no.
+
+The tests that matter now cover each way a call can go wrong: a rejection with an error body, a rejection with no body, a successful status with an empty body, and a response that isn't JSON at all. For each, the assertion is the same: the caller gets a clear failure, never an empty result.
+
+It's a short list, and it's the one that would have found the original problem on the day it was written.
+
+## Where it falls over
+
+Throwing on every non-success status isn't always right. Some statuses are part of normal flow: a 404 for "nothing found" or a 409 for "already exists" may be an expected outcome the caller wants to handle without catching an exception. The client needs a way to express that, or callers end up catching exceptions for control flow.
+
+Reading the error wrapper also relies on every service sending the same shape of error. Where one doesn't, the client falls back to the status code alone, and the message is less helpful.
+
+And changing a quiet failure into a loud one will, briefly, make things look worse. Errors that were previously swallowed now appear. That's the system telling the truth, but it's worth warning people before the dashboards change.
+
+## The takeaway
+
+**A failure that deserialises into an empty success is worse than a crash.** Check the status before the payload, read the error wrapper when the call fails, fix it once in the shared client, and leave the client's contract alone.
+
+Open the shared HTTP client in your own system and find the line that reads the response body. If there's no status check before it, you've found your next bug.
+
+Coming next in Shared Code, Shared Problems: the 403 that kept coming back.

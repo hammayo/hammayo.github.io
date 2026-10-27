@@ -1,0 +1,118 @@
+---
+title: "Shared Code, Shared Problems, Part 4: Fix Once, Break Everywhere"
+date: "2023-01-17"
+summary: "After a framework upgrade, an in-memory cache in shared code stopped clearing when reference data changed. Here's how it showed up, why the fix belonged in the shared library, why it's easy to confuse with a separate move to a shared cache, and the test we didn't have."
+tags: ["dotnet", "caching", "testing", "architecture"]
+series:
+  name: "Shared Code, Shared Problems"
+  part: 4
+published: true
+---
+
+A user changed a currency name in the reference data. The change saved. The screen refreshed. The old name was still there. Refresh again, same thing. Restart the service and the new name appeared, as though nothing had ever been wrong.
+
+Reference data like this is exactly what you cache: country codes, currency codes, lists that change rarely and are read constantly. The cache was meant to empty itself when the data changed. After a framework upgrade, it had stopped doing that.
+
+This is Part 4 of a series on the problems of shared code, and it follows [Part 3](/blogs/shared-code-shared-problems-part-3-the-httpclient-race-thread-safe-client-creation/). The subject is a **framework upgrade breaking a cache**, and the lesson is about what shared code needs in order to be trusted.
+
+## What was cached, and how it was cleared
+
+The cache lived in a shared package, so every service that read reference data used the same implementation. It held entries in memory, and when the underlying data changed, the service told the cache to drop the affected entries.
+
+Before the upgrade, that worked. After we moved the services to .NET 7, it didn't, in a quiet way. Nothing threw. Nothing logged. The call to clear the cache completed, and the old values stayed.
+
+The reason was a change in how the framework's in-memory cache handled the thing we had relied on. Our invalidation depended on a behaviour that was never really a promise, and the new version behaved differently.
+
+## Why it was nasty
+
+A failure that's visible gets fixed quickly. This one had every property of a hard bug.
+
+It affected stale data, not broken data. The system carried on, serving a value that was out of date, and a stale value looks exactly like a correct one until someone who knows better looks at it.
+
+It was intermittent from a user's point of view. It showed only when reference data changed, which is rare, and only until the service restarted, which hid it.
+
+And it was in shared code, so it wasn't one service's problem. Every service with a cache like that was exposed from the day it picked up the new framework.
+
+## The fix belongs in the shared library
+
+The tempting move, when one service reports a symptom, is to fix it in that service. Clear the cache a different way there, add a restart, move on.
+
+That treats one instance of the problem and leaves the others waiting. The cause was in the shared cache wrapper, so the fix went there too: make invalidation explicit and independent of the framework's internal behaviour, and release a new version.
+
+```csharp
+public sealed class ReferenceDataCache<T>
+{
+    private readonly IMemoryCache _cache;
+    private CancellationTokenSource _generation = new();
+
+    public void Set(string key, T value) =>
+        _cache.Set(key, value, new MemoryCacheEntryOptions()
+            .AddExpirationToken(new CancellationChangeToken(_generation.Token)));
+
+    public void Clear()
+    {
+        var old = Interlocked.Exchange(ref _generation, new CancellationTokenSource());
+        old.Cancel();
+        old.Dispose();
+    }
+}
+```
+
+Every entry is tied to the current "generation". Clearing cancels that generation and starts a new one, so every entry expires together. It doesn't depend on how the framework happens to evict anything, which is the whole point.
+
+Then every service gets it by upgrading the package, which is the benefit of the approach in [Part 1](/blogs/shared-code-shared-problems-part-1-shared-code-as-packages-not-copied-source/). Fix once.
+
+## A separate change that's easy to confuse with this one
+
+There's a second cache story from around the same time, and it's a different thing. It's worth separating, because people merge the two when they tell it.
+
+For scale, we also moved to a shared Redis cache, so that several instances of a service saw the same cached data and no instance had its own copy. That was a decision about running more than one instance. It wasn't a fix for the invalidation bug, and it didn't cause it.
+
+The two changes landed in the same period, and a person remembering the year may fold them together. They answer different questions. One is "why doesn't the cache clear after an upgrade?" The other is "how do several instances share a cache?" A shared cache doesn't excuse you from having invalidation that works. In fact it makes it more important, because now a stale value is stale for everyone.
+
+## The test we didn't have
+
+The honest part of this story is that a short test would have caught it.
+
+The shared package had tests. They checked that values went into the cache and came out again. What they never checked was the thing the package was really for: that after a clear, the old value is gone.
+
+```csharp
+[Fact]
+public void Clear_removes_every_entry()
+{
+    var cache = new ReferenceDataCache<string>(new MemoryCache(new MemoryCacheOptions()));
+    cache.Set("GBP", "Pound sterling");
+
+    cache.Clear();
+
+    Assert.False(cache.TryGet("GBP", out _));
+}
+```
+
+Run in the build for the upgrade, that test fails the moment the behaviour changes. It's three lines. We had written tests for the easy half of the contract and not the half that mattered.
+
+The wider lesson is about **tests that use shared code the way services do**. A package's own tests tend to exercise it the way its author imagines. The services use it in ways nobody listed, and a framework upgrade is the moment that gap shows.
+
+## Treat a framework upgrade as a change to your shared code
+
+An upgrade isn't just a version bump in a project file. Everything your shared code relies on has potentially changed underneath it.
+
+Before the upgrade, list what shared code depends on that isn't a documented guarantee: eviction order, timing, default settings, serialisation behaviour. For each, ask whether a test would notice if it changed. Where the answer is no, write the test first, then upgrade.
+
+It's dull work, and it's proportional. The more services use a package, the more an invisible assumption in it is worth checking.
+
+## Where it falls over
+
+You can't test every assumption. The list of things shared code quietly relies on is long, and some of them you won't know about until they change. The aim is to cover the ones where a silent failure would be expensive.
+
+Generation-based invalidation clears everything, not one entry. For small reference data, that's fine. For a large cache with costly rebuilds, it causes a wave of reloads, and you may need finer control.
+
+And a test that passes against today's framework only promises today's behaviour. It's a tripwire, not a guarantee, and it only works if somebody actually runs it during the upgrade.
+
+## The takeaway
+
+**Shared code needs tests that use it the way services do, especially across framework upgrades.** Fix a shared defect in the shared library, test the contract the package exists to keep, and keep scale decisions, like moving to a shared cache, separate from correctness fixes.
+
+Before your next framework upgrade, pick one thing a shared package does silently and write the test that would fail if it stopped.
+
+Coming next in Shared Code, Shared Problems: check the status before you trust the payload.

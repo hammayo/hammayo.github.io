@@ -1,0 +1,120 @@
+---
+title: "Shared Code, Shared Problems, Part 6: The 403 That Kept Coming Back"
+date: "2023-03-14"
+summary: "Users were told they were forbidden from things they were allowed to do, but only sometimes. The fixes that treated the symptom didn't last. The cause was a per-request header sitting in a shared client's default headers. Here's how we found it and the test that pins it."
+tags: ["dotnet", "httpclient", "authorisation", "debugging"]
+series:
+  name: "Shared Code, Shared Problems"
+  part: 6
+published: true
+---
+
+A user could do something on Monday and not on Tuesday. Sometimes they could do it twice in a row, and the third time they got a 403. Their permissions hadn't changed. Another user, doing the same thing at the same moment, sometimes got the first user's answer.
+
+Every report was slightly different, and none of them reproduced on demand. A 403 that depends on who else happened to be using the system is not a permissions bug. It's a state bug wearing a permissions costume.
+
+This is Part 6, and it picks up from [Part 5](/blogs/shared-code-shared-problems-part-5-check-the-status-before-you-trust-the-payload/). The subject is an **"acting on behalf of" header** on calls between services, and why anything that varies per request doesn't belong on a shared client.
+
+## How the calls worked
+
+Services call each other, and when they do it on behalf of a user, they say so. The calling service adds a header that identifies the person, and the receiving service uses it to decide what that person is allowed to do.
+
+That's a sensible design. A back-end service shouldn't have to trust that a caller has already checked permissions. It checks for itself, using the identity it's told about.
+
+The header went on in the shared HTTP client, so every service-to-service call got the same treatment. And it went on in the place that looked most convenient: the client's default headers.
+
+## Default headers are shared
+
+This is the detail that matters. A client's default headers are set once and applied to every request that the client sends. They're properties of the client, not of a request.
+
+And, as [Part 3](/blogs/shared-code-shared-problems-part-3-the-httpclient-race-thread-safe-client-creation/) covered, the client is shared by every request the service handles at the same time. So the "acting on behalf of" header was effectively a single slot, owned by whoever wrote to it last.
+
+Two users making calls at nearly the same moment would each set the header to themselves. Whichever write landed second won, and both requests went out carrying that person's identity. One of the two users was now asking the receiving service to do something as someone else, and getting an answer to match.
+
+When the borrowed identity had fewer permissions, the result was a 403 for someone who should have been allowed. When it had more, the result was worse, and quieter.
+
+## The fixes that treated symptoms
+
+It took a while to see this, and the early fixes show why. Each was reasonable and each missed.
+
+**Look at the permissions.** The first reports were handled as access problems. Roles were checked, data was corrected, and the user could do it again, for a while.
+
+**Retry on 403.** A retry sometimes fixed it, because the second attempt happened to pick up the right header. That made the problem look transient and encouraged a workaround. It also meant a genuine refusal would be retried pointlessly.
+
+**Set the header earlier.** Moving the point where the header was written narrowed the window without closing it. It made the bug rarer, which made it harder to find.
+
+None of these fixed anything. They made the symptom less frequent, and a rarer bug is a harder one.
+
+## The cause: shared state
+
+The turning point was a test with two users, back to back, and then at the same time. Once two identities went through one client in quick succession, the header from one appeared on the other's request, every time we looked for it.
+
+The cause had never been about permissions. It was a piece of per-request information stored in a place shared by all requests. The rule that falls out of it is simple: **anything that varies per request belongs on the request.**
+
+## The fix: put it on the request
+
+The header moved from the client's defaults to each outgoing message.
+
+```csharp
+public async Task<HttpResponseMessage> SendAsync(
+    HttpMethod method, string path, HttpContent content, CancellationToken ct)
+{
+    var request = new HttpRequestMessage(method, path) { Content = content };
+    request.Headers.Add("X-Acting-On-Behalf-Of", _userContext.CurrentUserId);
+
+    return await _http.SendAsync(request, ct);
+}
+```
+
+Each call builds its own message with its own header. Nothing is written to anything shared, so there is nothing to race on. Two users at the same moment each send their own identity.
+
+The client's default headers are now limited to values that really are constant: the content type it accepts, a user agent, things that are true for every call this service makes.
+
+## The test that pins it
+
+A fix to a bug like this is only as good as the test that keeps it fixed. This one needs two users and a client that's shared on purpose.
+
+```csharp
+[Fact]
+public async Task Each_request_carries_its_own_users_identity()
+{
+    var handler = new RecordingHandler();
+    var client = BuildSharedClient(handler);
+
+    await Task.WhenAll(
+        Call(client, userId: "alice"),
+        Call(client, userId: "bob"));
+
+    Assert.Contains(handler.Requests, r => r.UserHeader == "alice");
+    Assert.Contains(handler.Requests, r => r.UserHeader == "bob");
+    Assert.Equal(2, handler.Requests.Select(r => r.UserHeader).Distinct().Count());
+}
+```
+
+It sends two requests together and asserts that each one carried the right identity. Before the fix, that assertion fails. After it, it holds, and it will go on holding until somebody puts the header back where it was.
+
+It lives in the shared library's tests, not in a service, because that's where the mistake could be reintroduced for everyone.
+
+## Why this kept coming back
+
+Looking back, the bug persisted because of how it presented. It was reported as many different things, to many different people, and each report had a plausible local explanation. Nobody saw the pattern, because the pattern only existed across reports.
+
+It also took advantage of a general weakness: shared code hides shared state well. A default header looks like configuration. It doesn't look like a variable that many threads are writing to.
+
+When you review a shared client, read the property list as if each one were a global variable. Anything you wouldn't be comfortable making global shouldn't live there.
+
+## Where it falls over
+
+Moving the header to the request means every call site has to supply it, or go through a helper that does. A path that bypasses the helper sends no identity at all, which fails differently and arguably worse.
+
+It also relies on there being a reliable "current user" to read. In background work, where there's no request, the question of whose identity to send needs an answer of its own. Part 7 touches on that.
+
+And the test shows the two identities don't cross in one scenario. It doesn't prove there's no other piece of per-request state hiding in the client. It's worth auditing the rest.
+
+## The takeaway
+
+**Anything that varies per request belongs on the request, not the shared client's default headers.** If a bug depends on who else is using the system, look for shared state before you look at permissions, and write the test with two users back to back.
+
+Take a look at your own shared clients' default headers this week. Each one should be something you'd be happy to see sent on every call, to every user.
+
+Coming next in Shared Code, Shared Problems: your background service doesn't have a request.
