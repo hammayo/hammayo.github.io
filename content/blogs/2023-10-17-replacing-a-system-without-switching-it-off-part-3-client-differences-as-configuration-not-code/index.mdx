@@ -1,0 +1,116 @@
+---
+title: "Replacing a System Without Switching It Off, Part 3: Client Differences as Configuration, Not Code"
+date: "2023-10-17"
+summary: "A new jurisdiction or rule should be data, not a release. But once the differences between clients live in configuration, that configuration needs the same care as code: review, versioning and rollback. Here's what goes in it, and the point where it turns into a programming language."
+tags: ["architecture", "configuration", "migration", "dotnet"]
+series:
+  name: "Replacing a System Without Switching It Off"
+  part: 3
+published: true
+---
+
+A multi-country HR system had a simple-sounding requirement: leave rules differ by country. One country gave a fixed number of days. Another tied it to length of service. A third allowed carrying days over, with a limit and a deadline.
+
+The first version handled the first country in code. The second country added a branch to that code. By the fourth, the leave module was a thicket of conditions, and every new country meant a change, a review, a test cycle and a release.
+
+That's the pattern this part is about, from the series following [Part 2](/blogs/replacing-a-system-without-switching-it-off-part-2-version-one-endpoint-not-the-whole-api/): **client differences as configuration**, so that onboarding a new one is a matter of data, not of shipping software.
+
+## Why it matters for a rollout
+
+In a phased rollout, each new client arrives with its own needs. If those needs are met in code, every client is a release, and the release carries risk for every client already live.
+
+With configuration, the software is the same for everyone. What changes is the data it loads. A client can be prepared, checked and switched on without touching the build, and a mistake in one client's configuration can't alter the behaviour of another's.
+
+That is what makes the repeated steps of a rollout repeatable. The tenth client should be quicker than the first, because there's nothing new to build.
+
+## What belongs in configuration
+
+The boundary needs thought. Not everything should be configuration, and the things that should are those that vary between clients in a regular way.
+
+**Reference data.** Lists of values, such as categories, types and status codes, that differ between clients or change over time.
+
+**Forms.** Which fields appear, which are required and how they are laid out. A form definition is data about a form, not a form coded by hand.
+
+**Templates.** Documents and messages with client-specific wording and layout.
+
+**Languages.** The text shown to users. The UI in this rollout was translated into four languages, held as data, so that supporting a client's language was a content task and not a development one.
+
+**Rules with parameters.** Thresholds, limits and durations. The country's leave allowance, the number of days, the carry-over deadline.
+
+What doesn't belong is behaviour that is genuinely different in kind. If a client needs a whole new workflow, expressing it in configuration is usually a sign you are heading for the trap at the end of this post.
+
+## What it looks like
+
+For the HR example, a country's leave policy might be a small document:
+
+```json
+{
+  "country": "NL",
+  "annualLeave": { "basis": "fixed", "days": 25 },
+  "carryOver": { "allowed": true, "maxDays": 5, "expiresOn": "06-30" },
+  "publicHolidays": "calendar:nl-2024"
+}
+```
+
+The code reads the policy and applies it. It has a few ways of calculating allowance, such as fixed or length of service, and a policy picks one and supplies the numbers.
+
+```csharp
+public decimal Allowance(LeavePolicy policy, Employee employee) => policy.AnnualLeave.Basis switch
+{
+    "fixed" => policy.AnnualLeave.Days,
+    "service" => policy.AnnualLeave.Tiers.Last(t => employee.YearsOfService >= t.FromYears).Days,
+    _ => throw new UnsupportedPolicyException(policy.AnnualLeave.Basis)
+};
+```
+
+A new country with an existing basis needs no new code. A new basis needs a small addition, once, available to every client from then on.
+
+## Configuration is code
+
+The thing teams underestimate is that this configuration is as capable of breaking production as code is.
+
+A wrong value in a policy gives the wrong leave allowance to every employee in a country. A form definition with a required field that should be optional blocks every submission. A missing template means a message that goes out blank.
+
+So it needs the discipline that code gets.
+
+**Review.** Every change is reviewed by someone who understands the client and someone who understands the system. A configuration change is not a quick edit.
+
+**Version control.** Configuration lives in a repository, with history. You can see what changed, who changed it and why.
+
+**Validation.** The system checks configuration when it loads it, against a schema and against rules. A document that doesn't make sense is rejected on the way in, not discovered when a user hits it.
+
+**Rollback.** Each deployment of configuration can be reversed. If the new Dutch policy is wrong, you can go back to the previous one in minutes.
+
+**Testing.** For each client, tests that run its configuration through the real code and assert on results. "An employee with five years' service gets this allowance" is a check you can write down.
+
+## Deploy it like a release
+
+Treat a configuration change as a deployment. It goes to a test environment first, with that client's data. It's checked. It's promoted, with a record of when.
+
+In a phased rollout this lines up neatly with the sites. Before a client's first site goes live, its configuration is complete and tested. Afterwards, changes go through the same path as any release, in a smaller package.
+
+## When configuration becomes a programming language
+
+There's a failure mode at the far end of this approach, and it's worth naming. Each time a client needs something slightly different, the pressure is to add an option. Then a condition. Then an expression. Then a way to reference another value.
+
+After a few rounds, you've built a programming language, with none of the tooling that real ones have. No compiler, no debugger, no tests, no one who knows it well. The configuration is now the hardest code in the system to read, and the part only a few people can change safely.
+
+The warning signs are practical. Configuration documents that contain conditional logic. People asking "how do I express X in the config?" and getting different answers. Changes that need the original author to review them.
+
+When you see it, stop adding options. Either move the logic into code, where it can be tested and reviewed properly, with the configuration supplying only its parameters, or accept that this client needs a different piece of software behaviour and build it as such.
+
+## Where it falls over
+
+Configuration drifts. If it can be edited in production, some will be, and the repository will stop describing what is running. Make the repository the source, and deploy from it.
+
+It also moves the cost, but doesn't remove it. Preparing a client's configuration is real work: gathering their reference data, translating their forms, agreeing their rules. The saving is in the software, not in the effort of learning what each client needs.
+
+And configuration can hide complexity. A system with a hundred clients, each with slightly different settings, is a system with a hundred behaviours. Testing and supporting that takes planning.
+
+## The takeaway
+
+**A new jurisdiction or rule should be data, not a release, and that data needs the same care as code.** Put regular, per-client differences in configuration, review and version it, validate on load, make it deployable and reversible, and stop before it turns into a programming language.
+
+Look at how your system handles its most recent client-specific change. If it was a code change, ask which part could have been data.
+
+Coming next in Replacing a System Without Switching It Off: a read model for devices.

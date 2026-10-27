@@ -1,0 +1,115 @@
+---
+title: "Replacing a System Without Switching It Off, Part 4: A Read Model for Devices"
+date: "2023-11-14"
+summary: "A device-facing API can keep its own view of the data, built from events, instead of fanning out to a dozen services for every screen. Here's what the device needs to see, how the view is built, why reads stay local and writes are forwarded, and what eventual consistency costs."
+tags: ["dotnet", "cqrs", "event-driven", "api-design"]
+series:
+  name: "Replacing a System Without Switching It Off"
+  part: 4
+published: true
+---
+
+A hotel put tablets in its rooms. A guest picks one up and sees their bookings, the spa slot they reserved, what's on the room bill and when breakfast is served. One screen, one tap.
+
+Behind that screen were several services. Bookings in one, the spa in another, billing in a third, the restaurant in a fourth. Each tablet request, if built naively, would call all of them, wait for the slowest and stitch the results together.
+
+Multiply by a few hundred tablets, each refreshing every few seconds, and the services behind the screen spend their lives answering the same questions. This part is about a better shape for it, **a read model for devices**, and it follows [Part 3](/blogs/replacing-a-system-without-switching-it-off-part-3-client-differences-as-configuration-not-code/).
+
+## Why devices are different
+
+A device in a room, a kiosk or a terminal isn't a person at a desk with a full application. It has a small, specific job and a small, specific view of the world.
+
+It also has different demands. Many of them, all asking often, wanting quick answers, and mostly reading. They can't be expected to cope with the complexity of the services behind them, and the services shouldn't have to be shaped around them.
+
+When the device's API fans out to many services per screen, three things happen. Screens are slow, because they wait for the slowest call. They're fragile, because one service being down breaks the whole screen. And the services carry a load that doesn't match their real usage.
+
+## Start from what the device needs to see
+
+The design starts from the screen, not from the services.
+
+For the hotel tablet, the question is: what does this guest need to see right now? Their bookings. Their current bill. Their reservations. A handful of facts about one guest, in one place.
+
+That is a read model: a view of the data shaped for one purpose. It holds only what the device needs, arranged as the device wants it, and it answers a request with a single local lookup.
+
+```csharp
+public sealed class GuestStayView
+{
+    public Guid GuestId { get; init; }
+    public string RoomNumber { get; set; } = "";
+    public List<BookingSummary> Bookings { get; } = new();
+    public List<BillLine> Bill { get; } = new();
+    public DateTime LastUpdatedUtc { get; set; }
+}
+```
+
+## Build it from events
+
+The services behind the screen already know when things happen. A guest arrives. A booking is made. A charge is posted. A guest leaves. Those are events, and they're already being published.
+
+The device API subscribes to them and builds its own view. An arrival event creates the guest's entry. A booking event adds a line. A charge updates the bill. A departure event removes the entry, or archives it.
+
+```csharp
+public async Task HandleAsync(ChargePostedV1 e, CancellationToken ct)
+{
+    var view = await _views.GetAsync(e.GuestId, ct);
+    if (view is null) return; // not arrived, or already left
+
+    view.Bill.Add(new BillLine(e.Description, e.Amount, e.PostedAtUtc));
+    view.LastUpdatedUtc = e.PostedAtUtc;
+    await _views.SaveAsync(view, ct);
+}
+```
+
+The handlers are small, because each event changes one part of one view. They need to be idempotent, as ever, since events can arrive twice.
+
+## Reads local, writes forwarded
+
+The split of responsibilities is the heart of the design.
+
+**Reads are served from the read model.** A device asking for the guest's stay gets it from the device API's own store. No calls to other services. Fast, predictable and independent of whether the other services are up.
+
+**Writes go to the owner.** When the guest books a spa slot on the tablet, the device API doesn't update its view and hope. It forwards the request to the spa service, which owns spa bookings, and waits for the answer. The view updates when the booking event comes back.
+
+This keeps ownership clear, as in Part 2 of the Services in Practice series. The device API holds a copy for reading. It never becomes the owner.
+
+## Eventual consistency, honestly
+
+The read model is behind the truth by the time it takes an event to arrive. Usually that's a moment. Sometimes it's longer.
+
+For most screens, nobody notices. A guest who books a spa slot and sees it appear a second later is fine. But there are moments where the delay shows: they book, the screen refreshes, and the booking isn't there yet.
+
+There are a few ways to deal with it. After a write, the device can show the result returned by the owner, without waiting for the view to catch up. The view can carry a "last updated" time, so the screen can say when it was last current. And for anything where staleness is unacceptable, the device can ask the owner directly, accepting the cost.
+
+Be explicit about which screens need that. Most don't, and the few that do should be few.
+
+## Rebuilding
+
+A view built from events can be rebuilt from them. If the device API's store is lost, or the shape of the view changes, you replay the events and the view reappears.
+
+That gives you a freedom that a hand-maintained copy never has. Changing what the tablet shows becomes a change to the projection and a rebuild, not a data migration.
+
+It also gives you a way out of mistakes. A bug in a handler produced wrong views? Fix the handler and rebuild.
+
+## Why this helped a rollout
+
+In a phased replacement, devices are among the hardest parts to move. They're physical, numerous and spread across sites.
+
+A device API with its own read model gave a stable surface. The devices talk to it. Behind it, services can be replaced, moved or run in old and new forms, as long as they publish the same events. The device doesn't need to know which world a fact came from.
+
+That's the real advantage for this series: the thing in front of the user stays put while the things behind it change.
+
+## Where it falls over
+
+A read model is another store to run, secure and keep correct. It duplicates data, and every duplicate is a place for it to be wrong.
+
+It depends on events being complete. If a service changes something without publishing, the view silently misses it. The discipline of publishing every change that matters has to hold.
+
+And rebuilding isn't free. Replaying a long history takes time, and the events must still be there to replay. You need to plan retention, and to practise a rebuild before the day you need one.
+
+## The takeaway
+
+**A device-facing API can keep its own view from events instead of fanning out to a dozen services per screen.** Design the view from what the device needs, build it from events, serve reads locally, forward writes to the owner, and be honest about the delay.
+
+Take your slowest device-facing screen and count the services it calls. If the number is more than two, ask whether a read model would serve it.
+
+Coming next in Replacing a System Without Switching It Off: living with a mixed estate.

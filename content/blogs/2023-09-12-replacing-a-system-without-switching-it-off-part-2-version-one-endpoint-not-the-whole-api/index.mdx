@@ -1,0 +1,104 @@
+---
+title: "Replacing a System Without Switching It Off, Part 2: Version One Endpoint, Not the Whole API"
+date: "2023-09-12"
+summary: "When clients can't all update at once, version only what changed and run it next to the old one. Here's what that looks like in code: a v2 folder with one controller, a rule that published versions never change, and the question of when the old one goes."
+tags: ["dotnet", "api-design", "versioning", "migration"]
+series:
+  name: "Replacing a System Without Switching It Off"
+  part: 2
+published: true
+---
+
+A mobile app talked to a back-end API. A change was needed to one endpoint: addresses. The old shape stored an address as a single block of text, and the new one needed it split into fields.
+
+The people who built the back end could change it in a day. The people with the app on their phones could not. Some would update within a week. Some wouldn't update for months. The back end had to keep serving every one of them.
+
+This is Part 2, after [Part 1](/blogs/replacing-a-system-without-switching-it-off-part-1-plan-the-cutover-in-the-design/), and it's about the most practical piece of running old and new together: **API versioning**, and the idea that you version the endpoint that changed, not the whole API.
+
+## The two bad answers
+
+When a contract has to change, there are two instincts, and both go wrong.
+
+**Change it in place.** Edit the endpoint and tell callers. Anyone who hasn't updated breaks. This is the version of an API change that works only when you control every caller and can move them all on the same day. If you can do that, you don't have a rollout problem.
+
+**Copy the whole API.** Create a `v2` of everything, so that all the endpoints exist twice. It looks tidy, and it's expensive. Hundreds of endpoints that haven't changed now have two copies to maintain, test and document, and callers have to learn that they all moved for the sake of one.
+
+## The better answer: version only what changed
+
+Change one endpoint, version one endpoint. Everything else stays as it was, in its current version, and carries on working.
+
+The new address endpoint gets a `v2` of its own. The unchanged endpoints stay at `v1`. A client calling a mixture is fine: it uses `v1` of most things and `v2` of addresses.
+
+In ASP.NET Core with API versioning, this can be expressed on each controller:
+
+```csharp
+[ApiController]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/addresses")]
+public class AddressesV1Controller : ControllerBase
+{
+    [HttpGet("{customerId}")]
+    public Task<AddressV1Dto> Get(Guid customerId, CancellationToken ct) => _addresses.GetAsDtoV1(customerId, ct);
+}
+
+[ApiController]
+[ApiVersion("2.0")]
+[Route("api/v{version:apiVersion}/addresses")]
+public class AddressesV2Controller : ControllerBase
+{
+    [HttpGet("{customerId}")]
+    public Task<AddressV2Dto> Get(Guid customerId, CancellationToken ct) => _addresses.GetAsDtoV2(customerId, ct);
+}
+```
+
+Folder-wise, that means a `V2` folder holding one controller and its DTOs, not a parallel tree. The diff for the change is a small, visible addition.
+
+## Share the logic, not the contract
+
+Two controllers don't mean two implementations. The business logic underneath stays single. What differs is the shape of what goes in and comes out.
+
+The v1 controller maps the structured address back to a single text block. The v2 controller returns the fields as they are. Both call the same service, which only knows about the structured address.
+
+That keeps behaviour in one place. A bug fixed in the service is fixed for both versions, and the only code that knows about the old shape is the mapping that produces it.
+
+## Never change a published version
+
+The rule that makes this safe is simple and strict: once a version has been published, you do not change its contract.
+
+Don't add a required field. Don't rename or remove a property. Don't change a type or the meaning of a value. If any of these is needed, it's a new version.
+
+Adding an optional property to a response is usually safe, if clients ignore what they don't recognise. If you're not certain they do, treat it as a change.
+
+The rule seems rigid, and the rigidity is the point. A caller that works against v1 today should work against v1 next year. Anything else makes versions meaningless.
+
+## Which version is each endpoint on?
+
+With versions applying to individual endpoints, it becomes important to know what exists. A caller needs to see, at a glance, which version of which endpoint to use. A maintainer needs to see what is still being served.
+
+Generate the API description from the code, with each version as its own document or clearly labelled group. Publish it. Include in each version's description what changed and when it was introduced.
+
+The versions in service also need to be recorded somewhere you will find them later. A simple table in the repository is enough: endpoint, versions available, the date each was introduced and, where one is planned, the date it ends.
+
+## The retirement question
+
+Running two versions has a cost, and it doesn't stop on its own. Every version you keep is code to maintain, tests to run and behaviour to remember.
+
+So the question to ask when you introduce v2 is when v1 will go. Not whether it will, but when. The answer might be "when no client calls it", or a fixed date, or "after the last site has moved".
+
+Part 6 of this series covers how to answer it properly. For now, the habit to adopt is that the creation of a new version always comes with a note of how the old one ends.
+
+## Where it falls over
+
+Per-endpoint versioning makes it hard to say what "version 2 of the API" means. A client might use v1 of one thing and v2 of another, and support conversations get awkward when nobody can answer "which version are you on?" with a single number.
+
+The mapping layer can also become a liability. Converting the structured address back into the old text block is fine when the data allows it. When the new model holds information the old one can't express, v1 returns something lossy, and you need to decide what lossy means.
+
+And some changes can't be confined to one endpoint. When a concept changes across the whole API, such as a new identifier scheme or authentication method, versioning one endpoint doesn't address it, and a wider version may be the honest answer.
+
+## The takeaway
+
+**When clients can't all update at once, version only what changed and run it next to the old one.** A v2 folder with one controller, shared logic underneath, a strict rule that published versions never change, and a note of when the old one ends.
+
+Next time you need to change a contract, ask what the smallest unit that can carry a version is. It's usually smaller than the whole API.
+
+Coming next in Replacing a System Without Switching It Off: client differences as configuration, not code.

@@ -1,0 +1,95 @@
+---
+title: "Replacing a System Without Switching It Off, Part 7: The Async Side Was Fine, Where Our Microservices Actually Broke"
+date: "2024-02-13"
+summary: "After about three years on a case-management platform for the justice sector, a look back at what held up, what didn't, and the question I'd ask first next time: how does each dependency fail? Most distributed systems handle the happy path by design and the failure path by accident."
+tags: ["architecture", "microservices", "reliability", "retrospective"]
+series:
+  name: "Replacing a System Without Switching It Off"
+  part: 7
+published: true
+---
+
+After about three years working on a case-management platform for the justice sector, I can say where it was strong and where it was weak, and the two weren't spread the way I'd have guessed at the start.
+
+The part I'd worried about most, the messaging between services, held up well. The part I'd thought of as plumbing, the direct calls and the way services were checked and recovered, was where things went wrong.
+
+This last part of the series, after [Part 6](/blogs/replacing-a-system-without-switching-it-off-part-6-retiring-v1-decide-the-date-when-you-create-v2/), is a look back. It isn't a victory lap. The claim I want to defend is this: **most distributed systems handle the happy path by design and the failure path by accident.**
+
+## What held up
+
+Several things did what they were meant to do, and they have something in common: each was designed around failure.
+
+**The outbox and the inbox.** Writing the message with the change, and recording what had been handled, meant the broker could be down without anyone losing work. Duplicates were harmless. The retry schedule, back-off and give-up, was thought through. These ideas are covered in the Messages That Survive series.
+
+**Versioned events and APIs.** Changes arrived next to what existed, not on top of it. Consumers and clients moved when they were ready, which was what made a rollout over about eighteen months possible at all.
+
+**The phased rollout itself.** Moving one client, then one site at a time, turned a very large risk into many small ones. The costs, from Part 5, were real and were worth paying.
+
+**Configuration over code.** Client differences held as data meant the same software went to every client.
+
+All four share a feature. Someone had asked, in advance, "what happens when this goes wrong?" and built the answer in.
+
+## What didn't
+
+The weak points came from the opposite habit: designing what the thing does and leaving what it does badly until later.
+
+**Synchronous calls between services.** The async side had retries, back-off and an outbox. The direct calls often had a single retry and nothing more. A slow dependency, not a dead one, could tie up threads in the caller and spread. The Services in Practice series covers the timeouts and breakers I'd add.
+
+**Health checks that checked nothing useful.** An open port was treated as a healthy service, so instances with broken dependencies stayed in rotation.
+
+**Recovery assumptions.** Code that recovered its position for partition zero only. Defaults defined and never read. Settings that were right for the system as it was when they were written. Each worked until a change in scale or shape exposed it.
+
+**Opt-in checks.** Security checks that every new endpoint had to remember to add, where the answer to "did someone remember?" was only discoverable by looking.
+
+None of these is exotic. Each is a known problem with a known solution. What they have in common is that they only matter on a bad day, and bad days don't come to the design review.
+
+## Why the failure path ends up accidental
+
+There are understandable reasons for the pattern.
+
+The happy path is what you demo, test and are asked about. It's the thing that earns agreement. Failure paths are speculative: you're describing a bad day that may not come.
+
+Failure is also boring to specify. Few people volunteer to write down what happens when the third dependency times out during the second step of the saga. There isn't a ticket for it, and nobody will congratulate you when it works.
+
+And failures compound across teams. Each service author can reasonably assume the others behave well. The assumptions only meet in production.
+
+## The question to ask first
+
+If I had to give one piece of advice from three years of this, it would be about order.
+
+**Before choosing how to call a dependency, write down how it fails.** Does it fail fast or slow? Does it fail all at once or partially? Does it fail loudly, or return something plausible and wrong? Does it recover on its own, or does it need someone?
+
+Then choose the call. A dependency that fails slowly needs a timeout and a breaker. One that returns plausible wrong answers needs the status check from the Shared Code series. One that needs a person to recover needs an alert and a runbook.
+
+It is a cheap exercise. A table with a row per dependency and four columns can be written in an afternoon, and the gaps in it are your risk list.
+
+## The list I'd start with next time
+
+If I were starting a similar system tomorrow, this is the short list of things I'd put in place at the beginning, not discover later.
+
+- A timeout, a careful retry and a breaker on every direct call.
+- Readiness checks that test real dependencies, and liveness checks that stay simple.
+- An inbox and an outbox from the first service, not the fifth.
+- Events versioned from the start, with a retirement date for each version.
+- Deny by default for access control, with tests that assert what must be refused.
+- A correlation ID set at the edge and carried everywhere.
+- A real shared-library test suite that uses the code the way services do.
+- Offsets and partitions handled for more than one, even if there's only one today.
+- A dead-letter path that support can use.
+- A written failure table for each dependency.
+
+Most of those cost little at the start and a great deal in the middle.
+
+## Where it falls over
+
+It's easy to read a list like that and conclude that everything should be built up front. It shouldn't. Some of these protections are expensive for a system that is small, new or rarely used, and building them early can slow the thing that matters, which is learning whether the system is needed.
+
+Hindsight is also generous. It is easy to say which failures mattered after they happened. At the time, they were one of a hundred things that might have.
+
+And there's a limit to what any list does. The incidents that hurt most tend to be the ones the list didn't anticipate. The aim is not a complete set of defences, it is the habit of asking the question.
+
+## The takeaway
+
+**Most distributed systems handle the happy path by design and the failure path by accident; write down how each dependency fails before choosing how to call it.** What held up here was built around failure from the start, and what didn't was built around success and patched later.
+
+That closes the series. The seven parts: plan the cutover into the design, version only what changed, put client differences in configuration, give devices a read model, budget for the mixed estate, decide when old versions end, and ask how everything fails. The earlier posts are on [the blog](/blogs/) if you're catching up.
