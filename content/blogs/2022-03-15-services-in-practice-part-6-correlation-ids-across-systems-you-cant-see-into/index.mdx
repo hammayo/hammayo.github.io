@@ -1,0 +1,117 @@
+---
+title: "Services in Practice, Part 6: Correlation IDs Across Systems You Can't See Into"
+date: "2022-03-15"
+summary: "When a message crosses into someone else's system, its ID is the only thread you can pull. Here's where to set a correlation ID, how to carry it through events and HTTP calls, what to log, and how it shortens an investigation that spans two teams."
+tags: ["dotnet", "observability", "logging", "integration"]
+series:
+  name: "Services in Practice"
+  part: 6
+published: true
+---
+
+An order had gone missing. Our system said it had dispatched a shipment. The partner's warehouse system said it had never received one. Each side's logs were clean, and each side was sure the other was at fault.
+
+We had a timestamp, roughly, and an order number that meant something to us and nothing to them. Finding the one message in their logs among thousands from the same minute was guesswork.
+
+That's the moment a **correlation ID** earns its place. It follows on from [Part 5](/blogs/services-in-practice-part-5-bridging-kafka-and-rabbitmq-for-systems-you-dont-own/), where we built a bridge to a partner. This part is about being able to follow one thing through systems you can't see into.
+
+## One identifier, end to end
+
+A correlation ID is a value that identifies one logical piece of work as it moves through everything involved in it. It's generated once, at the start, and then carried everywhere the work goes.
+
+The point is not that it's clever. It's that it's the same value in every log line, every message and every call, in every service, so that one search finds the whole story.
+
+Without it, each service has its own identifiers: a request ID here, a message ID there, a database key somewhere else. Joining them up means matching by time and content, which is unreliable at the best of times and hopeless across a company boundary.
+
+## Set it at the edge
+
+Generate the ID at the point where the work enters your system: the first API that receives the request, the first consumer that picks up a file, the scheduler that starts a job.
+
+If an incoming request already carries one, because an upstream caller sent it, keep that and don't replace it. Otherwise, make one. A GUID is fine; it doesn't need to mean anything.
+
+```csharp
+public sealed class CorrelationMiddleware
+{
+    private const string Header = "X-Correlation-Id";
+    private readonly RequestDelegate _next;
+
+    public CorrelationMiddleware(RequestDelegate next) => _next = next;
+
+    public async Task InvokeAsync(HttpContext context, ICorrelationContext correlation)
+    {
+        var id = context.Request.Headers.TryGetValue(Header, out var existing) && !string.IsNullOrWhiteSpace(existing)
+            ? existing.ToString()
+            : Guid.NewGuid().ToString("N");
+
+        correlation.Set(id);
+        context.Response.Headers[Header] = id;
+
+        using (LogContext.PushProperty("CorrelationId", id))
+        {
+            await _next(context);
+        }
+    }
+}
+```
+
+Echoing it back in the response header is a small kindness that pays off: a caller reporting a problem can quote the value.
+
+## Carry it through everything
+
+Having an ID is the easy part. Keeping it attached as the work moves is where it gets lost.
+
+**Through HTTP calls.** The shared client, from the Shared Code series, adds the header to every outgoing call. As we saw there, it goes on each request, not in default headers.
+
+**Through events.** Put the ID in the message itself, in a standard place such as the envelope or a header, whatever your broker supports. A consumer that handles the message reads it and sets it for the work it does, so anything it publishes next carries the same one.
+
+**Through background work.** A worker has no request to take it from, so it has to take it from the message. That's the same discipline as the per-message scope in the Shared Code series: set the context at the start of each unit of work.
+
+If any hop drops it, the trail ends there. The test is simple. Send one request through the whole system and search every service's logs for the ID. The place where the results stop is the place that dropped it.
+
+## Log it everywhere
+
+An ID that isn't logged is no use. Configure your logging so the correlation ID is attached to every line automatically, as a property, so that no developer has to remember it.
+
+Structured logging makes this nearly free. Push the ID into the logging context once, at the start of the unit of work, and every line written inside it carries the property.
+
+Then the first question in any investigation becomes "what's the correlation ID?" and the second is a single search.
+
+## Crossing into someone else's system
+
+Everything above works inside your own boundary. The hard part is the edge.
+
+Where the partner's format allows it, put your correlation ID in the message you send them. Many envelopes have a field for a reference, an extra property or a header that they'll preserve. Ask what they will keep, and what they'll echo back in their own logs or acknowledgements.
+
+If they can't carry yours, record the pairing yourself. When the bridge sends a message and receives their identifier in return, log both together. You can't see inside their system, but you can hold a table that says "our ID corresponds to their ID". That is enough to ask them an exact question.
+
+```csharp
+var ack = await _courier.PublishAsync(message, ct);
+_logger.LogInformation(
+    "Forwarded shipment {OurReference} as {PartnerMessageId}", correlationId, ack.MessageId);
+```
+
+## What it did for that investigation
+
+Go back to the missing shipment. With the ID in the envelope and in both our logs and the bridge's, the question changed from "somewhere around ten past three" to "message with this reference". The partner could search once and tell us whether they had received it.
+
+The answer, in a case like that, is rarely dramatic. It might have arrived and been rejected for a field that didn't validate. It might have been accepted and then filtered. The value is in knowing which, within minutes, instead of arguing about it for days.
+
+It also changes the tone of the conversation. A precise question with an identifier gets a precise answer. A vague one gets a defensive one.
+
+## Where it falls over
+
+A correlation ID tells you where to look, not what went wrong. You still need useful logs at each hop. An ID threaded through logs that say nothing is a well-labelled empty box.
+
+One ID can also stand for too much. A long-lived piece of work, such as a batch that handles thousands of items, can make a single correlation value so broad that searching it returns everything. You may want a second, narrower identifier for each item inside it.
+
+And everything depends on discipline at the edges. One service that generates a fresh ID instead of using the one it received splits the story in two. The shared library should make "take the incoming one" the default, so this can't happen by accident.
+
+Be careful what the ID contains. It will appear in logs and, when you send it out, in other people's systems. A random value is safe. An order number or a person's name is not.
+
+## The takeaway
+
+**When a message crosses into someone else's system, its ID is the only thread you can pull.** Set it at the edge, carry it through events and HTTP calls, log it on every line, and pair it with the partner's identifier when theirs can't carry yours.
+
+Pick one flow that touches an outside system and try to follow a single item through every log involved. Wherever you have to stop and guess, that's where the next ID needs to go.
+
+Coming next in Services in Practice: partition zero, and the assumptions that block scaling.

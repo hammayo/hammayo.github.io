@@ -1,0 +1,104 @@
+---
+title: "Services in Practice, Part 5: Bridging Kafka and RabbitMQ for Systems You Don't Own"
+date: "2022-02-15"
+summary: "Your own services speak one messaging language. The system you need to talk to speaks another, and you can't ask it to change. Here's how to meet an external system where it is, keep the translation in one place, and keep the bridge honest about its own health."
+tags: ["dotnet", "kafka", "rabbitmq", "integration"]
+series:
+  name: "Services in Practice"
+  part: 5
+published: true
+---
+
+A courier company wanted shipment events from our order system. We published events to Kafka. They consumed messages from RabbitMQ, in an envelope of their own design, with field names and structure that suited their system, not ours.
+
+There was no negotiating with a partner's platform about which broker it used. Their side was fixed. If we wanted the integration, we had to meet them where they were.
+
+This part is about doing that cleanly: **bridging Kafka and RabbitMQ**, or more generally any two messaging worlds, when one end isn't yours. It follows [Part 4](/blogs/services-in-practice-part-4-your-readiness-probe-is-lying/) in the series.
+
+## The tempting shortcut
+
+The easy answer is to teach the order service to publish to the courier's RabbitMQ as well. It already knows when a shipment is dispatched, so one more publish call looks cheap.
+
+That puts the partner's details, their broker, their envelope and their field names, into a service that has nothing to do with couriers. The next partner adds another, and soon the order service is a museum of other people's conventions.
+
+It also ties your internal release schedule to someone else's integration. A change to their format means changing, testing and deploying a core service.
+
+## One service at the boundary
+
+The better approach is a dedicated integration service that sits between your system and theirs. It's the only part of your platform that knows the partner exists.
+
+Internally, it behaves like any other consumer. It subscribes to the events your system already publishes, for instance `ShipmentDispatched`, and does nothing else with them except translate and forward.
+
+The boundary service owns three things: the connection to the partner's broker, the translation into their format, and the rules about what to do when it goes wrong. The rest of your platform stays ignorant of all three.
+
+## A base handler per topic
+
+Inside that service, the structure matters, because partners multiply. A small pattern keeps each new integration short.
+
+A base handler takes care of the repeated work: receiving a message, recording that it was processed, handling failures, publishing to the partner. A concrete handler for each topic supplies only what's specific, which is how to turn our event into their message.
+
+```csharp
+public abstract class BridgeHandler<TEvent> : IMessageHandler<TEvent>
+{
+    public async Task HandleAsync(TEvent message, CancellationToken ct)
+    {
+        var outbound = Translate(message);
+        await Publisher.PublishAsync(outbound, ct);
+    }
+
+    protected abstract PartnerMessage Translate(TEvent message);
+    protected abstract IPartnerPublisher Publisher { get; }
+}
+
+public sealed class ShipmentDispatchedHandler : BridgeHandler<ShipmentDispatchedV1>
+{
+    protected override PartnerMessage Translate(ShipmentDispatchedV1 e) =>
+        new("shipment.dispatched", new { reference = e.OrderReference, collectedAt = e.DispatchedAt });
+
+    protected override IPartnerPublisher Publisher => _courierPublisher;
+}
+```
+
+Adding a second event for the same partner means one small class. Adding a second partner means a new publisher and a few more small classes, with the shared behaviour already in place.
+
+## Wrap the event in their envelope
+
+The partner's envelope is part of the contract, and it belongs in one place. Their format might add a message type, a version, a timestamp in a particular layout, or an identifier they use to deduplicate.
+
+Put all of that in the translation code, and nowhere else. If their format changes, you change one class, and the rest of your platform never hears about it.
+
+Preserve a link to your own identifiers inside the envelope where the format allows. When something goes wrong, the ability to say "this is your message for our order" in both directions saves hours of matching by timestamp. Part 6 of this series is about exactly that.
+
+## Retry policies for the connection
+
+The connection to an outside broker is less reliable than one inside your own network. It crosses a firewall, depends on their uptime and may be rate-limited or maintained at awkward times.
+
+The bridge needs its own retry policy for connecting, with back-off and a limit, separate from how it retries failed messages. If the partner's broker is unreachable, the bridge shouldn't spin on it. It should wait, try again later and keep your internal messages safe in the meantime.
+
+Because the bridge consumes from your own broker, the internal side already gives you durability. Messages queue up while the partner is unreachable and flow when it returns. The bridge needs to be idempotent about sending, so a message that was delivered just before a crash isn't sent twice if the partner can't deduplicate.
+
+## Health endpoints for the bridge
+
+The bridge is the sort of service that fails quietly. It's connected to two brokers, and either connection can drop without anything visible changing for a while.
+
+Give it a health endpoint that reports each side separately: can it reach our broker, can it reach the partner's, and how long ago did it last forward a message. As [Part 4](/blogs/services-in-practice-part-4-your-readiness-probe-is-lying/) argued, "the process is running" isn't the same as "the bridge is working".
+
+A bridge that's connected but has forwarded nothing for an hour, on a topic that normally sees traffic every minute, is telling you something. Alert on that.
+
+## Where it falls over
+
+Another service means another thing to deploy, monitor and own. For a single partner and a single event, a dedicated service may be heavier than the problem deserves, and a well-isolated module could do.
+
+The bridge also becomes a bottleneck for changes. Every partner request goes through the team that owns it, and if that team is small, partners wait.
+
+Translation is never perfect. Their model and yours differ, and some information doesn't map cleanly. Decisions about what to drop, default or approximate have to be made and written down, otherwise they're made differently each time.
+
+And the partner's reliability is still theirs. You can retry and buffer, but you cannot make their broker accept messages when it's down. Agree what happens at the edges, such as how long you hold messages and who is told, before it happens.
+
+## The takeaway
+
+**Meet external systems where they are, and keep that translation in one place.** One integration service at the boundary, a base handler per topic, the partner's envelope in a single class, its own connection retries and a health endpoint that reports both sides.
+
+Look at how your platform talks to its least flexible partner. If the answer is "a bit of code in several services", you have a bridge waiting to be built.
+
+Coming next in Services in Practice: correlation IDs across systems you can't see into.

@@ -1,0 +1,96 @@
+---
+title: "Services in Practice, Part 2: Who Owns This Data? No Shared Tables"
+date: "2021-08-17"
+summary: "If two services read the same table, they aren't two services. They're one service with a network between its halves. Here's the ownership rule I use, the two honest ways to get data you don't own, and the reporting problem that always follows."
+tags: ["dotnet", "microservices", "data", "architecture"]
+series:
+  name: "Services in Practice"
+  part: 2
+published: true
+---
+
+A customer service and an order service both needed the customer's address. The customer service owned it. The order service needed it to print on a delivery note, and the quick way to get it was a read-only connection to the customer database.
+
+It worked on the first day. By the third month, the customer team had renamed a column, and the order service had stopped printing delivery notes. Nobody had told the order team, because as far as the customer team was concerned, nobody else used that table.
+
+This is the question at the heart of splitting a system up: **who owns this data**. Part 1 was about how services talk. This part is about what they're allowed to look at, and the answer is not "each other's tables".
+
+## One table, two services
+
+When two services read the same table, the table is a shared interface. A column name, a type, an index or a constraint is now a contract between both, and neither side wrote it down.
+
+That's the cost, and it's invisible in the code. You can't search for who reads a table the way you can search for who calls an endpoint. Changing the schema becomes an exercise in guessing who will break.
+
+Worse, the services can't be deployed, scaled or reasoned about independently. They share a failure mode and a release schedule. So the saying goes: **if two services read the same table, they aren't two services.** They're one service with a network in the middle, which is the worst of both designs.
+
+## The rule: one owner per piece of data
+
+Every piece of data has exactly one service that owns it. Only the owner reads or writes the underlying store. Everyone else gets at the data through the owner.
+
+Ownership is about who is allowed to change it and who defines its shape. It's not about who reads it most. The customer service owns the address even though the order service reads it all day.
+
+This sounds restrictive, and it is. The restriction is what buys you independence: the owner can change its storage, its schema and its technology without asking anyone, as long as the interface holds.
+
+## Two honest ways to get data you don't own
+
+There are two ways for the order service to get an address without touching the table, and both are fine. They suit different needs.
+
+**Ask the API.** When the order service needs the address, it calls the customer service and gets it. The data is always current, and ownership is plain. The cost is the availability coupling from Part 1: if the customer service is down, so is the delivery note.
+
+```csharp
+var address = await _customers.GetDeliveryAddressAsync(order.CustomerId, ct);
+note.AddressLines = address.Lines;
+```
+
+**Keep a copy from events.** The customer service publishes `CustomerAddressChanged`. The order service listens and stores the address it cares about in its own database. Reads are local and fast, and they work when the customer service is down.
+
+```csharp
+public async Task HandleAsync(CustomerAddressChangedV1 e, CancellationToken ct)
+{
+    await _addresses.UpsertAsync(e.CustomerId, e.Lines, e.Version, ct);
+}
+```
+
+The cost of the copy is that it can be stale, and it's yours to maintain. You've taken on a small piece of someone else's model, and you need to decide what you do when it's wrong.
+
+Choose by asking how current the data must be and how bad it is to be without it. A price at the moment of purchase wants the API. A delivery address for a note that prints tomorrow can live with a copy.
+
+## What the copy is, and isn't
+
+A copy is not a second source of truth. It's a read model, shaped for what the order service needs, built from announcements by the real owner.
+
+That shape often differs from the original. The order service doesn't need the customer's whole record, just an address and a version. Keeping the copy narrow keeps the coupling narrow, and means the owner can change everything else freely.
+
+Never write back to it from the consuming side. If the order service finds a wrong address, the correction goes to the customer service, which publishes the change, which updates the copy. The loop stays one-way.
+
+## When the boundary is wrong
+
+Sometimes the pain of "no shared tables" is telling you something. If two services always change together, if every feature needs coordinated releases in both, or if each constantly asks the other for the same data, the boundary is probably in the wrong place.
+
+The signs are practical. Releases that must go out in pairs. A feature that touches two repositories every time. A chatty conversation between two services that never talks to anything else.
+
+In that situation, the answer is not a shared table. It's to merge the services, or to move the responsibility to where it belongs. Splitting along the wrong line and then gluing it back with a shared database is the worst outcome of all.
+
+## The reporting problem
+
+Whoever first argues against this rule usually argues from reporting. A report wants to join orders, customers, payments and bookings. With separate stores, a single query can't do that.
+
+There are honest answers, and none is "give the reporting tool access to everything". Services can publish their changes to a reporting store, which builds its own model from the events. Or a nightly extract copies the needed data from each service's API into a warehouse. Either way, the report reads a copy built for it, not the operational tables.
+
+It's more work than a join. But a reporting query hitting live tables with a heavy scan is also a good way to slow a service down at the busiest time of day, so the separation pays for itself in more than tidiness.
+
+## Where it falls over
+
+The cost is real and it shows up early. Anything that used to be a join becomes a call or a copy. Developers used to a single database feel the loss, and some of those joins were genuinely convenient.
+
+Event-fed copies need care. You have to cope with missed events, out-of-order delivery and a copy that has to be rebuilt. The idempotent consumers and versioned events from the Messages That Survive series are not optional here.
+
+And ownership can be argued about for a long time. Some data genuinely has two plausible owners. The decision matters less than making one and writing it down, so that the next person doesn't open a back door because the question looked open.
+
+## The takeaway
+
+**If two services read the same table, they aren't two services.** Give each piece of data one owner, let others ask its API or keep a narrow copy built from its events, and treat a boundary that keeps hurting as a signal that it's in the wrong place.
+
+Pick one table in your system and work out which services read or write it. If the answer is more than one, you've found a hidden interface that nobody has agreed to maintain.
+
+Coming next in Services in Practice: circuit breakers for calls between services.

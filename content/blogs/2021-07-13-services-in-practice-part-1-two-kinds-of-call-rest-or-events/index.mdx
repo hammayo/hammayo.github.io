@@ -1,0 +1,93 @@
+---
+title: "Services in Practice, Part 1: Two Kinds of Call, REST or Events?"
+date: "2021-07-13"
+summary: "Every call between services is either asking for something or announcing something. Mixing the two up is how systems end up slow, fragile and hard to change. Here's the test I use, with a booking example, and what each choice couples you to."
+tags: ["dotnet", "microservices", "kafka", "architecture"]
+series:
+  name: "Services in Practice"
+  part: 1
+published: true
+---
+
+A booking system had one flow that grew. Confirming a booking needed a price, so the booking service called the pricing service. Then it needed to tell the email service, so it called that too. Then reporting wanted to know, so it called reporting. Then someone added a loyalty service.
+
+Each call was reasonable when it was added. Together, they meant a booking could only be confirmed if five other services were up and quick, and adding a sixth meant changing the booking service again.
+
+The mistake wasn't any single call. It was treating two different kinds of call as one. This series is about running services in practice, and the first thing to get straight is **REST or events**: when to ask, and when to announce.
+
+## Asking versus announcing
+
+Some calls exist because the caller needs an answer to carry on. Confirming a booking needs a price. Without it, the booking can't proceed. The caller is blocked until the answer arrives, and what it does next depends on what it hears.
+
+Other calls exist because something has happened and others might care. A booking was confirmed. The caller isn't waiting for anything. It doesn't need a reply, and it shouldn't have to know who is listening.
+
+The first kind is a question. The second is an announcement. They want different tools.
+
+## The test I use
+
+The rule of thumb I rely on is short: **if you'd call three services to tell them the same thing, publish it.**
+
+When a service finds itself making several calls with the same payload to several places, it's announcing, not asking. It's carrying knowledge of everyone who cares about the news. Each new interested party means a new call, and a new reason to change the sender.
+
+Publishing turns that around. The sender says what happened, once. Anyone interested subscribes. The sender doesn't change when a seventh listener appears, and doesn't know that it did.
+
+## What REST couples
+
+A synchronous call couples **availability**. If the pricing service is down, the booking can't be confirmed. If it's slow, the booking is slow. The caller's reliability is capped by the reliability of everything it calls in line.
+
+That's acceptable when you genuinely need the answer. There's no way to confirm a booking without a price, so the dependency is real, and hiding it behind a queue would only hide a failure.
+
+```csharp
+// The booking cannot proceed without a price: ask, and wait.
+var price = await _pricing.GetPriceAsync(booking.ProductId, booking.Date, ct);
+booking.Confirm(price);
+```
+
+Keep these calls few and short, and protect them. Part 3 of this series covers what happens when you don't.
+
+## What events couple
+
+An event couples almost nothing, but it isn't free.
+
+The sender and listeners don't need to be up at the same time. A listener that's down misses nothing, because the message waits. New listeners can be added without touching the sender.
+
+What you give up is immediacy. There's a delay between the announcement and the reaction, and it isn't bounded in any way you control. A listener may process the event now or in a minute. The sender can't tell, and shouldn't care.
+
+```csharp
+// Others may care, but we don't wait for them or even know who they are.
+await _outbox.AddAsync(new BookingConfirmedV1(booking.Id, booking.CustomerId, booking.Date), ct);
+```
+
+If anything downstream truly needs the result before the user sees a response, an event is the wrong tool. The delay will show up as a bug.
+
+## Putting it together
+
+In the booking example, the split falls out naturally.
+
+Confirming needs a price, so it's a REST call to pricing. The email, the reporting entry and the loyalty points are all reactions to a confirmed booking, so the service publishes `BookingConfirmed` and stops. Each of those listeners subscribes on its own.
+
+The booking service now has one synchronous dependency and no knowledge of who cares about confirmations. A new listener doesn't change it at all.
+
+## Name topics so both ends are searchable
+
+A cost that sneaks in with events is invisibility. With a REST call, you can search the code for the URL and find the caller. With an event, the producer and consumers might never mention each other.
+
+The cheap fix is naming. Use one convention for topics, say `<domain>.<thing>.<what-happened>`, and use the same string in the producer and every consumer, with a constant and not a retyped literal.
+
+Then a search for the topic name finds everyone who sends or reads it. It's the only map of who depends on what that you'll get without extra tooling, so make it work.
+
+## Where it falls over
+
+The line between asking and announcing is not always sharp. Some things look like announcements and are really questions in disguise: a service publishes "please calculate a price" and waits for a "price calculated" event. That's a request-reply over a queue, and it has the downsides of both worlds, with extra delay and a harder trace.
+
+Events also make flows harder to follow. A user-facing action can set off a chain of reactions across services, and nothing in one place describes the whole sequence. That's a real price. Part 8 of this series returns to it when a flow needs an owner.
+
+And "just publish it" is not a licence to publish everything. Events that nobody consumes, or that carry the entire object for the convenience of one listener, turn into a tangle of their own.
+
+## The takeaway
+
+**Use REST when you need an answer to carry on; use events when you're telling others something happened.** Ask for what you can't proceed without, announce what others might care about, and name topics so you can search for both ends.
+
+Look at one service that makes several outgoing calls on a single user action. Count how many of them are really questions. The rest are announcements waiting to be published.
+
+Coming next in Services in Practice: who owns this data, and why there are no shared tables.

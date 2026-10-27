@@ -1,0 +1,99 @@
+---
+title: "Services in Practice, Part 3: Circuit Breakers for Calls Between Services"
+date: "2021-10-12"
+summary: "The asynchronous side of a system can be made to survive almost anything. The synchronous side is where an outage in one service spreads to every service that calls it. Here's how a slow dependency ties up threads, and the timeout, retry and breaker settings I'd put in front of every downstream call."
+tags: ["dotnet", "polly", "resilience", "microservices"]
+series:
+  name: "Services in Practice"
+  part: 3
+published: true
+---
+
+A checkout page called a stock service to see whether an item was available. One afternoon the stock service got slow. It didn't fail, it just took thirty seconds instead of thirty milliseconds to answer.
+
+Within minutes, the checkout service was unresponsive. Nothing was wrong with checkout. Every request it handled was waiting on stock, and the threads that should have served new customers were all parked on calls that hadn't returned.
+
+That is how one slow service takes down the ones that depend on it. This part is about **circuit breakers and timeouts for calls between services**, and about what I'd change in a setup where the asynchronous side was protected and the synchronous side wasn't.
+
+## Where the protection was
+
+In the messaging side of the platform, a lot of care had gone in. Retries with back-off, messages kept in an outbox, consumers that tolerated duplicates. That work is described in the Messages That Survive series.
+
+The calls made directly between services, the REST calls from Part 1, got far less. A typical one had a single retry and no breaker. If the downstream service was down, the caller tried twice and gave up with an error. That's fine when failures are brief and rare.
+
+It fails badly when a dependency is slow instead of dead. A slow dependency is harder to deal with than a dead one, because a dead one fails fast.
+
+## Why slow is worse than down
+
+When a downstream call blocks, the thread making it is held. A web service has a finite pool of threads, or in an async service a finite amount of capacity before queues build up. Requests keep arriving at the same rate, each one starts a call to the slow service, and each one waits.
+
+Soon, the caller has spent everything on waiting. New requests, including ones that don't touch the slow dependency, queue behind them. The failure has moved up a level.
+
+A retry makes it worse. Each failed call that is tried again adds load to a service that is already struggling, at precisely the moment it needs room to recover. A well-meant retry policy can turn a slowdown into an outage.
+
+## The three settings that matter
+
+Protecting a call comes down to three decisions, and the order matters.
+
+**A timeout, first.** Every outgoing call needs one, and the default is almost always too long. Decide how long the caller can afford to wait, and cut the call off there. A timeout turns "slow" into "failed", which is something you can handle.
+
+**A retry, carefully.** Retry only when it's safe and likely to help. Safe means the call is idempotent: asking twice does no harm. Likely to help means the failure is the kind that passes. Add jitter, a small random delay, so a hundred callers don't all retry at the same instant.
+
+**A circuit breaker, per downstream.** After enough recent failures, stop calling the dependency for a while and fail immediately. Then let a single trial call through to check whether it has recovered.
+
+```csharp
+var timeout = Policy.TimeoutAsync<HttpResponseMessage>(TimeSpan.FromSeconds(2));
+
+var retry = Policy<HttpResponseMessage>
+    .Handle<HttpRequestException>()
+    .OrResult(r => (int)r.StatusCode >= 500)
+    .WaitAndRetryAsync(2, attempt =>
+        TimeSpan.FromMilliseconds(200 * attempt + Random.Shared.Next(0, 100)));
+
+var breaker = Policy<HttpResponseMessage>
+    .Handle<HttpRequestException>()
+    .OrResult(r => (int)r.StatusCode >= 500)
+    .CircuitBreakerAsync(handledEventsAllowedBeforeBreaking: 5, durationOfBreak: TimeSpan.FromSeconds(30));
+
+var stockPolicy = Policy.WrapAsync(retry, breaker, timeout);
+```
+
+The breaker is what protects the caller. While it's open, calls fail in microseconds instead of holding a thread for seconds. The caller stays healthy even though its dependency isn't.
+
+## One breaker per downstream
+
+A breaker should be scoped to the thing it protects. If a single breaker guards every outgoing call, a failure in the stock service opens it and blocks calls to pricing, which is perfectly well.
+
+Give each downstream its own policy, and register it with the client for that service. That way, the blast radius of a failure is exactly the dependency that failed.
+
+## Retry only what is safe
+
+The retry settings deserve their own warning. A `GET` that reads stock can be retried freely. A `POST` that places an order cannot, unless the receiving service recognises a repeat.
+
+Treat retries as opt-in per call, not a global default on the client. Mark the operations that are idempotent, and retry those. For the rest, either use an idempotency key, as in the inbox pattern from the Messages That Survive series, or don't retry.
+
+## Fail in words people can use
+
+A breaker that opens needs to say so in a way the rest of the system understands. Returning a generic 500 hides the cause and invites a retry from the client.
+
+Return a clear "temporarily unavailable" with the name of the dependency and, if you know it, when to try again. The checkout page can then tell a customer "we can't check stock right now" instead of timing out, and an operator reading the logs knows where to look.
+
+It also gives you a decision to make deliberately: when the dependency is down, does the caller fail, or carry on with a degraded answer? Showing an item as available and checking again at payment may be better than blocking every sale. That's a business choice, not a technical one, and the breaker is what lets you make it.
+
+## Where it falls over
+
+Settings are guesses until they're tested. A threshold that opens too eagerly drops good calls; one that opens too late protects nobody. I'd tune them against real traffic, not defaults, and check them by deliberately slowing a dependency in a test environment.
+
+A breaker can also hide a problem. If calls fail fast and quietly, nobody notices the dependency is struggling. The breaker's state needs to be visible: logged when it changes, and counted in your monitoring.
+
+And none of this fixes a dependency that is simply too slow for the load. A breaker keeps the caller alive, but it doesn't make the stock service faster. The caller still needs a plan for the time the breaker is open.
+
+I should be clear about what this is. It's what I'd put in place, not a description of what we shipped everywhere. The direct-call side was the weaker one, and this is how I'd close the gap.
+
+## The takeaway
+
+**The asynchronous side was protected; the synchronous side is where outages spread.** Put a timeout, a careful retry and a breaker in front of every downstream call, scope each breaker to one dependency, and retry only what is safe to repeat.
+
+Pick the slowest dependency your busiest service calls, and ask what happens to the caller if that dependency takes thirty seconds instead of thirty milliseconds.
+
+Coming next in Services in Practice: your readiness probe is lying.
