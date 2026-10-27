@@ -1,0 +1,130 @@
+---
+title: "Spec-Driven, Part 4: Interview First, Code Second"
+date: "2026-07-27"
+summary: "My coding assistant rarely wrote bad code. It wrote good code for a problem I never had. The fix wasn't a better prompt, it was making the assistant interview me about every acceptance criterion before it touched a file."
+tags: ["ai", "productivity", "tooling", "architecture"]
+series:
+  name: "Spec-Driven: Building Software with Coding Agents in Production"
+  part: 4
+published: true
+---
+
+The Claude Code failures that cost me time weren't broken code. They compiled, the tests passed, and they solved a problem I didn't have.
+
+The assistant had read the ticket, pictured a situation, and built a careful answer to that picture instead of to the work in front of me. Once I'd seen that failure a few times, I stopped trying to fix it with better prompts and started fixing it with **acceptance criteria for coding agents**, asked back to me as questions before any code gets written.
+
+This post is about that habit: making the assistant interview me first. I'll show the weak version I used to run, the version I run now, the three documents it produces, and a few things it caught that I'd otherwise have found in review or, worse, in QA. There's an honest section at the end, because this approach has real costs.
+
+Part 3 promised the review side next. I'm taking one step back first, because the cheapest review comment is the one you make before a line of code exists.
+
+## Confident answers to the wrong question
+
+When I started using an assistant on a large, long-lived .NET service at work, I expected syntax errors, hallucinated APIs and missing null checks. I got a few of those. They were easy, because the compiler and the tests catch them.
+
+The expensive ones were different. They were confident, well-structured answers to a question nobody asked. A ticket says "make the payment timeout configurable", and you get a new setting, validated, wired into the admin UI, with tests. Lovely.
+
+Except the real question was which of two existing timeouts should win when both apply, and the new setting made that question harder to answer.
+
+That's an illustrative example rather than a war story, but the shape is real. The assistant fills every gap in a ticket with the most plausible assumption. On a greenfield side project, plausible is usually fine. On a mature service with house rules you can't see from the code, plausible is how you end up with a constructor dependency that the architecture quietly forbids.
+
+So I did two things. First, I wrote the house rules down and made the core ones load into every session, with the detailed guidance scoped by file type, so a C# change gets the C# rules and an Angular change doesn't pay for them. Second, and this is the post, I changed the order of work so the assistant can't start designing until it has checked its understanding with me.
+
+## The weak version: paste the ticket, ask for a plan
+
+Here's roughly what I used to type:
+
+> Here's the ticket. Read the relevant code and write me an implementation plan.
+
+It feels efficient. The assistant reads the ticket, reads some code, and produces a plan with headings, file paths and a test list. The plan looks like thinking, which is exactly the problem.
+
+Every ambiguity in the ticket gets resolved silently, inside the model, and the resolution comes back to me already dressed as a decision. I then review a plan instead of the assumptions underneath it. If one of those assumptions is wrong, I only find out when the code disagrees with a tester, a reviewer or production.
+
+Tickets are written by busy people for other people who share their context. "Housekeeping, no QA needed" is a perfectly reasonable thing to write on a ticket. It's a terrible input for an assistant that has to decide what done means.
+
+## The better version: acceptance criteria for coding agents, one question at a time
+
+The version I run now is a Claude Code skill I wrote for our repo, one of nine custom skills I've built for it. It fetches the ticket, and then, before it opens a single source file, it goes through each acceptance criterion with me, one at a time.
+
+For each criterion it does four things.
+
+It restates the criterion in its own words, so I can see whether it understood. It asks how we'll know it's done: a test, a log line, a capture from a test rig. It asks where the data comes from and how the thing fails. And it asks what else we could do instead, so the first idea isn't the only one on the table.
+
+An exchange looks something like this, reconstructed and made generic:
+
+> _Assistant:_ Criterion 2 says the test hook fails the pump authorisation "for the chosen amount". I'm reading that as: when the switch is on and the customer picks exactly that amount, the payment is still approved, but the service skips the real pump authorisation and takes the same path as when the pump controller really says no. Is the amount compared before or after any adjustment the service makes?
+>
+> _Me:_ Before. QA need to predict the trigger without knowing our internals.
+
+Then it waits. It doesn't carry on with its best guess, and it doesn't batch ten questions into a wall of text I'll skim. **One criterion, one conversation, then the next.** Only when every criterion has an agreed meaning does it move on to reading the code properly and writing anything down.
+
+### No criteria, no progress
+
+The rule I'm strictest about is the empty case. If a ticket has no acceptance criteria, the skill stops and asks what done looks like. It doesn't invent some and carry on.
+
+On one test-tooling ticket, the criteria field just said no QA was needed because it was housekeeping. The skill refused to go further until we'd agreed what done meant. We ended up with three criteria and deferred one of them with a written reason, instead of letting it drift into "we'll see".
+
+That deferral is the bit I value most. A deferred criterion with a reason is a decision. A missing criterion is a surprise waiting for someone else.
+
+### The five stages around the interview
+
+The interview is the front of a longer workflow: ticket evaluation, codebase analysis, plan, implementation and verification. The first stage is a gap analysis on the ticket itself, which is where the interview lives. The last stage maps every acceptance criterion to evidence, a test name or a rig capture, before anyone says "done".
+
+Those two ends are the same idea. The criteria get agreed at the start and proved at the end, and everything in between is judged against them.
+
+## Three documents, three readers
+
+Once the interview is done, the skill writes three documents: dev notes, a spec and a plan. A small script creates the three linked skeletons first, so the structure is always the same and the model spends its effort on the content rather than on formatting.
+
+They're separate because they have different readers with different lifespans. The spec is for QA, and it's stable once it's agreed. The plan is for whoever implements, and it's disposable after merge. The notes are for me in a year's time, when someone asks why we did it this way.
+
+So the notes carry the interview log: each question, the options, the decision and the reason. Each fact lives in exactly one of the three documents, and the skill checks that before it finishes. If the same fact lives in three places, it ends up written three slightly different ways, and one of them will be wrong.
+
+The writing rules are strict on purpose. Notes are first person and honest about trade-offs, with a diagram for any flow of three or more hops. There's a short list of red flags the skill checks itself against, like writing documents before the interview has finished, findings leaking into the spec, or rationale leaking into the plan.
+
+Around 40 tickets now have notes, a spec and a plan written this way. That's the part I'd point to if someone asked what this has changed. Not speed, which I haven't measured, but a consistent record of why each change looks the way it does.
+
+## What the interview actually caught
+
+The value shows up early and it's usually boring. Three examples, kept generic.
+
+The first was a QA hook for a payments service: a setting that makes the pump authorisation fail, after the payment is approved, for one chosen amount. It takes the same path as when the pump controller really says no, so QA can test the failure path on the build customers actually run instead of a special broken build. The ticket first gave the amount in pounds with a decimal point. Our config has no decimal setting type, so I'd already started designing around a text setting and parsing pounds into pence, with all the culture and bad-input handling that brings.
+
+Restating that criterion surfaced that the ticket had since been corrected to whole pence. Amounts in that part of the code were already whole pence, so the check became a plain equality. **The design shrank to two settings and a guard.** No parsing, no rounding, no "what if someone types rubbish" path, and a whole class of bugs never got written.
+
+The second was a status badge on an admin UI that showed the wrong state. The notes record three options: combine a few flags in the UI, change the object the backend sends, or find out why the underlying flag goes false. I picked the third. The notes also say why the obvious fix was wrong: the flags it would have combined stay true when the device is idle, so the badge would have shown "In Use" forever.
+
+The third came from the analysis stage that runs straight after the interview, not the interview itself, but it's the same habit. A ticket asked for a restricted staff view of an admin UI, and the obvious reading was to switch the UI to a lower-privilege key when the mode was on. Tracing the first call the UI makes showed that the call which tells it what mode it's in is admin-only. Switch keys and the UI locks itself out of the one answer it needs.
+
+We found that before anyone wrote code, and the design changed to bootstrap with the admin key and switch afterwards.
+
+None of these are clever. They're the kind of thing a good colleague asks in the first five minutes. The point is that the assistant now asks them too, at the moment they're cheapest to answer.
+
+## The agent never commits
+
+None of this replaces review. The assistant in this workflow never commits, pushes, merges or rebases. It stages the files for a unit of work, drafts a one-line commit message and stops.
+
+I review the staged diff and commit it myself. The pull request then goes through normal human review and CI like any other change, and the reviewer gets the spec and notes to check it against. That's the standard I set for AI-generated changes on our team: real assertions rather than tests that merely run, dependencies that have been verified to exist, and no secrets in prompts.
+
+This is also where the interview pays off a second time. A reviewer who can read the agreed criteria and the reasons behind each decision is reviewing intent, not just syntax.
+
+The spec/PRD approach is team-wide for larger work. The interview skill is mine; it's in a shared repo and colleagues use it if it suits them.
+
+If you've read [how I run a PRD through a loop with Ralph TUI](/blogs/spec-driven-part-3-prd-as-program-ralph-tui/), this is the opposite end of the dial. The loop is for well-decomposed work. The interview is for tickets on a shared codebase, where a wrong assumption costs someone else's afternoon.
+
+## Where it falls over
+
+**Three documents is too much for small work.** It's right for a bug on a money path. It's absurd for a label change. There's a quick path that produces the same documents without the full interview, and the rule is that it has to be chosen deliberately. Even so, I've over-documented small tickets, and I still catch myself doing it.
+
+Documents drift, including the ones an assistant helped write. When I audited our own core docs, I found 13 wrong facts. So "check the code before trusting a doc" went into the skills as well. An interview only helps if the thing it produces stays true, and nothing about this process guarantees that on its own.
+
+The interview is only as good as my answers. If I don't know how a criterion fails, the honest answer is "I need to ask", and the ticket stalls until I do. That's the right outcome, but it doesn't feel like progress on the day. It's also possible to say "yes, that's right" to every restatement without reading it properly, and then the interview becomes theatre with extra steps.
+
+And I haven't measured whether it makes me faster. I can show consistency and traceability: the same three documents, the same questions asked, a written reason for every non-obvious decision. I can't show you a speed-up, and I'm not going to invent one.
+
+## Start with one question
+
+My position is simple. An assistant that asks before it builds is worth more than one that builds quickly, because the expensive mistakes on a real codebase are wrong assumptions, not wrong syntax. Acceptance criteria for coding agents only work if the agent has to say them back to you and wait.
+
+You don't need my skill or my three documents to start. On your next ticket, before you ask for a plan, tell the assistant to restate each acceptance criterion as a question and stop for your answer. If the ticket has no criteria, make it ask you what done looks like. Then let the output go through the same PRs, review and CI as everything else.
+
+Next in the series, I'll look at what the assistant reads before it asks anything, and why I started treating its context as a budget. The review side I promised runs through the parts after that. The earlier parts are on [the blog](/blogs/) if you're catching up.
