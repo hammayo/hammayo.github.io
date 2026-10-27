@@ -1,0 +1,115 @@
+---
+title: "Messages That Survive, Part 7: The Back-Off Setting Nobody Used"
+date: "2022-07-12"
+summary: "A retry schedule was defined, documented in code, and never read. The publisher used a different one. This is a pattern worth looking for in your own configuration: the setting that exists, looks right, and changes nothing."
+tags: ["dotnet", "kafka", "configuration", "reliability"]
+series:
+  name: "Messages That Survive"
+  part: 7
+published: true
+---
+
+Reading through a shared messaging library recently, I found two retry schedules. One was for the processor, the part that consumes messages. The other was for the producer, the part that publishes them. The producer's schedule was careful and sensible, and I spent a while working out why the publisher's behaviour didn't match it.
+
+It didn't match because nothing used it. The setting was defined, it had a type and defaults, and no code read it. The publisher quietly borrowed the processor's schedule instead.
+
+I want to be careful about how I frame this. It isn't a bug I found and fixed, and it isn't a story about someone's mistake. It's a **unused configuration setting**, and it's a pattern worth knowing how to spot, because every codebase has some. This is the last part of Messages That Survive, and it follows [Part 6](/blogs/messages-that-survive-part-6-the-consumer-that-waited-forever-for-a-topic/).
+
+## Two schedules, one of them real
+
+The processor's back-off is the one from [Part 3](/blogs/messages-that-survive-part-3-retry-back-off-then-stop/): 5 seconds, then 5 minutes, then 5 hours, then stop.
+
+The producer's was defined separately, and it was longer. One minute, five minutes, five hours and then 24 hours. A publisher that cannot reach the broker has a different problem from a handler that hit a bad message, and a different schedule made sense. It could keep trying for a day before giving up.
+
+But the publisher never read it. It used the processor's schedule, which meant it stopped after five hours, not a day. The 24-hour step existed only on paper.
+
+## Why a setting like this survives
+
+It's easy to be hard on the people involved, and it's not useful. The reasons are ordinary.
+
+The setting was probably added with good intentions, then a refactor routed the publisher through shared code, and the shared code used the nearby, working schedule. Everything still compiled. Everything still ran. Nothing failed.
+
+That's the key property of an unused setting: **it can't fail, so nothing tells you it's there.** It has no tests that would break, no runtime path that would throw, and a name that reads as if it matters. A reader sees the schedule, assumes it applies, and moves on.
+
+## The weak habit: trust the name
+
+Most of us read configuration as a description of behaviour. If a class has a `ProducerBackoff` property with four values, then the producer backs off at those intervals. Why would you check?
+
+That assumption is the weakness. A name tells you what someone intended at the time. It says nothing about what the code does now.
+
+## The better habit: follow the setting to where it's used
+
+When a setting matters, find the line that reads it. Not the line that defines it, and not the documentation. The line that reads it and changes what happens next.
+
+Most editors will show you every reference to a property. If the answer is "the definition and nothing else", you have an unused setting. If the answer is "it's read in one place, and that place is not the code path you care about", you have a more subtle version of the same thing.
+
+```csharp
+// Defined, documented, and read by nothing.
+public TimeSpan[] ProducerBackoff { get; init; } =
+{
+    TimeSpan.FromMinutes(1),
+    TimeSpan.FromMinutes(5),
+    TimeSpan.FromHours(5),
+    TimeSpan.FromHours(24)
+};
+
+// What the publisher actually calls.
+var delay = _options.ProcessorBackoff[attempt];
+```
+
+It takes a couple of minutes. It's one of the cheaper review habits I know.
+
+## What the difference was worth
+
+Five hours against a day is not a small gap. A broker outage that lasts through a long evening and into the next morning is exactly the sort of thing that a longer schedule would have ridden out and a shorter one would not.
+
+When the publisher gives up, the messages it was holding don't go anywhere good. They're left for a person to deal with, and as [Part 5](/blogs/messages-that-survive-part-5-the-dead-letter-topic-we-didnt-have/) described, that is a slow and manual job.
+
+I'm not claiming this caused an incident. I'm saying the difference between a publisher that waits a day and one that waits five hours is real, it was invisible, and finding it was an accident.
+
+## A test that would pin it
+
+The best answer to a setting that nothing reads is a test that fails if nothing reads it. It doesn't need to be clever.
+
+Build the publisher with a configuration whose producer schedule is distinctive, say 1 second, 2 seconds, 3 seconds, and make it fail against a broker that always refuses. Then assert on the delays it actually waited.
+
+```csharp
+[Fact]
+public async Task Publisher_UsesProducerBackoff_NotProcessorBackoff()
+{
+    var options = new MessagingOptions
+    {
+        ProducerBackoff = new[] { Seconds(1), Seconds(2), Seconds(3) },
+        ProcessorBackoff = new[] { Seconds(100) }
+    };
+    var clock = new FakeDelay();
+
+    await Publisher(options, clock).PublishAsync(AlwaysFailing, CancellationToken.None);
+
+    Assert.Equal(new[] { Seconds(1), Seconds(2), Seconds(3) }, clock.Delays);
+}
+```
+
+The processor schedule is deliberately absurd, so a publisher that reads the wrong one gives a wildly different answer and the test is unmistakable.
+
+## Configuration you can't observe
+
+There's a wider point here. Most services have settings that nobody can see at runtime. You can read the code, but you can't ask a running instance what back-off it will use.
+
+A cheap improvement is to log the effective configuration at start-up, once, for the settings that change behaviour. Not secrets, just the numbers and the switches. When something behaves oddly, the first question is then answerable from the logs.
+
+It also turns this kind of discrepancy into something a person can notice. If the start-up line says the producer will wait five hours and the documentation says a day, someone will ask why.
+
+## Where it falls over
+
+Tracing every setting is not realistic. A large library has hundreds, and checking each one by hand is a poor use of an afternoon. The habit works best for settings that control something expensive or risky: retries, timeouts, limits.
+
+An unused setting is also not always a mistake. Sometimes it's reserved for a feature that hasn't landed. The decision is then whether to delete it, wire it up, or mark it clearly, and "leave it and hope" is the choice that causes the problem.
+
+And a test like the one above pins the behaviour you wrote down, not the behaviour you should have wanted. If the schedule itself is wrong, the test will happily guard the wrong numbers.
+
+## The takeaway
+
+**Read your own defaults: a setting that's defined isn't necessarily a setting that's used.** Follow it to the line that reads it, pin it with a test that fails if nothing does, and log the effective values at start-up.
+
+That closes this series. Between them, the seven parts cover sending messages reliably, receiving them safely, failing sensibly, changing them without breaking anyone, recovering from failure, starting in any order, and checking that your own settings do what you think. The earlier posts are on [the blog](/blogs/) if you're catching up.
