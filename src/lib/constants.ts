@@ -78,8 +78,8 @@ export const PAGE_META = {
     description: 'Open to senior software engineering roles: C#, .NET, agentic engineering with Claude Code. Previously SC cleared. Based in Basingstoke, covering Berkshire and London. Open to remote and hybrid roles.',
   },
   series: {
-    title:       "Spec-Driven | Hammayo's Portfolio",
-    description: 'Spec-Driven: AI development that actually ships. A series on using AI coding tools with twenty years of engineering judgement.',
+    title:       "Series | Hammayo's Portfolio",
+    description: 'Multi-part writing on spec-driven AI development, forecourt systems, legacy .NET, messaging, access control and more, in reading order.',
   },
   services: {
     title:       "Services | Hammayo's Portfolio",

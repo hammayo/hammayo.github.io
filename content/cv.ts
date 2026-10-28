@@ -78,7 +78,7 @@ export const cv = {
       kind:    'employer',
       summary: 'Built a workflow where the agent agrees every acceptance criterion before writing a spec; adopted team-wide for larger work. Delivered a 27-story Angular feature through a gated agent loop, and cut what the assistant loads each session from 1,122 lines to 380.',
       tags:    ['Claude Code', 'Agent loops', 'Angular'],
-      href:    '/series',
+      href:    '/series/spec-driven',
       hrefLabel: 'Spec-Driven series',
     },
     {

@@ -1,74 +1,55 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { format } from 'date-fns';
 import { Container } from '@/features/shared/container';
 import { PageTransitionWrapper } from '@/features/shared/page-transition-wrapper';
 import { PageHeader } from '@/features/shared/page-header';
 import { PageViewEvent } from '@/features/shared/analytics-event';
-import { getAllPostsMeta } from '@/features/blogs/pipeline';
-import { glowCard, accentTag, gradientText, ctaButton } from '@/design/variants';
-import { SOCIAL } from '@/lib/constants';
+import { getAllSeries, stripPartPrefix } from '@/features/blogs/series';
+import { accentTag, glowCard } from '@/design/variants';
 import { createPageMetadata } from '@/lib/metadata';
-import { series } from '../../../content/series';
+import { series as flagship } from '../../../content/series';
 
 export const metadata: Metadata = createPageMetadata('series', '/series');
 
+const range = (dates: string[]) => {
+  const [first, last] = [dates[0], dates[dates.length - 1]].map(d => format(new Date(d), 'MMM yyyy'));
+  return first === last ? first : `${first} – ${last}`;
+};
+
 export default function SeriesPage() {
-  const parts = getAllPostsMeta()
-    .filter(p => p.series?.name === series.name)
-    .sort((a, b) => (a.series!.part) - (b.series!.part));
+  const all = getAllSeries();
 
   return (
     <PageTransitionWrapper>
       <PageViewEvent page="series" />
       <Container className="py-8">
-        <PageHeader title={series.title} subtitle={series.tagline} />
+        <PageHeader title="Series" subtitle="Multi-part writing, in reading order." />
 
-        <div className="space-y-3">
-          {series.description.map((paragraph, i) => (
-            <p key={i} className="text-sm md:text-base text-muted-foreground leading-relaxed">
-              {paragraph}
-            </p>
-          ))}
-        </div>
-
-        <div className="mt-8 space-y-4">
-          {parts.map(post => (
-            <Link
-              key={post.slug}
-              href={`/blogs/${post.slug}`}
-              className={glowCard({ variant: 'default' }) + ' block p-5'}
-            >
-              <div className="flex items-start gap-4">
-                <span className={accentTag({ variant: 'scheme' })}>
-                  {`Part ${post.series!.part}`}
-                </span>
-                <div className="flex-1">
-                  <h2 className="font-semibold text-foreground">{post.title}</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">{post.summary}</p>
+        <div className="grid gap-4 md:grid-cols-2">
+          {all.map(({ slug, name, posts }) => {
+            const isFlagship = name === flagship.name;
+            const dates = posts.map(p => p.date).sort();
+            return (
+              <Link
+                key={slug}
+                href={`/series/${slug}`}
+                className={glowCard({ variant: isFlagship ? 'featured' : 'default' }) + ' block p-5 space-y-2'}
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="font-semibold text-foreground">{isFlagship ? flagship.title : name}</h2>
+                  {isFlagship ? <span className={accentTag()}>Flagship</span> : null}
                 </div>
-              </div>
-            </Link>
-          ))}
+                <p className="text-xs text-muted-foreground">
+                  {`${posts.length} ${posts.length === 1 ? 'part' : 'parts'} · ${range(dates)}`}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {isFlagship ? flagship.tagline : `Starts with: ${stripPartPrefix(posts[0].title)}`}
+                </p>
+              </Link>
+            );
+          })}
         </div>
-
-        <section
-          className={
-            glowCard({ variant: 'featured' }) +
-            ' mt-12 flex flex-col items-center gap-4 p-6 text-center md:p-8'
-          }
-        >
-          <h2 className={gradientText({ size: 'heading' })}>This series is becoming a course</h2>
-          <p className="max-w-lg text-sm text-muted-foreground md:text-base">
-            Spec-Driven is being turned into a full course. Email me to join the waitlist and
-            hear when it launches.
-          </p>
-          <a
-            href={`mailto:${SOCIAL.email}?subject=Course%20waitlist`}
-            className={ctaButton({ variant: 'gradient' })}
-          >
-            Join the waitlist
-          </a>
-        </section>
       </Container>
     </PageTransitionWrapper>
   );
