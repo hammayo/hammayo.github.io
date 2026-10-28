@@ -1,12 +1,12 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Container } from '@/features/shared/container';
 import { PageTransitionWrapper } from '@/features/shared/page-transition-wrapper';
 import { PageHeader } from '@/features/shared/page-header';
 import { PageViewEvent } from '@/features/shared/analytics-event';
+import { BlogCard } from '@/features/blogs/blog-card';
 import { getAllSeries, getSeriesBySlug } from '@/features/blogs/series';
-import { glowCard, accentTag, gradientText, ctaButton } from '@/design/variants';
+import { glowCard, gradientText, ctaButton } from '@/design/variants';
 import { SITE_URL, SOCIAL } from '@/lib/constants';
 import { series as flagship } from '../../../../content/series';
 
@@ -48,6 +48,7 @@ export default async function SeriesDetailPage({ params }: Props) {
         <PageHeader
           title={isFlagship ? flagship.title : group.name}
           subtitle={isFlagship ? flagship.tagline : `${group.posts.length} parts, in reading order.`}
+          className="mb-4"
         />
 
         {isFlagship ? (
@@ -60,23 +61,9 @@ export default async function SeriesDetailPage({ params }: Props) {
           </div>
         ) : null}
 
-        <div className="mt-8 space-y-4">
-          {group.posts.map(post => (
-            <Link
-              key={post.slug}
-              href={`/blogs/${post.slug}`}
-              className={glowCard({ variant: 'default' }) + ' block p-5'}
-            >
-              <div className="flex items-start gap-4">
-                <span className={accentTag({ variant: 'scheme' })}>
-                  {`Part ${post.series!.part}`}
-                </span>
-                <div className="flex-1">
-                  <h2 className="font-semibold text-foreground">{post.title}</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">{post.summary}</p>
-                </div>
-              </div>
-            </Link>
+        <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
+          {group.posts.map((post, i) => (
+            <BlogCard key={post.slug} post={post} index={i} />
           ))}
         </div>
 

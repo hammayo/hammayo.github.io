@@ -41,6 +41,7 @@ export default async function ProjectsPage() {
         <PageHeader
           title="Projects"
           subtitle="Explore my most recent projects and open source contributions."
+          className="mb-4"
         />
 
         <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
@@ -59,7 +60,7 @@ export default async function ProjectsPage() {
             {recentPinnedRepos.length > 0 && (
               <div>
                 <h2 className="text-xl font-semibold mb-4 text-zinc-200">Featured Projects</h2>
-                <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   {recentPinnedRepos.map((project, index) => (
                     <ProjectCard key={project.id} repo={project} index={index} featured blogPostSlug={REPO_BLOG_MAP[project.name]} />
                   ))}
@@ -70,7 +71,7 @@ export default async function ProjectsPage() {
             {remainingPinnedRepos.length > 0 && (
               <div>
                 <h2 className="text-xl font-semibold mb-4 text-zinc-200">Other Pinned Projects</h2>
-                <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   {remainingPinnedRepos.map((project, index) => (
                     <ProjectCard
                       key={project.id}
@@ -86,7 +87,7 @@ export default async function ProjectsPage() {
             {otherRepos.length > 0 && (
               <div>
                 <h2 className="text-xl font-semibold mb-4 text-zinc-200">Other Projects</h2>
-                <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   {otherRepos.map((project, index) => (
                     <ProjectCard
                       key={project.id}

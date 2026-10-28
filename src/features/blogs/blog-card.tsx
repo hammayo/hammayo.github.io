@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link';
 import { CardContent } from '@/features/shared/ui/card';
 import { CardEffects, cardBaseClasses } from '@/features/shared/ui/card-effects';

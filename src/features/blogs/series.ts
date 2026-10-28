@@ -3,14 +3,14 @@
 // the URL slug is the slugified name, so a new series needs no config.
 import { getAllPostsMeta } from './pipeline';
 import type { PostMeta } from './schema';
-import { series as flagship } from '../../../content/series';
+import { featuredSeries } from '../../../content/series';
 
 export type SeriesGroup = { slug: string; name: string; posts: PostMeta[] };
 
 export const slugify = (name: string) =>
   name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
-/** Published series, flagship first, then most recently updated first. */
+/** Published series, featured first, then most recently updated first. */
 export function getAllSeries(): SeriesGroup[] {
   const byName = new Map<string, PostMeta[]>();
   for (const post of getAllPostsMeta()) {
@@ -25,8 +25,8 @@ export function getAllSeries(): SeriesGroup[] {
   }));
 
   const latest = (g: SeriesGroup) => Math.max(...g.posts.map(p => +new Date(p.date)));
-  return groups.sort((a, b) =>
-    Number(b.name === flagship.name) - Number(a.name === flagship.name) || latest(b) - latest(a));
+  const rank   = (g: SeriesGroup) => { const i = featuredSeries.indexOf(g.name); return i < 0 ? Infinity : i; };
+  return groups.sort((a, b) => (rank(a) - rank(b) || 0) || latest(b) - latest(a));
 }
 
 export function getSeriesBySlug(slug: string): SeriesGroup | undefined {
