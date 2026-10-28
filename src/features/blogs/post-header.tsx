@@ -36,7 +36,7 @@ function SeriesLink({ post, className }: { post: PostMeta; className: string }) 
   if (!post.series) return null;
   const { name, part } = post.series;
   return (
-    <Link href={`/series/${slugify(name)}`} className={cn('inline-block text-sm font-medium hover:underline underline-offset-2 mb-2', className)}>
+    <Link href={`/series/${slugify(name)}`} className={cn('inline-block text-sm font-medium hover:underline underline-offset-2 mt-2', className)}>
       {`Part ${part} of ${name} →`}
     </Link>
   );
@@ -53,7 +53,6 @@ export function PostHeader({ post }: PostHeaderProps) {
         <Image src={heroPath} alt={post.title} fill className="object-cover" priority />
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-[var(--scheme-accent)]/20" />
         <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8">
-          <SeriesLink post={post} className="text-white/80 hover:text-white" />
           <h1 className="text-2xl md:text-4xl font-bold text-white leading-tight mb-3">{post.title}</h1>
           {post.tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-3">
@@ -67,6 +66,7 @@ export function PostHeader({ post }: PostHeaderProps) {
             <span>·</span>
             <span>{post.readingTime} min read</span>
           </div>
+          <SeriesLink post={post} className="text-white/80 hover:text-white" />
         </div>
       </div>
     );
@@ -78,7 +78,6 @@ export function PostHeader({ post }: PostHeaderProps) {
     <div className="relative w-full mb-8 rounded-2xl overflow-hidden min-h-[180px] md:min-h-[220px] border border-[var(--scheme-border)] flex flex-col justify-end">
       <HeroFallbackBackground />
       <div className="relative z-10 p-6 md:p-8">
-        <SeriesLink post={post} className="text-[var(--scheme-accent-text)]" />
         <h1 className="text-2xl md:text-4xl font-bold gradient-text leading-tight mb-2">{post.title}</h1>
         <div className="h-0.5 w-10 rounded-full gradient-bg scheme-glow mb-3" />
         {post.tags.length > 0 && (
@@ -93,6 +92,7 @@ export function PostHeader({ post }: PostHeaderProps) {
           <span>·</span>
           <span>{post.readingTime} min read</span>
         </div>
+        <SeriesLink post={post} className="text-[var(--scheme-accent-text)]" />
       </div>
     </div>
   );
