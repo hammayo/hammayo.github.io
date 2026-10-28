@@ -101,6 +101,8 @@
     --gradient-border-width: 1.5px;
     /* Darkened accent for foreground text in light mode — auto-derived, no component logic needed */
     --scheme-accent-text: color-mix(in srgb, var(--scheme-accent) 60%, #000);
+    /* Search-match highlight (same fluorescent green as the career kit) */
+    --mark: #a6ff3d;
 
     /* Code block surfaces — light mode: soft pale surface on white page */
     --code-bg: #f3f4f6;
@@ -135,6 +137,7 @@
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
     --scheme-accent-text: var(--scheme-accent);
+    --mark: #9cff2e;
 
     /* Code block surfaces — dark mode: elevated surface above near-black page */
     --code-bg: #1e2235;
@@ -370,4 +373,15 @@ code[data-theme] span {
 @keyframes marquee {
   from { transform: translateX(0); }
   to   { transform: translateX(-50%); }
+}
+
+/* Search-match highlight: blog list filter and the Pagefind palette both emit <mark> */
+mark {
+  background: var(--mark);
+  color: #0d1a00;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--mark) 60%, transparent);
+  border-radius: 3px;
+  padding: 0 2px;
+  font-style: normal;
+  -webkit-text-fill-color: #0d1a00; /* stays readable inside gradient-text titles */
 }
