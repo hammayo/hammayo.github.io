@@ -1,7 +1,7 @@
 ---
 title: "Services in Practice, Part 3: Circuit Breakers for Calls Between Services"
 date: "2021-10-12"
-summary: "The asynchronous side of a system can be made to survive almost anything. The synchronous side is where an outage in one service spreads to every service that calls it. Here's how a slow dependency ties up threads, and the timeout, retry and breaker settings I'd put in front of every downstream call."
+summary: "The asynchronous side of a system can be made to survive almost anything. The synchronous side is where an outage in one service spreads to every service that calls it. A slow dependency ties up threads. The timeout, retry and breaker settings I'd put in front of every downstream call stop that."
 tags: ["dotnet", "polly", "resilience", "microservices"]
 series:
   name: "Services in Practice"

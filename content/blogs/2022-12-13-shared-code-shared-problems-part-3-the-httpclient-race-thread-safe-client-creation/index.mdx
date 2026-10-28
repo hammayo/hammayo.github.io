@@ -1,7 +1,7 @@
 ---
 title: "Shared Code, Shared Problems, Part 3: The HttpClient Race"
 date: "2022-12-13"
-summary: "A shared HTTP client is shared mutable state, and the first place that shows is in how it's created. Here's what goes wrong when two callers build a client at the same moment, and how to make creation safe and testable."
+summary: "A shared HTTP client is shared mutable state, and the first place that shows is in how it's created. What goes wrong when two callers build a client at the same moment, and how to make creation safe and testable."
 tags: ["dotnet", "httpclient", "concurrency", "testing"]
 series:
   name: "Shared Code, Shared Problems"

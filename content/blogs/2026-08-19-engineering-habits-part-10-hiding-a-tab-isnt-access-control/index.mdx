@@ -1,7 +1,7 @@
 ---
 title: "Engineering Habits, Part 10: Hiding a Tab Isn't Access Control"
 date: "2026-08-19"
-summary: "A hidden nav item is a convenience. The route guard and the server are the security. Here's how an admin panel with a read-only mode for junior staff should be built: guards that redirect restricted routes, the server as the real enforcement, and tests that assert a control is absent by name."
+summary: "A hidden nav item is a convenience. The route guard and the server are the security. The route guard redirects restricted routes and the server does the real enforcement, with tests that assert a control is absent by name. That is how an admin panel with a read-only mode for junior staff should be built."
 tags: ["security", "frontend", "angular", "testing"]
 series:
   name: "Engineering Habits"

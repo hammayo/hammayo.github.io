@@ -1,7 +1,7 @@
 ---
 title: "Building Tewe Diary, Part 5: Output Caching with Tag-Based Eviction"
 date: "2026-09-21"
-summary: "Cache reads, and tie eviction to writes instead of guessing how long data stays fresh. Here's the output cache policy in my movie diary API, the tag that every write evicts, the endpoint the import pipeline calls, and why this only works on a single instance."
+summary: "Cache reads, and tie eviction to writes instead of guessing how long data stays fresh. The output cache policy in my movie diary API has a tag that every write evicts and an endpoint the import pipeline calls. It only works on a single instance."
 tags: ["dotnet", "caching", "performance", "api-design"]
 series:
   name: "Building Tewe Diary"

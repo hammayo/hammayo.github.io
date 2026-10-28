@@ -1,7 +1,7 @@
 ---
 title: "Legacy .NET That Still Pays, Part 7: Your Singleton Is Shared State"
 date: "2026-07-18"
-summary: "A singleton in the dependency-injection container is a global variable with better manners. Every write to it affects every reader at once. Here's what that means for a shared in-memory list read by several background workers, and when to snapshot instead of share."
+summary: "A singleton in the dependency-injection container is a global variable with better manners. Every write to it affects every reader at once. That matters for a shared in-memory list read by several background workers, and for deciding when to snapshot instead of share."
 tags: ["dotnet", "dependency-injection", "concurrency", "legacy"]
 series:
   name: "Legacy .NET That Still Pays"

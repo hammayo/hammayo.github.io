@@ -1,7 +1,7 @@
 ---
 title: "Services in Practice, Part 10: The Helper That Made a Query per Item"
 date: "2023-07-18"
-summary: "An N+1 hides best inside a helper that looks cheap. A category page asked for translated product names one item at a time, and each call was a round trip. Here's the batched query, the cache keyed by what callers actually ask for, and the weak spot in invalidating it."
+summary: "An N+1 hides best inside a helper that looks cheap. A category page asked for translated product names one item at a time, and each call was a round trip. The fix is a batched query and a cache keyed by what callers actually ask for, with a weak spot in invalidating it."
 tags: ["dotnet", "performance", "caching", "redis"]
 series:
   name: "Services in Practice"

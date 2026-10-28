@@ -1,7 +1,7 @@
 ---
 title: "Shared Code, Shared Problems, Part 7: Your Background Service Doesn't Have a Request"
 date: "2023-06-13"
-summary: "'Cannot access a disposed object' in a message handler usually means a scoped service lives in something that outlives its scope. Here's why hosted services have no request scope, the per-message scope that fixes it, and why the fix belongs in the shared library."
+summary: "'Cannot access a disposed object' in a message handler usually means a scoped service lives in something that outlives its scope. Hosted services have no request scope. A per-message scope fixes it, and the fix belongs in the shared library."
 tags: ["dotnet", "dependency-injection", "ef-core", "background-services"]
 series:
   name: "Shared Code, Shared Problems"

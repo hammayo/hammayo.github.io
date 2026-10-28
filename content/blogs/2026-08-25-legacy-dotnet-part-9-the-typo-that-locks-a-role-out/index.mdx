@@ -1,7 +1,7 @@
 ---
 title: "Legacy .NET That Still Pays, Part 9: The Typo That Locks a Role Out"
 date: "2026-08-25"
-summary: "Role names as raw strings in attributes fail silently when misspelled. A controller gets locked to nobody, or opened to the wrong people, and the compiler says nothing. Here's the move to constants, why I combined them by concatenation instead of naming every combination, and the test per role that backs it up."
+summary: "Role names as raw strings in attributes fail silently when misspelled. A controller gets locked to nobody, or opened to the wrong people, and the compiler says nothing. The fix is a move to constants, combined by concatenation instead of naming every combination, with a test per role to back it up."
 tags: ["dotnet", "security", "csharp", "aspnet"]
 series:
   name: "Legacy .NET That Still Pays"

@@ -1,7 +1,7 @@
 ---
 title: "Building Tewe Diary, Part 6: Schema Owned by Migrations, With Separate Database Roles"
 date: "2026-09-24"
-summary: "One thing owns the schema, and each job that touches the database gets the least privilege it needs. Here's how my movie diary API uses FluentMigrator as the only owner of DDL, keeps import scripts data-only, and splits the database into migrate, import and runtime roles."
+summary: "One thing owns the schema, and each job that touches the database gets the least privilege it needs. My movie diary API uses FluentMigrator as the only owner of DDL, keeps import scripts data-only, and splits the database into migrate, import and runtime roles."
 tags: ["dotnet", "postgres", "migrations", "security"]
 series:
   name: "Building Tewe Diary"

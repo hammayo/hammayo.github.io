@@ -1,7 +1,7 @@
 ---
 title: "Building Tewe Diary, Part 13: What I'd Add Next, Where an Outbox Would Go"
 date: "2026-10-29"
-summary: "My movie diary API doesn't publish any events today. Here's the design for the first one, a rating being saved: where an outbox table would sit in the existing Postgres, how it would be written, who would consume it, and why I haven't built it."
+summary: "My movie diary API doesn't publish any events today. This is the design for the first one, a rating being saved: where an outbox table would sit in the existing Postgres, how it would be written, who would consume it, and why I haven't built it."
 tags: ["dotnet", "postgres", "event-driven", "architecture"]
 series:
   name: "Building Tewe Diary"
@@ -89,7 +89,7 @@ limit 50
 for update skip locked;
 ```
 
-Publishing can fail, so the worker needs back-off and a limit, and it needs to be safe to run twice. That brings the rest of the earlier series along: at-least-once delivery means a consumer can see a message twice, so consumers need an inbox, and a failure that never succeeds needs somewhere to go.
+Publishing can fail, so the worker needs back-off and a limit, and it needs to be safe to run twice. That brings the rest of the earlier series along: at-least-once delivery means a consumer can see a message twice, so consumers need [an inbox](/blogs/messages-that-survive-part-2-every-message-arrives-twice/), retries need [a back-off and a stop](/blogs/messages-that-survive-part-3-retry-back-off-then-stop/), and a failure that never succeeds needs [somewhere to go](/blogs/messages-that-survive-part-5-the-dead-letter-topic-we-didnt-have/).
 
 I'd call the event `RatingSetV1` from the first day. Putting the version in the type name costs nothing now and saves a migration later.
 
