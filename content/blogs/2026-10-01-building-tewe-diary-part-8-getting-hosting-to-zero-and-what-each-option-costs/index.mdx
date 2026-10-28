@@ -1,0 +1,68 @@
+---
+title: "Building Tewe Diary, Part 8: Getting Hosting to $0, and What Each Option Costs"
+date: "2026-10-01"
+summary: "I wanted my portfolio project live for nothing. The honest answer is that this exact Azure stack can't do it. The reasons, the three options I compared, what I chose, and the one that's documented but deliberately not built."
+tags: ["azure", "devops", "cost", "dotnet"]
+series:
+  name: "Building Tewe Diary"
+  part: 8
+published: true
+---
+
+I wanted my movie diary API on the internet and costing nothing. A demo project that nobody can open is a weaker demo, and a demo that bills me forty dollars a month is a bad hobby.
+
+It turned out the stack I'd chosen couldn't do it. That's not a failure to report. It's the useful part, because the reasons are specific, and they're the sort of thing you only learn by pricing it.
+
+This is Part 8 of **Building Tewe Diary**, following [Part 7](/blogs/building-tewe-diary-part-7-the-adr-habit-decision-rationale-revisit-when/). It's about **Azure hosting costs for a small container app**, and about writing the options down before choosing.
+
+## What I started with
+
+Both APIs deploy as containers to Azure App Service on a Basic plan, backed by Azure Database for PostgreSQL Flexible Server, with a container registry and a Key Vault. It's a proper production shape, and it's the shape I wanted a reviewer to see.
+
+It also costs money. By the figures in my decision log, which are approximate and pay-as-you-go, the registry is a few dollars a month, the database is the biggest line, the App Service plan is around thirteen, and the Key Vault is pennies. Add them up and it lands somewhere in the region of thirty-five to forty-five dollars a month.
+
+## Why not just make it free
+
+Three things stop this exact stack being free for ever, and each is a fact about a product, not a limitation of mine.
+
+The free App Service tier on Linux can't run custom containers. It only runs code. The PostgreSQL Flexible Server has no perpetual free tier: new accounts get a year free, then it's paid. And the container registry's Basic tier isn't free.
+
+So "$0 for ever on this stack" isn't on the menu. The question becomes which compromise is acceptable.
+
+## The options I compared
+
+I wrote them in a table, with the catch for each.
+
+**Local Docker.** One script brings up the whole stack on my machine. It costs nothing and uses no cloud. The catch is there's no public URL, so a demo is screenshots, a recording or a screen share.
+
+**Temporary Azure.** The current design, run on a new account's credit and free database year, then torn down. It's free out of pocket while the credit lasts. The catch is it isn't permanent, and forgetting to delete the resource group means charges later.
+
+**A different stack for a permanent free URL.** Container Apps with scale-to-zero, a free public container registry, a free managed Postgres from one of the hosted providers, and no Key Vault. It's close to nothing for low traffic. The catch is real rework of the pipeline and the setup script, cold starts from scaling to zero, and size caps on the free database.
+
+## What I chose
+
+The decision is the first option as the default, with the second to show it live. Local Docker is the zero-cost path, and temporary Azure under the free credit is how I put it on the internet when I want to.
+
+The third option is documented and not built. I wrote down what it would change, including that the app reads its database connection from configuration, so pointing at another provider needs no code change, and that Key Vault is already optional because the app skips it when no vault address is set. Then I stopped. It would swap the hosting, the registry and the database to get a permanent URL, and that's a project of its own.
+
+## The cost I knowingly accepted
+
+The same log records a smaller cost decision. The original pipeline used deployment slots, for zero-downtime swaps. Slots need the standard tier of App Service, which costs around five times the basic one.
+
+For a project nobody depends on, paying for zero-downtime deploys isn't justified. I dropped the slots, and now a deploy goes straight to production, restarts the container and checks health. The downside is written down too: a short outage, and a brief window where new migrations meet the old image, which is why the migrations are kept backward-compatible.
+
+## Where it falls over
+
+Free tiers change. Everything about grants, limits and caps in my table was true when I wrote it, and my own note says to check current figures before relying on them. A decision based on a price is the kind most likely to expire.
+
+The figures are also approximate and pay-as-you-go. A real bill depends on region, usage and what else is in the account.
+
+And a temporary deployment is a discipline problem. The money is only saved if the tear-down happens, and I've built a script step for it because I don't trust myself to remember.
+
+## The position
+
+**Every free tier has a catch, so name it before you commit.** Price the stack you want, list the options with their limits, choose one on purpose, and write down the one you're not building so the next person doesn't have to rediscover it.
+
+Take a project you'd like to host for free and look up whether each piece has a perpetual free tier. The answer for at least one is probably no.
+
+Next in Building Tewe Diary: the deployment problems that a dry run can't catch. The rest of the series is on [the blog](/blogs/).

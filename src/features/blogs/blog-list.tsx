@@ -3,7 +3,8 @@
 import { useState, useMemo } from 'react';
 import { BlogCard } from './blog-card';
 import { SearchPalette } from './search-palette';
-import { accentTag } from '@/design/variants';
+import { TagFilter } from './tag-filter';
+import { searchWords } from './highlight';
 import { cn } from '@/lib/utils';
 import type { PostMeta } from './schema';
 
@@ -16,6 +17,7 @@ interface BlogListProps {
 export function BlogList({ posts, pinnedTags, postCount }: BlogListProps) {
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
   // Collect all unique tags; pinned tags come first, rest alphabetically
@@ -26,9 +28,15 @@ export function BlogList({ posts, pinnedTags, postCount }: BlogListProps) {
     return [...pinned, ...rest];
   }, [posts, pinnedTags]);
 
-  const filtered = activeTag
-    ? posts.filter(p => p.tags.includes(activeTag))
-    : posts;
+  const words = searchWords(query);
+  const filtered = posts.filter(p => {
+    if (activeTag && !p.tags.includes(activeTag)) return false;
+    const haystack = `${p.title} ${p.summary} ${p.tags.join(' ')}`.toLowerCase();
+    return words.every(w => haystack.includes(w));
+  });
+  const countLabel = filtered.length === posts.length
+    ? postCount
+    : `${filtered.length} of ${posts.length} posts`;
 
   const POSTS_PER_PAGE = 6;
   const totalPages = Math.ceil(filtered.length / POSTS_PER_PAGE);
@@ -40,63 +48,53 @@ export function BlogList({ posts, pinnedTags, postCount }: BlogListProps) {
   return (
     <div>
       {/* Count + search row */}
-      <div className="flex items-center justify-between mb-2">
-        {postCount ? (
-          <p className="text-xs text-muted-foreground">{postCount}</p>
+      <div className="flex items-center justify-between gap-3 mb-3">
+        {countLabel ? (
+          <p className="text-xs text-muted-foreground">{countLabel}</p>
         ) : (
           <span />
         )}
-        <button
-          onClick={() => setSearchOpen(true)}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--scheme-border)] text-sm text-muted-foreground hover:text-foreground transition-colors"
-          aria-label="Search posts"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <div className="flex w-full max-w-xs items-center gap-2 rounded-lg border border-[var(--scheme-border)] px-3 py-1.5 text-sm text-muted-foreground focus-within:text-foreground">
+          <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
-          <span>Search</span>
-          <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded border border-border px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+          <input
+            value={query}
+            onChange={e => { setQuery(e.target.value); setCurrentPage(1); }}
+            placeholder="Search posts…"
+            aria-label="Search posts"
+            className="min-w-0 flex-1 bg-transparent text-foreground outline-none placeholder:text-muted-foreground"
+          />
+          <button
+            onClick={() => setSearchOpen(true)}
+            aria-label="Full-text search"
+            title="Full-text search"
+            className="hidden sm:inline-flex items-center rounded border border-border px-1.5 py-0.5 text-[10px] font-mono hover:text-foreground"
+          >
             ⌘K
-          </kbd>
-        </button>
+          </button>
+        </div>
       </div>
 
-      {/* Tag filter chips */}
-      <div className="flex flex-wrap items-center gap-2 mb-6">
-        <button
-          onClick={() => { setActiveTag(null); setCurrentPage(1); }}
-          className={cn(
-            accentTag(),
-            'cursor-pointer transition-opacity',
-            activeTag !== null && 'opacity-40'
-          )}
-        >
-          All
-        </button>
-        {allTags.map(tag => (
-          <button
-            key={tag}
-            onClick={() => { setActiveTag(activeTag === tag ? null : tag); setCurrentPage(1); }}
-            className={cn(
-              accentTag(),
-              'cursor-pointer transition-opacity',
-              activeTag !== null && activeTag !== tag && 'opacity-40'
-            )}
-          >
-            {tag}
-          </button>
-        ))}
+      {/* Tag filter */}
+      <div className="mb-6">
+        <TagFilter
+          pinned={pinnedTags.filter(t => allTags.includes(t))}
+          allTags={allTags}
+          active={activeTag}
+          onSelect={tag => { setActiveTag(tag); setCurrentPage(1); }}
+        />
       </div>
 
       {/* Post grid */}
       {paginated.length === 0 ? (
         <p className="text-sm text-muted-foreground py-8 text-center">
-          No posts{activeTag ? ` tagged "${activeTag}"` : ''}.
+          No posts{activeTag ? ` tagged "${activeTag}"` : ''}{query.trim() ? ` matching "${query.trim()}"` : ''}.
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           {paginated.map((post, i) => (
-            <BlogCard key={post.slug} post={post} index={i} />
+            <BlogCard key={post.slug} post={post} index={i} query={query} />
           ))}
         </div>
       )}

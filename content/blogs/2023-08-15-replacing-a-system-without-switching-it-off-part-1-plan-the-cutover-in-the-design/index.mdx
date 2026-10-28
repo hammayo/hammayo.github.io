@@ -1,0 +1,96 @@
+---
+title: "Replacing a System Without Switching It Off, Part 1: Plan the Cutover in the Design"
+date: "2023-08-15"
+summary: "The decisions that make a rollout safe are made long before the first site goes live. A phased replacement needs these in the design: phasing by client then site, events that are stored before they're sent, old and new APIs side by side, configuration per client, and a settle period."
+tags: ["architecture", "migration", "rollout", "dotnet"]
+series:
+  name: "Replacing a System Without Switching It Off"
+  part: 1
+published: true
+---
+
+Imagine replacing the till software across a chain of shops. The old system works, in its way, and it is in use every minute the shops are open. The new one is better. The plan, on paper, is to swap one for the other.
+
+Nobody can do that on a Saturday afternoon. Some shops are busy at any hour, the staff need training, the new system will do something unexpected in the first week, and if it goes wrong, the shops cannot stop selling.
+
+So you don't switch it over. You roll it out in phases, and the part that's easy to miss is that **a safe rollout is mostly decided in the design**, long before the first shop goes live. This is the first of seven parts about replacing a live system, drawn from a rollout that ran in phases over about eighteen months on a case-management platform for the justice sector.
+
+## Why you can't just switch
+
+A big-bang cutover bets everything on one day. Every site, every user and every integration moves at once, and every defect arrives at once.
+
+It also leaves no way back. By the time the problems show, the old system has been switched off and its data has moved on. Reversing means re-migrating, under pressure, with people waiting.
+
+A phased rollout turns one large risk into many small ones. Each phase is small enough to understand, watch closely and, if necessary, undo. The price is that you run two worlds at once for a while, which is the subject of Part 5.
+
+## Phase by client, then by site
+
+The first design decision is the unit of rollout. Too large, such as everything at once, and you've lost the benefit. Too small, such as one user at a time, and the work of coordination swamps you.
+
+We phased in two levels. Clients came first: one organisation's whole estate moved before the next began. Within each client, individual sites moved one at a time.
+
+That gave natural boundaries. Everything belonging to one client shared configuration, training and support arrangements, so it made sense to move together. Within a client, sites let us start with a small, friendly one, learn, and then continue.
+
+It also made rollback tractable. If one site went badly, only that site was affected, and the rest of the client carried on as before.
+
+## Events: stored first, then sent
+
+The design has to handle the moment where old and new coexist and still need to talk to each other. Events are one of the main ways they do.
+
+A pattern from the Messages That Survive series is the key: an event is stored in the same transaction as the change that caused it, and sent afterwards. That means a change is never made without its event, and an event is never sent for a change that didn't happen.
+
+For a rollout, this matters more than usual. If the new system is briefly unreachable from the old one, or the other way round, events wait and are delivered when the connection returns. Nothing is lost during a bad hour.
+
+## Old and new APIs side by side
+
+Devices, integrations and other services call the system through its API. They don't all update on the same day as the system itself.
+
+So the old and new versions of the API have to run together. The new version appears next to the old one, and callers move across when they are ready. In our rollout, two versions of the API ran side by side so that devices could move over without downtime.
+
+That is a design decision, not something you bolt on. The API has to be built so that a second version can exist without disturbing the first. Part 2 covers how.
+
+## Configuration per client
+
+Different clients need different things: reference data, forms, templates, rules, languages. If each of those is code, every new client is a release and a risk.
+
+If they are configuration, a new client is data. The system's behaviour changes by loading a different set of values, not by deploying a different build.
+
+That is what makes a phased rollout repeatable. The same software, with a different configuration, goes to each client. Part 3 looks at how much care that configuration then deserves.
+
+## A settle period per site
+
+After a site goes live, don't move on immediately. Give it a period to settle, where you watch it, support it and fix what turns up, before the next one begins.
+
+Without that, problems at one site and the start of the next collide. The team is firefighting in two places, and the lessons from the first haven't reached the second.
+
+How long a site needs depends on its size and the nature of the work. The principle is that the rollout has pauses built in, and that the pauses are in the plan, not taken reluctantly when something has gone wrong.
+
+## What goes in the design, not the plan
+
+It's tempting to treat all of this as project management: a schedule, a list of sites, a runbook. Much of it is, but several things are only possible if the software was designed for them.
+
+**Version coexistence.** An API that can't have two versions at once can't be rolled out gradually.
+
+**Configuration-driven behaviour.** If the differences between clients are scattered through the code, each new client touches the code.
+
+**Events that survive a gap.** If the old and new worlds only talk synchronously, a gap between them breaks both.
+
+**Per-site switches.** If you can't enable the new behaviour for one site and not another, the smallest unit of rollout is the whole system.
+
+None of these can be added in the last month before go-live. They have to be in the architecture from the start.
+
+## Where it falls over
+
+Phasing costs time and money. Eighteen months of running two systems is more expensive than a weekend, and the extra months are not free. If the risk of a big bang is low, because the system is small or the stakes are modest, phasing may be unjustified.
+
+It also stretches out the period during which things are inconsistent. People, reports and integrations all have to cope with a mixed estate, and that is a lot of effort that doesn't appear in the original estimate.
+
+And a phased plan can be abandoned halfway. A rollout that stalls, with half the estate on each system, can be worse than either end state. Commit to finishing it, with a date.
+
+## The takeaway
+
+**The decisions that make a rollout safe are made long before the first site goes live.** Phase by client then site, store events before sending them, run API versions side by side, make client differences configuration, and build settle periods into the plan.
+
+If you're about to build something that will replace a live system, list what has to be true of the design for a phased rollout to work. Anything on the list that isn't true yet is cheaper to fix now than later.
+
+Coming next in Replacing a System Without Switching It Off: version one endpoint, not the whole API.

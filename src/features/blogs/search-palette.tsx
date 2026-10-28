@@ -184,8 +184,6 @@ export function SearchPalette({ open, onOpenChange }: SearchPaletteProps) {
                       <p
                         className={cn(
                           'text-xs line-clamp-2 text-muted-foreground',
-                          '[&_mark]:bg-[var(--scheme-accent)]/20 [&_mark]:text-[var(--scheme-accent-text)]',
-                          '[&_mark]:font-semibold [&_mark]:not-italic [&_mark]:rounded-sm [&_mark]:px-0.5',
                         )}
                         dangerouslySetInnerHTML={{ __html: result.excerpt }}
                       />

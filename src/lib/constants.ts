@@ -8,15 +8,15 @@ export const SITE_URL = 'https://hammayo.co.uk';
 
 export const SITE = {
   name:        "Hammayo's Portfolio",
-  title:       "Hammayo's | Backend Software Engineer",
-  description: '20+ years of backend engineering across finance, justice, and retail — now writing about building software with AI, properly.',
+  title:       "Hammayo's | Senior Software Engineer",
+  description: '20+ years of C# and .NET engineering across finance, justice, and retail — now writing about building software with AI, properly.',
   author:      'Hammy Babar',
   keywords:    [
     // Personal brand
     'Hammy Babar', 'Hammayo Babar', 'Hammayo',
     // Recruiter signals
-    'SC cleared engineer', 'SC cleared backend engineer', 'backend engineer UK',
-    'backend engineer London', 'Sutton', 'hire backend engineer',
+    'SC cleared engineer', 'senior software engineer UK', 'agentic engineering',
+    'remote software engineer UK', 'Basingstoke', 'hire senior software engineer',
     // Technical stack
     'C#', '.NET', 'Azure', 'Docker', 'microservices', 'CI/CD',
     // AI-assisted development
@@ -25,7 +25,7 @@ export const SITE = {
     // Domain experience
     'HMPPS', 'MoJ', 'fintech', 'payment systems',
     // General
-    'backend software engineer', 'portfolio',
+    'senior software engineer', 'portfolio',
   ],
 };
 
@@ -54,12 +54,12 @@ export const SITE_LAUNCH_YEAR = 2024;
 // Per-page SEO metadata — all page metadata exports import from here
 export const PAGE_META = {
   home: {
-    title:       "Hammayo's | Backend Software Engineer",
-    description: '20+ years of backend engineering across finance, justice, and retail — now writing about building software with AI, properly.',
+    title:       "Hammayo's | Senior Software Engineer",
+    description: '20+ years of C# and .NET engineering across finance, justice, and retail — now writing about building software with AI, properly.',
   },
   about: {
     title:       "About | Hammayo's Portfolio",
-    description: 'Backend engineer with 20+ years across finance, justice, and retail. C#, .NET, Azure, Docker. SC cleared. Sutton, London — open to hybrid and remote across the UK.',
+    description: 'Senior software engineer with 20+ years across finance, justice, and retail. C#, .NET, Azure, agentic engineering with Claude Code. Previously SC cleared. Basingstoke — open to remote and hybrid roles.',
   },
   blogs: {
     title:       "Blogs | Hammayo's Portfolio",
@@ -67,7 +67,7 @@ export const PAGE_META = {
   },
   cv: {
     title:       "CV | Hammayo's Portfolio",
-    description: "Hammy Babar's professional CV — C#, .NET, Azure, Docker, microservices. SC cleared. 20+ years across finance, justice, and public service.",
+    description: "Selected work, stack and how I work: Senior Software Engineer, 20+ years in C# and .NET, agentic engineering with Claude Code. SC cleared. CV on request.",
   },
   projects: {
     title:       "Projects | Hammayo's Portfolio",
@@ -75,11 +75,11 @@ export const PAGE_META = {
   },
   contact: {
     title:       "Contact | Hammayo's Portfolio",
-    description: 'Currently open to backend and DevOps roles. SC cleared. Based in Sutton, open to hybrid and remote across the UK.',
+    description: 'Open to senior software engineering roles: C#, .NET, agentic engineering with Claude Code. Previously SC cleared. Based in Basingstoke, covering Berkshire and London. Open to remote and hybrid roles.',
   },
   series: {
-    title:       "Spec-Driven | Hammayo's Portfolio",
-    description: 'Spec-Driven: AI development that actually ships. A series on using AI coding tools with twenty years of engineering judgement.',
+    title:       "Series | Hammayo's Portfolio",
+    description: 'Multi-part writing on spec-driven AI development, forecourt systems, legacy .NET, messaging, access control and more, in reading order.',
   },
   services: {
     title:       "Services | Hammayo's Portfolio",

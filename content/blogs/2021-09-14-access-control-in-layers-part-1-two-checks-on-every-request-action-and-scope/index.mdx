@@ -1,0 +1,110 @@
+---
+title: "Access Control in Layers, Part 1: Two Checks on Every Request, Action and Scope"
+date: "2021-09-14"
+summary: "'Can this user do this?' is only half of authorisation. The other half is 'is this record theirs to touch?' Privileges and data scope fit together; the post covers where the scope should come from, what the extra lookup costs, and why a create needs a scope you actually hold."
+tags: ["dotnet", "security", "authorisation", "api-design"]
+series:
+  name: "Access Control in Layers"
+  part: 1
+published: true
+---
+
+A member of staff at one branch of a retail chain could view orders. That was their job, and the system knew it: their role included the privilege to view orders.
+
+So when they changed a number in the address bar, from one order to the next, the system found the order and showed it. It belonged to a different branch. The privilege check passed, because they were allowed to view orders in general. Nobody had asked whether they were allowed to view that one.
+
+This is the most common gap in authorisation, and it's the subject of this series. The first thing to get right is that there are **two checks on every request**: one about the action, and one about the scope.
+
+## The check everyone writes
+
+The first check is the one most systems have. It asks whether the user's role carries the privilege for this operation on this kind of resource.
+
+```csharp
+[Authorize(Policy = "Orders.View")]
+[HttpGet("orders/{id}")]
+public async Task<IActionResult> Get(Guid id, CancellationToken ct) { ... }
+```
+
+It's coarse, and that's fine. It answers a question about the type of thing: can this person view orders, edit customers, approve refunds? It's cheap to evaluate, because it depends only on who the user is and what they're trying to do.
+
+It's also where most designs stop. And that is where the problem starts.
+
+## The check people forget
+
+The second check asks about the particular record. Given that this user may view orders, may they view this one?
+
+Scope is what answers it. A user's privileges come with a boundary: their branch, their region, their team, their own records. The data carries the matching label, and a request is allowed only when the two line up.
+
+Without it, a privilege is a master key to every record of that type. With it, the same privilege opens only the records inside the boundary.
+
+The two checks are independent and you need both. Privilege without scope lets someone with the right job see everyone's data. Scope without privilege lets someone with the right branch do anything to their branch's data.
+
+## Where the scope comes from
+
+Scope has to come from somewhere trustworthy, and it must not come from the request.
+
+A tempting design lets the client say which branch it's acting for, with a parameter or a header. That turns the scope check into the user telling the system what they're allowed to see.
+
+Take it from the authenticated identity instead: from the user's record, their assignments or their claims, established when they signed in or looked up on the server. The request names the record; the server decides whether this user's scope covers it.
+
+```csharp
+public async Task<Order> GetOrderAsync(Guid orderId, UserContext user, CancellationToken ct)
+{
+    var order = await _orders.FindAsync(orderId, ct);
+    if (order is null) throw new NotFoundException();
+
+    if (!user.Scope.Covers(order.BranchId))
+    {
+        // Same response as "not found", so the existence of the record isn't revealed.
+        throw new NotFoundException();
+    }
+
+    return order;
+}
+```
+
+Returning "not found" for out-of-scope records, instead of "forbidden", is a small choice with a real effect: it doesn't confirm to anyone probing the system that the record exists.
+
+## What the extra check costs
+
+Scope has a price, and it's worth naming. Every request that touches a record now needs the record's label, which means looking at the record before deciding.
+
+For a single-record read, that's free: you fetch the record anyway. For a list, it means filtering in the query itself, adding the scope to the `WHERE` clause, so you never fetch what you shouldn't return. For an update, it means loading the record, checking, then writing.
+
+```csharp
+var orders = await _db.Orders
+    .Where(o => user.Scope.BranchIds.Contains(o.BranchId))
+    .ToListAsync(ct);
+```
+
+Filtering in the query is both safer and faster than filtering afterwards. A list that fetches everything and removes the out-of-scope rows in memory is one mistake away from returning all of them.
+
+## Creates need a scope you hold
+
+Creating things is the case that gets missed. There's no existing record to check, so it's easy to see nothing to check.
+
+But a create names where the new record will live. A member of staff at one branch who can create orders must create them for their branch. If the request lets them put a different branch ID on the new order, they've written into someone else's scope.
+
+The rule is the same, applied to the target: the scope in the request must be one the user holds. Often the cleanest design doesn't take it from the request at all, and the server sets the branch from the user's own scope.
+
+## Writing it down once
+
+Scope checks spread easily. If every endpoint writes its own, some will be wrong and some will be missing.
+
+Put the logic in one place: a method on the user context, a helper in the data layer, a filter that applies to queries. Endpoints call it, and review is about whether they call it, not about whether each has reinvented it correctly. Part 5 of this series is about making that call impossible to forget.
+
+## Where it falls over
+
+Scope models get complicated quickly. A user may belong to several branches, a region that contains branches, or a team that cuts across them. The rule "does the user's scope cover this record" is easy to say and can take real design to implement well.
+
+It also costs performance on big lists. Scope filters need indexes on the columns they use, and a scope that expands to thousands of identifiers is a poor fit for an `IN` clause. At that point, scope stops being a list and becomes a rule evaluated in the query.
+
+And data can belong to more than one scope, or to none. An order that has moved between branches, a record created before scopes existed or one shared deliberately across teams will all need explicit decisions.
+
+## The takeaway
+
+**"Can you do this?" isn't enough; you also need "is this record yours to touch?"** Check the action, then check the scope, take the scope from the authenticated identity and never the request, filter in the query, and make creates prove they target a scope you hold.
+
+Pick one endpoint that returns a record by ID. Try it with an ID from outside your own scope. If the record comes back, you've found the gap.
+
+Coming next in Access Control in Layers: keep privileges out of the token.

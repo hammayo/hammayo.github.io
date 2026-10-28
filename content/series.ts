@@ -13,3 +13,12 @@ export const series = {
     'Specs before prompts. Review gates before merges. Evidence before claims. The tools are new; the judgement is not.',
   ],
 };
+
+// Series shown as featured (Flagship) on /series, in this order. `series` above stays the
+// primary one used by the homepage strip, CV link and course waitlist.
+export const featuredSeries = [series.name, 'Building Tewe Diary'];
+
+// One-line card blurbs for featured series other than `series`.
+export const featuredBlurbs: Record<string, string> = {
+  'Building Tewe Diary': 'A movie-diary API built spec-first with Claude Code: .NET 10, Dapper, Postgres and a React front end.',
+};

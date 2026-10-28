@@ -1,0 +1,105 @@
+---
+title: "Services in Practice, Part 9: A Saga Where Every Participant Answers"
+date: "2023-05-16"
+summary: "A participant that fails silently leaves the whole saga waiting. The rule that keeps a multi-service merge honest is simple: always reply, even if the reply is 'I failed'. The participant's side of the account merge, and what compensation you still need."
+tags: ["dotnet", "saga", "microservices", "reliability"]
+series:
+  name: "Services in Practice"
+  part: 9
+published: true
+---
+
+The merge had been started. Two of the three participants had done their part and reported back. The third, the one that moved addresses, had said nothing. Not a success and not a failure, just silence.
+
+The orchestrator did what it was built to do: it waited. An hour later it was still waiting. The operator's screen said "in progress" and would go on saying it, because nothing had told the orchestrator that anything was wrong.
+
+[Part 8](/blogs/services-in-practice-part-8-orchestration-or-choreography-merging-duplicate-records/) argued that a merge across services needs one owner. This part looks at the same flow from the other side, a participant's, and at the rule that stops it hanging: **in a saga, every participant answers**.
+
+## The failure that makes no noise
+
+A saga is a long-running process made of local steps across services. It works only if the orchestrator learns the outcome of every step.
+
+A participant can fail in three ways. It can succeed and say so. It can fail and say so. Or it can fail and say nothing: a handler that throws before it replies, a message that is discarded, a bug that logs an error and carries on.
+
+The third is the dangerous one, because the orchestrator can't distinguish it from a slow success. Nothing arrives, so it waits. The whole saga stalls on one participant's silence.
+
+## The rule: always reply
+
+The fix is a discipline, not a clever mechanism. Whatever happens inside a participant, it sends a reply. A step that worked replies "done". A step that couldn't be completed replies "failed", with a reason.
+
+```csharp
+public async Task HandleAsync(MoveAddressesCommand command, CancellationToken ct)
+{
+    try
+    {
+        await _addresses.MoveAsync(command.FromCustomerId, command.ToCustomerId, ct);
+        await _replies.SendAsync(new StepResult(command.ProcessId, "addresses", StepStatus.Done), ct);
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Address move failed for process {ProcessId}", command.ProcessId);
+        await _replies.SendAsync(
+            new StepResult(command.ProcessId, "addresses", StepStatus.Failed, ex.Message), ct);
+    }
+}
+```
+
+"I failed" is a perfectly good answer. It's information. It lets the orchestrator mark the saga as needing attention, notify someone and stop waiting. Silence gives it nothing to act on.
+
+The same reasoning applies to the cases where a participant decides it has nothing to do. If the customer has no addresses to move, the answer is "done, nothing to move", not no reply at all.
+
+## Register, then proceed
+
+The start of the saga has a smaller version of the same problem. The orchestrator needs to know which participants will take part, and whether they're ready.
+
+In the approach we used, a participant registers its interest first, and the orchestrator then proceeds to issue the real work. Registration says "I'm here and I know about this process".
+
+I'd note, as an honest observation, that registration alone doesn't prove readiness. A participant can register and then be unable to do its part. A stronger design would make the first phase a genuine readiness check: can you do this, right now, for these records? That would catch problems before any step has changed anything.
+
+It matters because the cheapest failure is the one that happens before any data has moved.
+
+## Make each step idempotent
+
+Messages get delivered more than once, and orchestrators resend commands when they're unsure. Every participant's step has to cope.
+
+Moving addresses twice must give the same result as moving them once. That's the same idea as the idempotent consumers earlier in the Messages That Survive series, applied to a command: key the work by the process ID and the step, and make the second arrival a no-op that sends the same reply again.
+
+Replaying the reply matters. If the first reply was lost, the orchestrator will ask again, and the participant should answer again with the same result.
+
+## Audit each move
+
+Merging two people's records is a significant change. Whoever looks at it later will want to know what moved, when, and on whose authority.
+
+Every participant records its own part: the process ID, the records involved, the before and after, and the time. The orchestrator records the sequence. Together, those two give a complete account without anyone having to reconstruct it from several logs.
+
+This is also what makes "I failed" useful to a person. A failure with a reason, tied to a process ID, is something an operator can act on.
+
+## Participants in configuration
+
+Which services take part in a merge is a decision that changes over time. A new service that holds customer data needs to be included without redeploying the orchestrator.
+
+Hold the list of participants in configuration, not in code. Adding one becomes a deliberate, reviewable change, and the orchestrator can compare the replies it received with the list of those it expected. An expected participant that never answered is, again, something it can notice.
+
+## What compensation you still need
+
+Replying doesn't remove the need to undo. If the order step succeeded and the payment step failed, the saga is in a state that nobody wants, and the orchestrator has to decide what to do.
+
+For some steps there's a clean reversal: move the orders back. For others there's only compensation: add a note, raise a task for a person. It helps to decide for each step, in advance, whether it can be undone and how.
+
+Without that thinking, "I failed" gets you an accurate picture of a mess. With it, you get a path out.
+
+## Where it falls over
+
+Always replying isn't free. Every participant now needs a code path for failure that sends a message, and that code can itself fail. If the reply is lost, the orchestrator is back to waiting, so it still needs a timeout and a way to ask again.
+
+A reply also describes what the participant believes happened. A bug that reports "done" when the work was wrong defeats the whole scheme. The answer is only as good as the step behind it.
+
+And a saga with many participants is a lot to hold in one's head. If you find yourself adding steps to get one flow right, it may be a sign that a boundary is in the wrong place.
+
+## The takeaway
+
+**A participant that fails silently leaves the whole saga waiting; always reply, even with "I failed".** Make each step idempotent and audited, hold participants in configuration, prefer a real readiness check in the first phase, and decide in advance how each step is undone.
+
+Look at one multi-service flow you run and ask what happens if a single participant says nothing at all. If the answer is "it waits forever", you know what to add.
+
+Coming next in Services in Practice: the helper that made a query per item.

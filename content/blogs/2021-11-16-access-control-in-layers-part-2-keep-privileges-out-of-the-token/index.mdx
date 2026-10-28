@@ -1,0 +1,111 @@
+---
+title: "Access Control in Layers, Part 2: Keep Privileges Out of the Token"
+date: "2021-11-16"
+summary: "If revocation has to be instant, a token should say who you are and nothing about what you can do. What goes wrong when privileges travel in the token, the cache-and-push design that replaces it, and why that cache becomes one of the most critical things you run."
+tags: ["dotnet", "security", "authentication", "caching"]
+series:
+  name: "Access Control in Layers"
+  part: 2
+published: true
+---
+
+A contractor was working a shift when their engagement ended. Someone in the office removed their access in the admin screen. The change saved immediately. The contractor, still logged in on a device on the floor, carried on working for another fifty minutes.
+
+Nothing was broken. The system had done exactly what it was designed to do. The contractor's token said they were allowed, and tokens are trusted until they expire.
+
+That's the cost of putting privileges inside the token, and it's the subject of Part 2 of this series, after [Part 1](/blogs/access-control-in-layers-part-1-two-checks-on-every-request-action-and-scope/). When revocation has to be instant, **keep privileges out of the token**.
+
+## What a token is good at
+
+A signed token is a neat idea. The server issues it once, signs it, and from then on any service can check the signature without calling anyone. No lookup, no shared state, no single point of failure.
+
+That convenience comes from the token being self-contained. Everything the service needs to know is inside it, so nothing outside can disagree.
+
+The same property is the problem. A self-contained token keeps saying what it said when it was issued, until it expires. The server that issued it can't take it back, because the point of the design was that nobody has to ask.
+
+## The weak design: privileges in the token
+
+The natural next step is to put the user's privileges in the token as claims. The token says "this is Sam, and Sam can view orders and approve refunds". Every service reads the claims and decides.
+
+It's attractive, because authorisation then needs no lookup at all. And for many systems, it's fine.
+
+It has one serious weakness. Privileges are not static. People change role, leave, are suspended, or have an account compromised. Whatever the token says remains true, as far as every service is concerned, until it expires.
+
+If tokens last an hour, a revocation can take up to an hour to take effect. Short lifetimes reduce that window, but at the cost of forcing everyone to sign in again, or to refresh constantly, and the window is never zero.
+
+## When "wait for expiry" isn't acceptable
+
+How much that matters depends on what the system protects. For a system where the consequences of a stale permission are low, waiting is a reasonable trade.
+
+For a system where an ended engagement, a lost device or a suspected compromise must take effect at once, it isn't. The people running such a system will ask for revocation in seconds, and a token that holds its own permissions can't give them that.
+
+## The better design: say who, look up what
+
+The alternative is to make the token small. It says who you are, and nothing about what you can do. It carries a user identifier, an expiry and a signature.
+
+When a request arrives, the service takes the user ID from the token and looks up the current privileges for that user. The lookup is fresh, so a change made a second ago applies to the next request.
+
+```csharp
+public async Task<bool> IsAllowedAsync(string userId, string privilege, CancellationToken ct)
+{
+    var privileges = await _privileges.GetForUserAsync(userId, ct);
+    return privileges.Contains(privilege);
+}
+```
+
+The token stays valid for its normal lifetime, but a valid token no longer means valid privileges. The question "what can this person do right now?" is answered by something you control.
+
+## A cache keyed by user
+
+A database lookup on every request would be slow and would put your permissions store on the critical path of everything. So the lookup goes to a cache, keyed by user.
+
+The cache holds each user's current privileges, loaded when they're first needed and kept in memory or in a shared store such as Redis. Reads are fast. Services that check privileges do so against the cache and rarely touch the database.
+
+That solves speed. It brings back the question of freshness: if the privileges are cached, how does a change get in?
+
+## Push changes, don't wait for them
+
+The answer is to push. When an administrator changes someone's privileges, the change is published, and every service that caches privileges receives it and updates or evicts its entry.
+
+A publish-subscribe channel suits this well. The admin service writes the change, then publishes "privileges changed for user X". Subscribers drop that user's cached entry, and the next request reloads it.
+
+```csharp
+public async Task RevokeAsync(string userId, CancellationToken ct)
+{
+    await _store.RemoveAllPrivilegesAsync(userId, ct);
+    await _bus.PublishAsync("privileges.changed", new PrivilegesChanged(userId), ct);
+}
+
+// In each service:
+_bus.Subscribe<PrivilegesChanged>(e => _cache.Evict(e.UserId));
+```
+
+The contractor's access now ends in the time it takes a message to cross the system, which is seconds, not the remainder of a token's life.
+
+Give cache entries a short expiry as well. It's a safety net for a missed message: even if a push is lost, a stale entry cannot outlive its expiry.
+
+## The cache becomes critical
+
+Here is the cost of the design, and it deserves plain words. By moving privileges out of the token and into a cache, you've created something every request depends on.
+
+If the cache is unavailable, you have a choice, and none of the choices is comfortable. Deny everything, which is safe and stops the system. Fall back to the database, which keeps things running but may swamp it. Or allow, which is fast and unsafe.
+
+Most systems should pick the first or second, and decide in advance, deliberately. It should also be monitored like any critical component, with alerts on its availability and on the age of its entries.
+
+The same applies to the push channel. If it silently fails, you're back to waiting for expiry, only now you don't know that you are.
+
+## Where it falls over
+
+It's more to build and run. A token-only design has no moving parts beyond the signing keys. This one adds a store, a cache and a messaging path, each of which can fail.
+
+It costs a lookup per request, even when cached. For very high-volume internal calls, that overhead is real, and some systems keep privileges in the token for those and use the lookup for sensitive operations.
+
+And it doesn't revoke the token itself. A suspended user's token remains cryptographically valid, and they can still prove who they are. They simply have no privileges. For a full block, such as a compromised account, you may also want a deny list of user IDs checked early.
+
+## The takeaway
+
+**If revocation must be instant, the token should say who you are, not what you can do.** Put identity in the token, look up privileges from a cache keyed by user, push changes so entries are evicted at once, and treat the cache as the critical dependency it has become.
+
+Ask how long it takes, in your system, for a removed permission to stop working. If the answer is "until the token expires", decide whether that is acceptable.
+
+Coming next in Access Control in Layers: staff and self-service users are different users.

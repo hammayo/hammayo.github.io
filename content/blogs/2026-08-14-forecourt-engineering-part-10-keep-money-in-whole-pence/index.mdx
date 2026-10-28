@@ -1,0 +1,139 @@
+---
+title: "Forecourt Engineering, Part 10: Keep Money in Whole Pence"
+date: "2026-08-14"
+summary: "When money is already whole pence in the code, keep it whole pence in config too, and a lot of parsing, rounding and culture handling disappears. A test amount first written with a decimal point shrank a design, and the comparison is against what the customer chose."
+tags: ["payments", "configuration", "dotnet", "design"]
+series:
+  name: "Forecourt Engineering"
+  part: 10
+published: true
+---
+
+A configurable discount threshold in a checkout sounds like a one-line setting. It stops being one the moment someone asks which units it's in.
+
+I met the same question on a forecourt. A setting needed an amount, and the way I'd first been given that amount, with a decimal point and a currency symbol in my head, nearly turned a small change into a parsing project.
+
+This is Part 10 of **Forecourt Engineering**, following [Part 9](/blogs/forecourt-engineering-part-9-store-and-forward-and-how-long-the-store-can-hold/). The lesson is to **keep money in whole pence**, in configuration as well as in code.
+
+## The setting
+
+I was adding a switch that lets QA make one particular kind of payment fail on demand, using the real build of the service. The switch is the subject of [Break the Real Build](/blogs/engineering-habits-part-5-break-the-real-build/). This post is about one detail of it: the amount that triggers the failure.
+
+The ticket first gave that amount in pounds, written with a decimal point. And the configuration system had no decimal setting type.
+
+## The design that grew
+
+Faced with a pounds-and-pence value and no decimal type, I started designing around a text setting. The service would parse the text into a decimal, convert it into pence, and compare.
+
+Each step brought its own questions. What if the text uses a comma as the decimal separator on a machine with a different culture? What if someone types a currency symbol? What if there are three decimal places? How do I round? What does the service do with something that doesn't parse?
+
+None of those is hard. All of them are code, tests and decisions, in service of a feature that is mostly a one-line comparison.
+
+## The correction
+
+Then the ticket was corrected. The amount was to be given in whole pence.
+
+That deleted most of my design. Everywhere else in that part of the code, amounts are already whole pence, as plain integers. So the setting could be an unsigned whole number, and the check became a plain equality.
+
+There was no parsing, no culture handling, no rounding and no "what if someone types rubbish" path, because a number setting can't hold rubbish.
+
+The design didn't just get simpler. A whole class of bugs became impossible, because the code that would have contained them no longer existed.
+
+## Why whole pence is the right unit
+
+Money in floating point is a well-known trap, and using whole minor units, pence, cents, is the standard answer. It's worth following to its conclusion.
+
+If every amount in the system is an integer number of pence, then arithmetic is exact, comparisons are exact, and there's no unit to convert at the boundaries. A value that crosses from code to configuration to a log line to a database is the same integer throughout.
+
+The moment you introduce a second representation, pounds with a decimal point, you've created a conversion. Every conversion is a place for an error, a rounding rule and a test. The cheapest conversion is the one that isn't there.
+
+## Compare against what the customer chose
+
+There was a second decision in the same change, and it's about which number to compare.
+
+The service doesn't send the pump exactly the amount the customer picks. It works out an adjusted figure, for the limit it actually uses. I could have compared against either.
+
+I compared against the amount the customer chose. QA need to predict the trigger without knowing anything about the service's internals. "Choose this amount at the pump" is something a tester can do. "Choose whatever amount produces this adjusted figure after the service's own calculation" is not.
+
+The rule I take from it is to put a trigger on the value a person can see and control, not the value the code computes.
+
+## Making it usable
+
+A few small choices kept the feature honest. The setting follows the same pattern as the others in that part of the system, so the admin UI picked it up automatically, with no extra work. It's off by default. And the default amount is an unusual one, so nobody would choose it by accident.
+
+I also made a deliberate call about zero. If someone sets the amount to zero, a zero-value request will trigger it. I compared literally and didn't add a special case, because a special case for something that doesn't arise in normal use is more code to read.
+
+## What the setting looks like
+
+The shape of the setting is worth showing, because the simplicity is the point.
+
+Settings in that part of the system were defined as properties on a class, each with a name, a category and a default. The admin interface built its settings screens by looking at those properties, so adding one meant adding a property and nothing else.
+
+```csharp
+[Setting(Category = "Payments", Description = "Amount in pence that triggers a simulated failure")]
+public uint FailAuthorisationAmountPence { get; set; } = 2026;
+
+[Setting(Category = "Payments", Description = "Turns the failure simulation on")]
+public bool FailAuthorisationEnabled { get; set; } = false;
+```
+
+An unsigned whole number can't hold a negative amount, a fraction or text. The type did the validation that my first design would have done in code.
+
+The name includes the unit. `Pence` in the name is a small habit that prevents a lot of confusion. Someone reading the settings screen doesn't have to wonder whether 2026 means pounds, pence or a year.
+
+## Where else the unit question bites
+
+The same question appears across payments code, and it's worth being deliberate about it.
+
+If a value crosses a boundary, such as from a screen to an API to a database to a log, the unit should be the same on both sides, and the boundary should be the only place it can change. Wherever I've seen money bugs, it was because one side assumed pounds and the other pence, or one side rounded and the other truncated.
+
+Fuel prices add a wrinkle. A price per litre is often quoted to a tenth of a penny, which means pence isn't always the smallest unit. The honest approach is to be explicit about it wherever it matters: either use a smaller unit throughout that part of the system, or convert in one named place. The rule isn't "always pence". It's "pick the unit, put it in the name, and convert in exactly one place".
+
+## Testing the trigger
+
+The behaviour I was adding had three cases that mattered, and each had a test.
+
+A matching amount, with the switch on, fails the payment and doesn't call the pump authorisation. A matching amount with the switch off proceeds as normal. A different amount with the switch on also proceeds as normal.
+
+Those three cover the logic. They don't need clever set-up, because the comparison is a plain equality on whole numbers. If the amount had been parsed from text, I'd have needed tests for culture, symbols, rounding and bad input as well, which would have been most of the test file for a trivial feature.
+
+The difference in test count is a good measure of the design's complexity. Fewer cases to test usually means fewer places for bugs to live.
+
+## A switch that makes sales fail
+
+I said at the end that this is a risky thing to ship, and it's worth being clear about how I think about it.
+
+The switch is off by default. It only fires on one chosen amount. It logs whenever it fires. Each of those is a layer of protection, and none of them is a guarantee.
+
+What would make me more comfortable is making it unavailable on live sites: restricting it to test builds, or to a role that only engineers have. Until then, it relies on the people with access to configuration being careful. I'd rather say that plainly than suggest the defaults make it safe.
+
+The general rule I take from it is that any switch that can break a customer's transaction deserves more protection than a default of "off".
+
+## A checklist for any setting that holds money
+
+I've started asking the same short set of questions whenever a setting holds an amount.
+
+- **What unit does the rest of the code use?** Use that one, and don't invent a second.
+- **Is the unit in the name?** A suffix such as `Pence` costs nothing and prevents a misreading.
+- **What type can only hold valid values?** An unsigned whole number can't be negative or fractional. A string can be anything.
+- **What is the default, and is it safe?** For a switch that changes real behaviour, off, and a value nobody would pick by accident.
+- **What does the comparison use?** The value a person can see and control, not one the code computes.
+- **Where is the one place it's converted, if it must be?** There should be exactly one.
+
+It takes a minute to run through, and most of the answers come out the same way each time, which is a sign the checklist is worth having.
+
+## Where it falls over
+
+Whole pence is only the right unit while everything shares it. If a part of the system deals in tenths of a penny, which fuel prices sometimes do, then "everything is pence" stops being true, and the conversion has to live somewhere explicit.
+
+It's also less friendly. A person reading a setting of a few thousand has to know it means pence. A comment or a name that says so helps, and it's easy to get wrong.
+
+And this is a switch in production code that can make real sales fail. It ships off and logs when it fires, but anyone with access to configuration could turn it on. A simpler feature is not a safer one.
+
+## The position
+
+**When money is already whole pence in the code, keep it whole pence in config too, and a lot of parsing, rounding and culture handling disappears.** Ask about units before you design, compare against the value a person controls, and let the type of the setting rule out the bad inputs for you.
+
+Before you design a setting that holds an amount, find out what unit the rest of the code uses. If it's a different one from your setting, you've found your first conversion.
+
+The rest of my writing is on [the blog](/blogs/).

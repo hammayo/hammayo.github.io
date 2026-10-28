@@ -1,0 +1,124 @@
+---
+title: "Access Control in Layers, Part 5: Opt-In Security Checks Get Forgotten"
+date: "2022-09-13"
+summary: "A check that every new endpoint must remember to add will eventually be missed. The fix isn't more reviewers, it's making 'deny' the default and 'allow' something an endpoint has to ask for. The tests that assert what must be refused keep that default honest."
+tags: ["dotnet", "security", "authorisation", "testing"]
+series:
+  name: "Access Control in Layers"
+  part: 5
+published: true
+---
+
+A developer added an "export orders" endpoint. It was a sensible feature: a manager wanted a spreadsheet of the branch's orders. The endpoint was written, tested, reviewed and shipped. It worked.
+
+It also returned orders from every branch. The branch check from [Part 1](/blogs/access-control-in-layers-part-1-two-checks-on-every-request-action-and-scope/) existed, and the older endpoints all used it. The new one had simply not been written with it. No one decided to skip it. It just wasn't there.
+
+That's the usual shape of an authorisation gap. Not a clever attack, but a check that depended on someone remembering. This last part of the series is about why that dependence fails, and the design that removes it: **deny by default**.
+
+## How opt-in checks fail
+
+Most authorisation is written as opt-in. To protect an endpoint, you add something: an attribute, a call to a helper, a filter on a query. Endpoints without it are open.
+
+For the first few endpoints that's fine, because the author remembers. As the system grows, it depends on every future author, on every future change, remembering the same step.
+
+Humans are reliable at remembering things they've done many times, and unreliable at remembering things they've not done. A missing check leaves no trace: no failing test, no error, no visible gap. The endpoint works. It works for everyone.
+
+The result is predictable. Given enough endpoints and enough developers, one will be missed. The question is only which one, and when someone notices.
+
+## The review that doesn't catch it
+
+The standard answer is code review. Reviewers will check for the missing line.
+
+They'll catch it sometimes. But review has the same problem in reverse: it's looking for something that isn't there. A reviewer reads the code that was written, and a check that was never added doesn't appear in the diff.
+
+Reviewers also tire, trust the author and look at what's changed, not what's absent. Relying on them to be the safety net is relying on the same human memory, one step removed.
+
+## Flip the default
+
+The better design inverts the arrangement. Everything is denied unless an endpoint explicitly says what it allows.
+
+In ASP.NET Core, the simplest form is a fallback policy that requires an authenticated user for any endpoint that doesn't say otherwise.
+
+```csharp
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
+```
+
+Now a new endpoint with no attributes is protected. To make something public, a developer has to write `[AllowAnonymous]`, which is a deliberate, visible, reviewable act. A reviewer can see it in the diff.
+
+The mistake that used to be invisible, leaving something off, has become impossible. The mistake that remains, adding an exception, is loud.
+
+## Do the same for the record check
+
+The fallback policy covers authentication. The record-level checks, scope and ownership, need the same inversion.
+
+One way is to make the data layer refuse unscoped queries. Repositories take a scope as a required parameter, and there is no method that returns records without one.
+
+```csharp
+public interface IOrderRepository
+{
+    Task<IReadOnlyList<Order>> ListAsync(UserScope scope, CancellationToken ct);
+    Task<Order?> FindAsync(Guid id, UserScope scope, CancellationToken ct);
+}
+```
+
+A developer writing the export endpoint can't call the repository without supplying a scope, because the signature demands one. The missing branch check is now a compile error.
+
+For the rare case where a query should be unscoped, such as an administrative report, give it a differently named method that is clearly marked and easy to search for.
+
+```csharp
+Task<IReadOnlyList<Order>> ListAcrossAllBranchesAsync(CancellationToken ct);
+```
+
+Its name says what it does. Reviewers can search for every use of it, and a new one stands out.
+
+## Explicit opt-ins
+
+The principle is the same everywhere: deny by default, with explicit, visible exceptions.
+
+Public endpoints are marked. Cross-scope queries are named. Service-to-service endpoints, from Part 4, declare which tokens they accept. A privileged operation lists the privilege it requires.
+
+None of these removes the need for thought. It moves the thought to the moment of granting access, where it's a decision someone made, instead of to the moment of forgetting, where it's an accident nobody noticed.
+
+## Tests that assert what must be refused
+
+A deny-by-default design should be backed by tests that prove it.
+
+The most valuable is a test that walks every endpoint in the application and asserts that it requires authentication unless it's on a short allow-list of public ones.
+
+```csharp
+[Fact]
+public void Every_endpoint_requires_authorisation_unless_explicitly_public()
+{
+    var unprotected = _endpoints
+        .Where(e => e.Metadata.GetMetadata<IAllowAnonymous>() is not null)
+        .Select(e => e.DisplayName)
+        .OrderBy(n => n);
+
+    Assert.Equal(PublicEndpointAllowList, unprotected);
+}
+```
+
+When someone adds a public endpoint, this test fails until they add it to the list. That change appears in the diff and needs a reviewer's agreement. A deliberate act, again.
+
+A second test targets scope. For each list or read endpoint, call it as a user from one branch with data from another, and assert that the other branch's records don't appear. It's tedious to write and it's the test that would have caught the export endpoint.
+
+## Where it falls over
+
+Deny by default is noisy to adopt in an existing system. Turning it on can break endpoints that were open by accident, and some by design, and you have to go through them one by one. That is the point, but it is work.
+
+It also doesn't make the checks correct. A developer can add the right attribute and the wrong scope. The fallback policy guarantees that a check exists. It can't guarantee that it's the right one.
+
+Allow-lists can themselves become a place to hide. If the public list grows without anyone looking at it, you've recreated the problem with extra steps. Keep it short and make additions to it conspicuous.
+
+## The takeaway
+
+**A check that every new endpoint must remember to add will eventually be missed; make "deny" the default.** Use a fallback policy, make repositories demand a scope, name the exceptions loudly, and write tests that assert what must be refused.
+
+Add a new, empty endpoint to your application today and call it without credentials. What happens tells you which default you have.
+
+That closes this series. Between the five parts: check the action and the scope, keep privileges out of the token, give different users separate doors, treat internal tokens as the powerful things they are, and make denial the default. The earlier posts are on [the blog](/blogs/) if you're catching up.

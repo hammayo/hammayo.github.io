@@ -24,13 +24,13 @@ export default function OgImage() {
             HAMMAYO.CO.UK / SERIES
           </div>
           <div style={{ fontSize: '52px', fontWeight: 700, color: '#ffffff', lineHeight: 1.2 }}>
-            Spec-Driven
+            Series
           </div>
           <div style={{ fontSize: '22px', color: '#f0f0f0', lineHeight: 1.5 }}>
-            AI development that actually ships
+            Multi-part writing, in reading order
           </div>
           <div style={{ fontSize: '14px', color: '#a78bfa', letterSpacing: '1px' }}>
-            Twenty years of engineering judgement, applied to AI tooling
+            Spec-Driven · Forecourt Engineering · Legacy .NET · Messaging
           </div>
         </div>
       </div>

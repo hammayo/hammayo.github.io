@@ -1,0 +1,94 @@
+---
+title: "Replacing a System Without Switching It Off, Part 5: Living With a Mixed Estate"
+date: "2023-12-12"
+summary: "The expensive part of a phased rollout isn't the code, it's running two worlds at once. Support, training, reports and integrations all have to cope with some sites on the old system and some on the new. What that costs, how long is too long, and what I'd plan differently."
+tags: ["architecture", "migration", "operations", "rollout"]
+series:
+  name: "Replacing a System Without Switching It Off"
+  part: 5
+published: true
+---
+
+A bank moved its branches to a new account system one region at a time. For the first region, everything was new and exciting. By the fourth, the novelty had worn off and something less glamorous had set in.
+
+A customer in one region could do something at a branch that a customer in the next region could not. A report that was right for the old system was wrong for the new. A support person had to ask, before answering any question, "which system are you on?"
+
+None of that was about the code. The software worked. What had become expensive was the fact that two worlds existed at once, and everyone had to live in both. This is Part 5 of the series, following [Part 4](/blogs/replacing-a-system-without-switching-it-off-part-4-a-read-model-for-devices/), and it's about that cost.
+
+## The code is the smaller bill
+
+When people plan a replacement, the estimate is dominated by building the new system. That's natural, because it's the visible work.
+
+A phased rollout then adds a second bill that is rarely estimated well: the cost of operating the mixed estate for the whole length of the transition. On the rollout I worked on, that transition ran in phases over about eighteen months, and nearly everything around the software had to carry the burden for that whole period.
+
+The estimate that matters isn't how long the build takes. It's how long the estate stays mixed, and what it costs a month.
+
+## Support, for two systems
+
+Support staff have to know both systems. A question about a screen is a question about an old screen or a new one, and the answers differ.
+
+That means two sets of documentation, two sets of known issues and two sets of troubleshooting steps. It means that new support staff learn both, even though one is going away. And it means every incident starts with working out which world it happened in.
+
+The practical help is to make it obvious. Show on every ticket, and where possible on every screen, which system and which phase a site is on. A question that doesn't need asking is a minute saved on every call.
+
+## Training, twice
+
+Users need training on the new system when their site moves. They also still need the old one, until the moment of cutover, so training can't simply stop.
+
+The people who move between sites, or work across regions, are the awkward case. They have to use both and keep them apart. Mistakes made by someone applying old-system habits to the new one are predictable, and the training should name them.
+
+Time the training to the move. Too early and it's forgotten. Too late and the first week is spent learning on live work.
+
+## Reports that understand both
+
+Reports are where the mixed estate shows most plainly. A total across all sites needs data from both systems, and they don't record things the same way.
+
+Categories differ. Dates are held differently. A thing that was one record in the old system may be two in the new one. A report that simply adds the numbers is wrong, and may be wrong in a way that looks convincing.
+
+Decide early where combined reporting is built. It might be a separate reporting store fed by both systems, with a mapping into a common shape, or it might be a clear rule that a report covers one system only until everyone has moved. Either is workable. Leaving it undecided is not.
+
+## Integrations that understand both
+
+Other systems connected to yours have the same problem. They send requests, receive events and expect behaviour. During the transition, they may be talking to the old world for some records and the new for others.
+
+The side-by-side API versions from Part 2 are one answer. Events with a clear version, from the Messages That Survive series, are another. The aim is that an integration can be moved to the new world on its own schedule, and meanwhile works with whichever side holds the record.
+
+Be careful with anything that assumes one source of truth. An integration that looks up a record in the new system and finds nothing, because that site hasn't moved yet, needs a defined next step. Usually that step is to look in the old one.
+
+## How long is too long
+
+There's a length of time beyond which a mixed estate stops being a stage and becomes a state. Everyone gets used to it. The reasons for finishing weaken, because the pain is familiar and the remaining sites are the awkward ones.
+
+The signs are worth watching for. The schedule slips, and the slippage stops being discussed. The sites left are those with the most unusual requirements. Workarounds start to be treated as normal features. The old system is quietly receiving fixes again.
+
+Set an end date at the start, and review it deliberately. If it needs to move, move it with a reason. A rollout without a date tends to last for ever.
+
+## What I'd plan differently
+
+A few things I would do differently another time, stated plainly.
+
+**Estimate the mixed period explicitly.** Put a monthly cost on running two worlds, and count it in the business case. It changes the arguments about pace.
+
+**Decide combined reporting up front.** Don't discover it when the first cross-system report is requested.
+
+**Make the phase visible everywhere.** In tickets, in screens, in logs, in documentation. The cost of not knowing which world you're in is paid on every interaction.
+
+**Plan the hard sites earlier.** The unusual ones tend to be left to last, and then they set the end date. Starting one of them earlier shows the real problems sooner.
+
+**Write down the exit criteria for the old system.** What has to be true before it can be switched off, and who agrees that it is.
+
+## Where it falls over
+
+This post is more about cost than technique, and there's no neat fix. Some of the expense of a phased rollout is simply the price of not betting everything on one day, and trying to remove it removes the safety that justified phasing.
+
+Making the phase visible adds clutter. Banners and labels everywhere are noise, and some will be wrong. You'll need to keep them accurate as sites move.
+
+And an end date is a promise you can break. Pressure to hit it can push a site over before it is ready, which is the situation phasing was supposed to avoid.
+
+## The takeaway
+
+**The expensive part of a phased rollout isn't the code, it's running two worlds at once.** Count the cost of support, training, reports and integrations across the whole transition, make the phase visible, decide combined reporting early and set an end date.
+
+If you're planning a phased replacement, write down what the mixed period will cost each month and what would make you end it. If you can't, you haven't planned the rollout yet.
+
+Coming next in Replacing a System Without Switching It Off: retiring v1, and deciding the date when you create v2.

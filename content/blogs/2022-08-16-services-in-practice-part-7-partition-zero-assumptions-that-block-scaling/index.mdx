@@ -1,0 +1,108 @@
+---
+title: "Services in Practice, Part 7: Partition Zero, the Assumption That Blocks Scaling"
+date: "2022-08-16"
+summary: "Code that only works with one partition quietly decides you'll never scale out. It can run for years without a problem, right up to the day you add a second consumer. The pattern to look for, why it hides, and what to do instead."
+tags: ["dotnet", "kafka", "scaling", "reliability"]
+series:
+  name: "Services in Practice"
+  part: 7
+published: true
+---
+
+An order-events consumer was getting busy. One instance could no longer keep up at peak, and the obvious move was to run a second. The topic had been created with a single partition, and adding partitions is easy enough.
+
+Then someone reading the consumer's start-up code noticed a line that looked fine and wasn't. When the consumer started, it worked out where to resume reading by looking up the stored offset for partition zero.
+
+Partition zero. Not "each partition it's been given". Just zero. That is a pattern worth knowing how to spot, and I want to be clear about how I'm framing it. This isn't a fix I shipped. It's an **assumption that blocks Kafka scaling**, found by reading, and the kind of thing worth looking for in your own code. It follows [Part 6](/blogs/services-in-practice-part-6-correlation-ids-across-systems-you-cant-see-into/).
+
+## What the code assumed
+
+The consumer kept its own record of how far it had read, so it could recover after a restart. That record was an offset, a position in a partition's log.
+
+When it started, it fetched the saved offset for one partition, zero, and told the client to resume from there.
+
+```csharp
+// On start-up: where did we get to?
+var offset = await _offsets.GetAsync(topic, partition: 0, ct);
+consumer.Assign(new TopicPartitionOffset(topic, partition: 0, offset));
+```
+
+With one partition, that's exactly right. There is only a partition zero, and the code does what it should.
+
+## Why it worked for years
+
+The reason this survives is that nothing about it is wrong in the setup it was written for. A topic with one partition has one ordered log, one consumer reads it, and ordering is trivially preserved. Many systems start there deliberately, because it's simple.
+
+So the code passed its tests, ran in production and recovered correctly after restarts. There was no failure to notice. The assumption wasn't a bug until the day the topic changed shape.
+
+That's what makes it dangerous. A limit that has never been hit looks exactly like a feature that isn't there yet.
+
+## What breaks when you add partitions
+
+Add a second partition and several things go wrong at once.
+
+**Half the data is never read.** The consumer assigned itself partition zero and nothing else. Messages published to partition one pile up, unread, and nobody gets an error.
+
+**A second instance can't help.** Running two copies of the service, each assigning partition zero, means both read the same messages and neither reads the other partition.
+
+**Recovery is wrong for everything else.** Even if you assigned all partitions, the saved offset belongs to partition zero. Resuming partition one from that number would skip or repeat messages.
+
+The silent nature of the first is the worst. The consumer is healthy, lag on partition zero looks fine, and a partition's worth of orders is going nowhere.
+
+## The better ways
+
+There are two sound ways to deal with offsets across partitions, and both are better than assuming one.
+
+**Track offsets per partition.** Store an offset for each partition the consumer owns, keyed by topic and partition, and on start-up recover each of them. This makes the consumer correct for any number of partitions, at the cost of more bookkeeping.
+
+**Let the broker remember, and make the consumer safe to repeat.** Use the broker's own committed offsets, with a consumer group, so Kafka tracks where each member has got to and assigns partitions among instances. Then make the handler idempotent, with an inbox like the one from the Messages That Survive series, so that the occasional repeat after a rebalance is harmless.
+
+```csharp
+var config = new ConsumerConfig
+{
+    GroupId = "order-events-consumer",
+    EnableAutoCommit = false,
+    AutoOffsetReset = AutoOffsetReset.Earliest
+};
+
+// After the message is safely recorded in the inbox:
+consumer.Commit(result);
+```
+
+The second is what I'd choose for most services. It uses what the broker already does well, and it scales by adding instances. The cost is that you must have idempotent handling, which you should have anyway.
+
+## Look for it in your own code
+
+You don't need an incident to find this. A few questions will turn it up.
+
+Search for literal partition numbers in consumer code. A `0` next to the word partition, an assignment that names one, or an offset lookup with no partition in its key are all signs.
+
+Look at how offsets are stored. If the storage has no column for partition, it was designed for one.
+
+And look at what the tests cover. If every test uses a single-partition topic, the multi-partition case has never run.
+
+Finally, ask the blunt question: if we added a partition tomorrow, what would happen? If the honest answer is "I'm not sure", that's the finding.
+
+## Test it before it matters
+
+The way to turn the question into evidence is a test with more than one partition. Create a topic with several, publish messages across all of them, run the consumer, and assert that every message is processed.
+
+Then run two instances against the same group and assert that each message is handled once, give or take the repeats that idempotency makes harmless.
+
+It costs an afternoon to build and it prevents a surprise at the worst possible time: when volume has grown and you need to scale quickly.
+
+## Where it falls over
+
+Multiple partitions change ordering. Within a partition, messages stay in order. Across partitions, they don't. If your processing needs strict ordering for related messages, you must choose a key that sends them to the same partition, and that's a design decision, not a configuration change.
+
+Moving to consumer groups also changes your failure modes. Rebalances pause consumption briefly and can cause repeats. That's why the idempotent inbox isn't optional.
+
+And I'd stress again that this is a pattern to look for, not a confession about a specific system. Plenty of code written for one partition is entirely fine for as long as it only ever has one. The trouble starts when nobody remembers the assumption is there.
+
+## The takeaway
+
+**Code that only works with one partition quietly decides you'll never scale out.** Look for literal partition numbers and offset storage with no partition, track offsets per partition or let the broker do it with idempotent handling, and test with more than one partition before you need them.
+
+Search your consumers for the word partition this week. Anything that's a constant is worth a conversation.
+
+Coming next in Services in Practice: orchestration or choreography, and merging duplicate records.

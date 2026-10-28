@@ -43,6 +43,8 @@ Everything that could be a magic string in a component lives in `src/lib/constan
 | `GITHUB_TOKEN`          | For projects page | GitHub PAT — enables pinned repos via GraphQL              |
 | `GA_MEASUREMENT_ID`     | No                | Google Analytics — omit to disable                         |
 
+`SONAR_TOKEN` is deliberately not in `env.ts`: the app never reads it (see [development.md](development.md#code-quality-sonarcloud)).
+
 In CI, `basePath` is derived from `GITHUB_REPOSITORY` automatically. `env.ts` ignores `NEXT_PUBLIC_BASE_PATH` when `GITHUB_ACTIONS=true`.
 
 ## Image Loader

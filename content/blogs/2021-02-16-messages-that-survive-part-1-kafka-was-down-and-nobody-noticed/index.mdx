@@ -1,0 +1,123 @@
+---
+title: "Messages That Survive, Part 1: Kafka Was Down and Nobody Noticed"
+date: "2021-02-16"
+summary: "If our message broker goes down, no user notices. That isn't luck. It's one design decision: write the change and the message in the same database transaction, and publish later. This is the outbox pattern, what it costs, and where it still falls short."
+tags: ["dotnet", "kafka", "microservices", "architecture"]
+series:
+  name: "Messages That Survive"
+  part: 1
+published: true
+---
+
+The first question I ask about any event-driven service is: what happens to a user's save if the broker is down?
+
+On the platform I work on, a case-management system for the justice sector, almost everything interesting that happens is an event. Someone arrives, someone moves, someone leaves, money changes hands. Several services react to each of those. And the answer to my question is: nothing the user would notice. Staff keep saving records. Screens keep working. When the broker comes back, the waiting events go out in a burst and everything catches up.
+
+That isn't luck. It came from one decision about how we publish events, and it's the first thing I'd want anyone building event-driven services to understand. This series, Messages That Survive, is about the handful of habits that make messaging boring in the good way. This first part is about the one that matters most: **the outbox**.
+
+## The gap between save and send
+
+Here's how most people publish an event the first time. You save your change, then you send a message saying it happened.
+
+```csharp
+public async Task PlaceOrderAsync(Order order)
+{
+    _db.Orders.Add(order);
+    await _db.SaveChangesAsync();
+
+    await _producer.ProduceAsync("orders.order.placed", ToMessage(order));
+}
+```
+
+It looks fine, and it works almost every time. The trouble is the gap between those two lines.
+
+If the save succeeds and the send fails, because the broker is down or the network blips or the process is recycled at the wrong moment, the order exists and nobody else knows about it. Billing never bills it. The confirmation email never goes. You've lost an event, and nothing will ever tell you.
+
+So people swap the order round: send first, then save. Now if the send succeeds and the save fails, everyone else hears about an order that doesn't exist. That's arguably worse.
+
+The underlying problem is that you're trying to change two systems, a database and a broker, and there's no transaction that covers both.
+
+## The weak fix: retry harder
+
+The obvious next step is to wrap the send in a retry. Try three times with a short delay, and log an error if it still fails.
+
+That helps with blips. It doesn't help if the process dies between the save and the final retry, because the retry only lived in memory. It doesn't help with a broker that's down for twenty minutes, unless you're happy holding a web request open for twenty minutes. And it still leaves you with an error in a log that someone has to notice and act on.
+
+Retrying makes the gap smaller. It doesn't close it.
+
+## The better fix: put the message in the transaction
+
+The outbox pattern closes the gap by not trying to talk to two systems at once. You write the message into your own database, in the same transaction as the change, and publish it later.
+
+```csharp
+public async Task PlaceOrderAsync(Order order)
+{
+    await using var tx = await _db.Database.BeginTransactionAsync();
+
+    _db.Orders.Add(order);
+    _db.OutboxMessages.Add(new OutboxMessage
+    {
+        MessageId = Guid.NewGuid(),
+        Topic = "orders.order.placed",
+        Payload = JsonSerializer.Serialize(new OrderPlacedV1(order.Id, order.Total)),
+        Status = OutboxStatus.Pending,
+        CreatedUtc = DateTime.UtcNow
+    });
+
+    await _db.SaveChangesAsync();
+    await tx.CommitAsync();
+}
+```
+
+Now there is only one system involved in the user's request: the database. Either the order and its message are both saved, or neither is. There's no gap.
+
+A background worker does the sending. It reads pending rows, publishes them, and marks them sent.
+
+```csharp
+foreach (var message in await _outbox.GetPendingAsync(batchSize: 50, ct))
+{
+    try
+    {
+        await _producer.ProduceAsync(message.Topic, message.ToKafkaMessage(), ct);
+        await _outbox.MarkSentAsync(message.MessageId, ct);
+    }
+    catch (ProduceException<string, string> ex)
+    {
+        await _outbox.ScheduleRetryAsync(message.MessageId, ex.Message, ct);
+    }
+}
+```
+
+If the broker is down, the send fails, the message is scheduled for a retry with a back-off, and the worker moves on. The user's request finished long ago. When the broker comes back, the next pass picks the message up. That's the whole reason a broker outage is a delay rather than an incident.
+
+## What it costs
+
+It isn't free, and I'd be suspicious of anyone who says it is.
+
+**Latency.** The worker polls every few seconds, so an event goes out a few seconds after the change instead of immediately. For "someone moved" or "an order was placed", that's nothing. For something a person is sitting and waiting on, it might matter.
+
+**An extra table in every service.** It needs indexes on status and creation time, and it needs cleaning up. We delete sent messages after a few days, and keep failed ones longer so someone can investigate.
+
+**A worker to keep alive.** A hung publisher is invisible: the service looks healthy and simply stops sending. We give each worker a heartbeat and have a watchdog restart it if the heartbeat stops.
+
+**Ordering is only as good as your query.** If you publish in creation order per aggregate, you keep ordering per order. If you parallelise the publisher carelessly, you lose it.
+
+We put all of this in a shared library that every .NET service uses, so each service gets the table, the worker, the back-off and the clean-up without building them again. That's the part I'd recommend most strongly. Getting the outbox right once is work. Getting it right twenty times is a lot of chances to get it wrong.
+
+## Why not broker transactions?
+
+Kafka does have transactions, and people sometimes ask why we didn't just use them. The answer is that they cover writes to Kafka, not writes to SQL Server. The part we care about, "the order was saved", is in the database. A broker transaction can't include it, so it doesn't solve the problem.
+
+There are libraries that implement the outbox for you, and for a new project they're worth a look. For us, the pattern was simple enough, and our setup specific enough, that owning it was reasonable.
+
+## Where it still falls short
+
+The outbox guarantees a message will be sent at least once. It doesn't guarantee it'll be sent only once. If the worker publishes a message and then crashes before marking it sent, it'll publish it again on restart. So the receiving side has to cope with duplicates. That's the next post.
+
+It also doesn't tell you what to do with a message that fails every time. Eventually you have to stop retrying, and then you need somewhere for that message to go. That's Part 3.
+
+## The takeaway
+
+**Trust the database transaction, not the network.** If two things must both happen and only one of them is transactional, put the other one inside it and do the risky part later.
+
+Coming next in Messages That Survive: every message arrives twice, and how to make the second one harmless.

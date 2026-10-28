@@ -27,10 +27,10 @@ export default function OgImage() {
             Open to Work
           </div>
           <div style={{ fontSize: '22px', color: '#f0f0f0', lineHeight: 1.5 }}>
-            Backend and DevOps roles · SC Cleared · UK
+            Senior Software Engineer · C# / .NET · Agentic Engineering
           </div>
           <div style={{ fontSize: '14px', color: '#a78bfa', letterSpacing: '1px' }}>
-            Sutton, London · Hybrid and remote considered
+            Basingstoke, Berkshire, London · Open to remote and hybrid roles
           </div>
         </div>
       </div>

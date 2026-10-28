@@ -1,0 +1,171 @@
+---
+title: "Legacy .NET That Still Pays, Part 7: Your Singleton Is Shared State"
+date: "2026-07-18"
+summary: "A singleton in the dependency-injection container is a global variable with better manners. Every write to it affects every reader at once. That matters for a shared in-memory list read by several background workers, and for deciding when to snapshot instead of share."
+tags: ["dotnet", "dependency-injection", "concurrency", "legacy"]
+series:
+  name: "Legacy .NET That Still Pays"
+  part: 7
+published: true
+---
+
+A shared in-memory list of active devices was read by several background workers. One of them cleared the list. Every other worker, at that instant, was reading an empty one.
+
+Nobody had written a global variable. Everyone had written a perfectly ordinary class, registered it as a singleton in the dependency-injection container, and asked for it in a constructor. It looked like normal, tidy .NET code. It behaved like a global.
+
+This is Part 7 of **Legacy .NET That Still Pays**, following [Part 6](/blogs/legacy-dotnet-part-6-prove-it-then-promote-it/). The sentence to keep is the one in the title: a singleton is shared state.
+
+## What registering a singleton does
+
+When you register a service as a singleton, the container creates one instance and hands that same instance to everything that asks for it. That is the whole contract.
+
+It's convenient, and it's often the right choice for things that are expensive to build or genuinely global, like a configuration reader or a connection factory. But the moment the instance holds state that changes, it has become a piece of memory shared by every consumer in the process.
+
+The container's polish hides this. A global variable looks like one. A constructor parameter looks like a clean dependency. Both are the same thing in effect: one object, many readers, one place to write.
+
+## The shape of the bug
+
+Several hosted services read the same collection of devices. Each ran on its own thread. Each assumed the list was a stable thing they could look at.
+
+The collection could be cleared and refilled. In the code that did it, that was a sensible-looking sequence: clear the old entries, then add the new ones. For one worker, in isolation, it's fine.
+
+For the rest it's a window. Between the clear and the refill, every reader sees an empty list. Nothing locks them out and nothing tells them it's changing. They act on nothing, quietly.
+
+That's the failure mode of shared mutable state in a singleton: the writer thinks it's tidying its own data, and the readers experience a sudden change in theirs.
+
+## Start-up order is a hidden contract
+
+There's a second layer, and it's the one that makes these bugs hard to see.
+
+Hosted services start in some order. If one of them fills the shared list, and others read it, then the correctness of the whole system depends on the fill happening before the reads. Nothing in the code says so. It's an agreement that exists only because, today, the services happen to start in the right order.
+
+[The Empty Window at Start-Up](/blogs/forecourt-engineering-part-6-the-empty-window-at-start-up/) is a real example: the first fill ran before the data was available, and the clear that followed left every reader with nothing. The container couldn't warn about it, because it had no idea the order mattered.
+
+When you share a singleton, you've accepted an ordering contract. The first job is to find out whether you wrote it down.
+
+## What to do about it
+
+There isn't one answer, because it depends on how the data is used. These are the options I reach for.
+
+**Make the writer atomic.** Build the new collection off to the side, then swap the reference in one step. Readers see either the old complete list or the new complete list, never the gap in between.
+
+```csharp
+public sealed class DeviceRegistry
+{
+    private volatile IReadOnlyList<Device> _devices = Array.Empty<Device>();
+
+    public IReadOnlyList<Device> Current => _devices;
+
+    public void Replace(IEnumerable<Device> fresh)
+    {
+        var next = fresh.ToList();
+        if (next.Count == 0) return;   // keep the last good list
+        _devices = next;
+    }
+}
+```
+
+The write is a single reference assignment. A reader holding the old list carries on with a consistent view.
+
+**Snapshot instead of share.** If a worker needs a stable view for the duration of a piece of work, it takes a copy at the start and uses that. It's slightly stale, and it can never change underneath the worker.
+
+**Own it in one place.** Make one component the only writer and expose read-only access. If a dozen classes can clear the collection, one of them eventually will at the wrong moment.
+
+**Don't share it at all.** Sometimes the answer is that each consumer should ask for what it needs when it needs it, and the singleton shouldn't hold the list.
+
+## A test that shows the problem
+
+You can demonstrate the bug without a production system. One thread reads the shared list in a tight loop and records any time it sees fewer items than it should; another repeatedly replaces the contents.
+
+With a clear-then-add writer, the reader catches empty lists. With the swap, it never does. That's a test worth keeping next to the registry, because it's the first thing a future refactor will quietly break.
+
+## How to find who writes
+
+Before changing anything, I want to know how big the problem is, and that starts with finding every writer.
+
+Search for the singleton's registration, then for every place that receives it. Most of the classes that take it in a constructor only read, and a few write. The writers are the ones to examine, and there are often more than you expect, because a method named something innocuous like `Refresh` or `Allocate` can clear and refill a collection.
+
+For each writer, ask three questions. When does it run? What does a reader see while it runs? And can it run when there's no data to write? The third is the one that causes the worst bugs, because a writer that always clears and then adds will happily clear and add nothing.
+
+## Concurrent collections don't fix this
+
+A common reaction is to swap the dictionary for a thread-safe one. It helps with one problem and leaves the one in this post untouched.
+
+A concurrent dictionary guarantees that individual operations are safe: an add, a remove, a lookup. It doesn't guarantee that a sequence of operations is safe. "Clear, then add these ten items" is two steps, and a reader that looks between them sees the gap. The collection is perfectly consistent at every instant, and the program is still wrong.
+
+The problem isn't thread safety of the container. It's the shape of the update. A reader needs to see a complete state, and a clear-then-fill never offers one. That's why replacing the whole value in a single step is the right idea, and a thread-safe collection is not a substitute.
+
+## Share, snapshot or ask: a quick guide
+
+I use a short set of questions to decide which shape fits.
+
+- **Does a reader need to see a change the instant it happens?** Then it needs to share the live value, and the writer has to make updates atomic.
+- **Does the reader do a piece of work that must see a consistent view from start to finish?** Then it should take a snapshot at the start and use that.
+- **Is there really only one place that needs it?** Then don't register a singleton, and let that place own it.
+- **Does the data change rarely and tolerate being a little stale?** Then a snapshot refreshed on a schedule is the simplest answer.
+
+Most of the hosted services I've seen fall into the second and fourth groups. They don't need the live value. They need a stable view, and a singleton hands them a moving target.
+
+## Why this keeps appearing in older code
+
+Legacy services are often built around a handful of long-lived workers and a few big shared objects, because that's how background processing was commonly done before the patterns around it matured. A singleton in a container was a convenient way to give every worker the same data.
+
+It also tends to accumulate writers over time. The original class had one method that filled the list. A later feature added a second. A bug fix added a third, to cover a case the first two missed. Nobody was careless. Each addition was reasonable, and the result is a global with several authors.
+
+That's why I treat singleton state as something to audit whenever I'm in the area, not only when it breaks. The cost is small, and the failures it prevents are the quiet kind.
+
+## A test with real threads
+
+The test for the registry from earlier doesn't need much code.
+
+```csharp
+[Fact]
+public async Task Readers_never_see_an_empty_list_during_a_replace()
+{
+    var registry = new DeviceRegistry();
+    registry.Replace(Enumerable.Range(1, 50).Select(i => new Device(i)));
+
+    using var stop = new CancellationTokenSource();
+    var sawEmpty = false;
+
+    var reader = Task.Run(() =>
+    {
+        while (!stop.IsCancellationRequested)
+            if (registry.Current.Count == 0) sawEmpty = true;
+    });
+
+    for (var i = 0; i < 10_000; i++)
+        registry.Replace(Enumerable.Range(1, 50).Select(n => new Device(n)));
+
+    stop.Cancel();
+    await reader;
+
+    Assert.False(sawEmpty);
+}
+```
+
+Swap the registry's `Replace` for a clear-then-add and the test fails, usually quickly. It's a race, so I'd run it a few times, and I'd not rely on a single green run as proof. But a test that fails often enough to notice is the point.
+
+## Registrations worth a second look
+
+When I audit a container's registrations, a few shapes catch my eye straight away.
+
+A singleton whose name ends in "Cache", "Collection", "Registry" or "Store" is holding state. A singleton with a method called `Refresh`, `Reload`, `Allocate` or `Clear` has a writer. A singleton injected into more than one hosted service has several readers on different threads.
+
+Any one of those is normal. Two together deserve a look. All three on one class are almost always a global variable in disguise, and the first thing to check is what a reader sees while the writer is mid-way through.
+
+## Where it falls over
+
+Swapping an immutable list handles the gap, but not a reader that needs to see a change as soon as it happens. If a worker must react to the removal of a device the instant it's gone, a snapshot tells it too late.
+
+The "keep the last good list" guard I put in the example has a cost: it can hide a genuine empty state. A site that really has no devices will keep showing the old ones. That has to be a deliberate choice, logged loudly.
+
+And none of this fixes the ordering contract. Atomic swaps stop readers seeing a half-built list. They don't make a worker wait until the first list exists. That needs an explicit signal that the data is ready.
+
+## The position
+
+**A singleton in the container is a global variable with better manners; treat every write to it as affecting every reader at once.** Swap complete values instead of clearing in place, snapshot when you need a stable view, and write down any start-up order the design depends on.
+
+Search your container registrations for singletons that hold a collection. For each one, ask who writes it and what a reader sees in the middle.
+
+The rest of my writing is on [the blog](/blogs/).

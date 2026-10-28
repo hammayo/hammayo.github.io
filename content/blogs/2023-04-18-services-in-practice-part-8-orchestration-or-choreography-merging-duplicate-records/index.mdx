@@ -1,0 +1,115 @@
+---
+title: "Services in Practice, Part 8: Orchestration or Choreography? Merging Duplicate Records"
+date: "2023-04-18"
+summary: "Merging two customer accounts touches orders, payments and addresses, each owned by a different service. A distributed transaction isn't the answer. How to decide between one service that owns the flow and events that carry it, and why this one needed an owner."
+tags: ["dotnet", "microservices", "saga", "architecture"]
+series:
+  name: "Services in Practice"
+  part: 8
+published: true
+---
+
+Two customer accounts turned out to be the same person. One was created at a counter, one online, with a slightly different spelling of the name. Now somebody needed to merge them: orders, payments and addresses all had to end up under a single record.
+
+In a single database, that would be a transaction. Update the orders, update the payments, update the addresses, commit, or roll the whole thing back.
+
+Here, orders lived in one service, payments in another and addresses in a third. Each owned its own data, as [Part 2](/blogs/services-in-practice-part-2-who-owns-this-data-no-shared-tables/) insisted they should. There was no transaction that could span all three.
+
+This part is about a choice every multi-service flow forces: **orchestration or choreography**. A merge makes the trade-off very clear.
+
+## Why not a distributed transaction
+
+The first instinct, for anyone who has worked with a single database, is to look for a way to make the three services commit together. There are protocols that attempt exactly that.
+
+They're rarely worth it. They need every participant to support the protocol and to hold locks while the others decide. They make availability worse, because one slow participant holds up all the others. And they bind the services together in precisely the way the separation was meant to avoid.
+
+What you do instead is accept that the merge will happen in steps, with a window in which it's partly done, and design the steps so that they can be completed, or undone, safely.
+
+## Two ways to run the steps
+
+That leaves a question: who decides what happens next?
+
+**Choreography.** No one is in charge. A `CustomersMerged` event is published; the order service hears it and moves its orders; the payment service hears it and moves its payments; the address service hears it and moves its addresses. Each reacts independently, and the whole thing happens as a consequence.
+
+**Orchestration.** One service owns the flow. It knows the steps, tells each participant what to do, records what has been done and decides what comes next. The participants do as they're asked and report back.
+
+Both work. They suit different shapes of problem.
+
+## When choreography is better
+
+Choreography is simplest when the reactions are independent, and nobody needs to know whether they've all finished.
+
+Telling email and reporting that a booking was confirmed, from Part 1, is the model case. The sender doesn't care whether the listeners succeed. No step depends on another. If one fails, it retries without affecting the rest.
+
+It scales well in terms of change. A new listener subscribes, and nothing else is touched.
+
+## When someone has to own the flow
+
+A merge doesn't fit that shape. Several things are true at once.
+
+The steps matter together. A merge where orders moved but payments didn't leaves a customer whose history is split across two records, and worse, an inconsistent one.
+
+Someone needs to know the state. An operator will ask "has this merge finished?" and the answer has to come from somewhere. With choreography, the only way to find out is to ask each participant.
+
+It might need to be cancelled. If the two accounts turn out to be different people, the merge has to stop, and anything already moved has to move back. That needs someone who knows what has been done.
+
+When those are true, the flow needs an owner. That's orchestration.
+
+## One owner that knows the state
+
+The orchestrating service keeps a record of each merge: which accounts, which steps are done, which are pending and what state it's in.
+
+```csharp
+public sealed class MergeProcess
+{
+    public Guid Id { get; init; }
+    public Guid SurvivorId { get; init; }
+    public Guid DuplicateId { get; init; }
+    public MergeStatus Status { get; private set; }
+    public Dictionary<string, StepStatus> Steps { get; } = new();
+
+    public void RecordStep(string participant, StepStatus result)
+    {
+        Steps[participant] = result;
+        Status = Steps.Values.All(s => s == StepStatus.Done) ? MergeStatus.Completed
+               : Steps.Values.Any(s => s == StepStatus.Failed) ? MergeStatus.NeedsAttention
+               : MergeStatus.InProgress;
+    }
+}
+```
+
+That record answers the operator's question, drives the next step and provides the audit trail for a change that matters to the people whose records are involved.
+
+The orchestrator doesn't contain the other services' logic. It doesn't know how to move an order, only that the order service can, and that it should be asked. Ownership of data stays where it was.
+
+## Cancellation
+
+The orchestrator is also the natural home for the awkward case. If someone decides the merge was a mistake, the orchestrator is the only place that knows which participants have already acted.
+
+It can then ask each of them to reverse their step, in a sensible order, and record the outcome. Without an owner, "undo" means finding out from several places what happened, and hoping nothing has changed since.
+
+I'd be honest that reversing isn't always perfect. Some changes can be undone cleanly, others only compensated for. The point is that the flow has somewhere to try.
+
+## Commands, not events
+
+One practical difference is worth stating. In orchestration the messages sent to participants are instructions, not announcements: "move these orders from A to B". They're addressed, and an answer is expected.
+
+That changes how you name and handle them. A command has one recipient and a result. An event has no named recipient and no result. Mixing the two is a common source of confusion, so keep the vocabulary clear.
+
+## Where it falls over
+
+An orchestrator is a new service with new responsibilities, and a new place where logic can pile up. If it starts to know how participants work, the coupling you avoided comes back through the side door.
+
+It is also a single point of attention. If the orchestrator is down, merges stop. It doesn't lose them, because the state is stored, but they wait.
+
+For simple flows it is overkill. If your steps are independent and failure of one doesn't matter to the others, choreography is lighter, and an owner is an overhead you'd be paying for nothing.
+
+And both approaches leave you with a period of partial completion. Users and other services can see a half-merged state. Design for that, with clear statuses and, where it matters, a way to hide the records until the merge finishes.
+
+## The takeaway
+
+**If someone needs to own the whole flow, orchestrate it; if not, let events carry it.** A distributed transaction wasn't the answer for a merge, so one service owns the state, tells each participant what to do and handles cancellation.
+
+Take a multi-step flow in your system and ask three questions: do the steps matter together, does anyone need to know when it's finished, and might it need to stop? Two yeses is a flow that wants an owner.
+
+Coming next in Services in Practice: a saga where every participant answers.

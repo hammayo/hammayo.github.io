@@ -1,0 +1,120 @@
+---
+title: "Engineering Habits, Part 2: The Reviewer Deleted My Fix"
+date: "2026-06-23"
+summary: "My server-side fix for a broken 'revert to default' button worked. A reviewer asked one question, showed me a smaller client-side fix, and I deleted about 25 lines of my own code. Then I did the same thing to myself on a timer bug, three attempts too late."
+tags: ["dotnet", "angular", "codereview", "productivity"]
+series:
+  name: "Engineering Habits"
+  part: 2
+published: true
+---
+
+On the advanced config page of our admin web UI, every setting has a "revert to default" button. For settings whose default is an empty string, it failed. The user got a warning triangle saying the field couldn't be updated, and nothing was saved.
+
+I fixed it on the server, and my fix worked. Then a reviewer asked one simple question, and the right answer was to delete about 25 lines of my own code. This post is about **taking code review well**: why the smaller fix is usually the better one, even when the bigger one is yours and already working.
+
+This is Part 2 of Engineering Habits. [Part 1](/blogs/engineering-habits-part-1-grep-every-caller/) was about looking for more places to fix. This one is about the opposite discipline: noticing when the fix itself is bigger than it needs to be.
+
+## Two causes working together
+
+There were two causes. A shared validation rule rejected any empty value, as a safety net against someone blanking an important setting by accident. It predated the revert button, and nobody had revisited it when the button arrived.
+
+And the UI only sent the new value, not the default. So when the server saw an empty string, it had nothing to compare it with, and no way to know that empty was exactly what the user meant.
+
+The rule itself needed changing either way. Empty should be allowed when it matches the setting's default, and still refused otherwise:
+
+```csharp
+static bool IsAcceptable(string value, string defaultValue) =>
+    !string.IsNullOrEmpty(value)                     // the original rule: no blanks
+    || (value != null && value == defaultValue);     // unless blank is the default
+```
+
+The null check matters. Without it, a null value with a null default would pass, because null equals null, and the safety net would have a hole in it.
+
+There's a second detail that made the bug harder to see. The validation ran twice, once in the web layer and again in the database layer. The first one rejected the request and returned an error, so the request never reached the stored procedure, which would have accepted an empty string quite happily. The layer that looked strict wasn't the one that mattered.
+
+## My fix: the server looks it up
+
+The rule needed a default to compare with, and the request didn't carry one. So my fix had the server look up the setting's default from its config cache, and fill it in on the incoming request before validation ran.
+
+It worked. It was tested. It also added a cache dependency to the save path, and a lookup that ran on every save.
+
+Before choosing, I'd weighed five options. A flag saying "this is a revert, not a save" meant threading intent through the whole call chain. Changing the rule alone didn't work, because the incoming default was always null. Removing the validation would have dropped the safety net for every field.
+
+That left two: the rule plus the server looking up the default, which was mine, and the rule plus the UI sending the default, which the reviewer would suggest.
+
+## The reviewer's question
+
+The reviewer asked why the server was looking up the default, when the UI already had it.
+
+The page loads every setting with its default, to show the user what "revert" will do. It just wasn't sending that default back. So the UI could send it alongside the value, and the server could validate against it directly:
+
+```typescript
+// The page already knows each setting's default; send it with the value.
+this.config.save({
+  key: setting.key,
+  value: setting.value,
+  defaultValue: setting.defaultValue   // metadata for validation, not the value being set
+});
+```
+
+They were right. I switched to that, and deleted about 25 lines of server-side lookup code, plus the cache dependency in the save path. It also fixed a quirk I hadn't spotted, where an empty value was being turned into a null on the way in.
+
+**The best diff sometimes deletes your own code.** My version wasn't wrong. It just did work the system didn't need, in a place that made the save path harder to reason about.
+
+## Why this is harder than it sounds
+
+The weak response to a comment like that is to defend the diff. It's already written, it passes its tests, and switching approach means redoing work. Every one of those reasons is about the author, not the code.
+
+The better response is to ask which version you'd rather maintain in a year. The smaller one has fewer moving parts, fewer dependencies in a hot path, and less for the next reader to understand. That's almost always the one to keep, whoever wrote it.
+
+I did write down the trade-off, though. With the reviewer's version, the server trusts a default value sent by the client. For an internal admin UI on the forecourt's own network, that's acceptable, and I recorded it as a decision rather than letting it slide. On a public-facing API, I'd make the other call.
+
+The reviewer also caught a subtle point worth recording. Save and revert share the same send method, so the default in the payload is only ever metadata for validation. It isn't the value being set, even when the user pressed revert.
+
+## The part review couldn't see
+
+The follow-up was the bit no reviewer could have spotted from the diff.
+
+Some settings had no default at all. For those, revert sent a null, failed, and the page's single error flag lit the warning triangle on the Save button too. So it looked like Save had failed, when Save had never been pressed.
+
+I audited them. There were 21 keys with 5 different causes, from a missing attribute on the class holding the constants to keys that only exist in the database. Two of them turned out to be orphans that nothing in the code read at all.
+
+What shipped was disabling revert when a setting has no default, a separate error flag per button, and a data migration removing the two orphaned keys. I disabled revert only on a strictly null default, because an empty string can be a perfectly legitimate default.
+
+## Then I did it to myself
+
+The same instinct should have saved me time on another bug on that page, and it didn't, not at first.
+
+Saving anything made some dropdowns snap back to "None".
+
+The page refreshed its options every time the server pushed an update after a save, and the refresh reset the selection. I tried suppressing the refresh with a counter. Then a flag and a timer. Then two timers.
+
+Each one was fragile, because the number and order of push events per save isn't predictable. A timer is a guess about how long a burst will last, and bursts don't read your guesses.
+
+Then I asked the question the reviewer would have asked: do the options ever change at runtime? They don't. So the fix was to set the options once, when the page loads, and never refresh them:
+
+```typescript
+ngOnInit(): void {
+  this.integrationOptions = this.buildOptions();   // fixed for the page's lifetime
+}
+// No refresh on push: nothing to suppress, nothing to time.
+```
+
+**When events arrive in unpredictable bursts, a deterministic guard beats any timer.** Better still is removing the thing that needed guarding.
+
+## Where it falls over
+
+**Most of those 21 keys still have no default.** Disabling the button removes the confusing error, but revert still can't work for them until each gets a proper default, and that's separate work across five different causes.
+
+The library that held the validation rule needed a release before the service could use the change. So I added an interim local copy of the rule in the service, with a cleanup step to delete it afterwards. That copy only goes away when someone does the cleanup, and it's the kind of step that lingers.
+
+And the dropdown fix took me three attempts at suppressing refreshes before I asked whether the options ever changed. That's the lesson of this whole post, and I still needed three goes to apply it to my own code.
+
+## Ask what already exists one layer up
+
+My position: when a reviewer suggests a smaller fix, the burden of proof is on the bigger one, even when it's yours and it works. Take the smaller fix, write down any trade-off it brings, and move on.
+
+Before you add code to compute something, check whether it already exists one layer up: in the client, the caller, or the data that's already on the page. And before you reach for a timer to tame a burst of events, ask whether the thing the events are changing needs to change at all.
+
+Next in the series: adding access control without breaking the clients that already relied on open access. The rest of my writing is on [the blog](/blogs/).

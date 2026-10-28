@@ -1,0 +1,141 @@
+---
+title: "Spec-Driven, Part 11: The As-Built Spec"
+date: "2026-09-05"
+summary: "When a loop outruns its plan, write the spec back from what was built, before anyone forgets why. Nine stories of a 27-story feature shipped with no written spec as the scope grew. I rebuilt the record from commit messages. The post covers what that record is good for, and what it can't recover."
+tags: ["ai", "documentation", "workflow", "spec-driven"]
+series:
+  name: "Spec-Driven"
+  part: 11
+published: true
+---
+
+The feature was finished, and it had a spec. The spec described about two thirds of what had shipped.
+
+Nine of the 27 stories in the feature were never written down. The scope had grown while the loop was running, and each new story went straight from an idea in my head to an agent's task and a commit, without a line of the spec being updated. When I came to close the ticket, its own acceptance criterion said the spec should reflect what shipped. It didn't.
+
+This is Part 11 of the **Spec-Driven** series, following [Part 10](/blogs/spec-driven-part-10-review-the-batch-not-the-diff/). It's about the **as-built spec**: what to do when a loop outruns its plan, and why the answer is to write the spec back from what was built.
+
+## How it happened
+
+[Part 7](/blogs/spec-driven-part-7-green-isnt-right/) told the story of the loop itself. The short version: a well-specified feature, split into small stories, each with its own gates. Then, partway through, a correctness pass. Earlier stories had got some display maths wrong, and the later stories fixed it.
+
+The correctness stories were the ones that never got written down. They arrived as consequences of what I found, not as planned work, so nothing prompted me to add them to the document. The work was recorded in the commits. The spec stopped describing it.
+
+That's the usual way a spec falls behind. Not a decision to skip it. A sequence of small moments when updating it wasn't the next thing to do.
+
+## What I had to work from
+
+The record of what shipped was scattered.
+
+The work had spread across several task files over the weeks. One was an early draft of three stories that a later version had replaced. One was empty. None of them covered the correctness pass.
+
+What did cover it was the commit history. Each story had been committed locally by the loop, with a message that said what it did. Four commits, read in order, told the story of those nine stories more reliably than my memory did.
+
+That is the first lesson, and it's about commit messages. A message that states what changed and why is a record you can rebuild a spec from. A message that says "fixes" is not.
+
+## Rebuilding it
+
+I did it in three passes.
+
+**List what shipped.** Walk the history for the feature, in order, and write one line per story: what it changed. This is the skeleton, and it comes from the code and the commits, not from the plan.
+
+**Work out the why.** For each line, add the reason. Some were in the commit message. Some I could recover from the review findings. A few I reconstructed from knowing what had gone wrong earlier, which is why doing this soon matters.
+
+**Mark the decisions.** The interesting entries were the ones where a choice had been made: which control to use, what to lock while something is running, where to store defaults. Those need to be in the record as decisions, with the alternative, so they aren't reopened by someone who doesn't know they were settled.
+
+The result was an as-built spec: not the plan I started with, but a description of what exists, in the same shape as the original, covering all 27 stories.
+
+## What it's good for
+
+An as-built record earns its keep in a few specific ways.
+
+It lets someone new read the feature and understand it without archaeology. They see what it does and why, and not only the diff.
+
+It makes the next change safer. Anyone proposing a change can check whether it contradicts a recorded decision before they start.
+
+It closes the ticket honestly. The acceptance criterion was that the spec reflects what shipped, and now it does.
+
+And it gives a future loop something true to be held to. If the next piece of work builds on this feature, the agent reads an accurate account, and not a stale one.
+
+## What it can't recover
+
+Be honest about the limits, because they shape how much to trust the thing.
+
+It can't recover the reasoning that was never written anywhere. If a decision was made in my head and left no trace, the as-built spec states what was done and not why. I filled some of those gaps with my best reading, and I marked them as reconstruction.
+
+It can't recover the plan. The original intent, what I expected to build and in what order, is only partly there. What's written is the outcome.
+
+And it can't tell you whether what shipped was right. It describes the feature faithfully, including the parts a review should have questioned. A spec written afterwards is a description, not a verification.
+
+## Keeping the spec live next time
+
+The better fix is not to need the as-built one. The change I made to the process is small: updating the spec is the last line of every story.
+
+Each story's acceptance criteria now end with the instruction to update the spec to match what the story did. The gates check the build, the lint and the tests. The reviewer checks the spec line. If the spec isn't touched, the story isn't done.
+
+It costs a minute per story, and it makes the document a living record, not a post-mortem. The review gate stays where it was: the loop commits locally, nothing is pushed until the whole branch builds, and everything goes through a normal pull request with human review and CI.
+
+## What the document looks like
+
+I kept the as-built spec in the same shape as the original, so someone comparing the two could see what had changed.
+
+It has a short summary of what the feature is and what it's for. A list of the stories as they shipped, in order, each with a line on what it changed and a status. A section of decisions, each with the choice, the alternative and the reason. And a section of known limits, the things the feature doesn't do or does imperfectly.
+
+The stories section is the one the reconstruction filled in. For the nine that were never written, each entry says what the commit did, why, and how I know. That last part is the bit I'd keep in any as-built record, because it separates what is recorded from what is reconstructed.
+
+## Marking what's recorded and what's reconstructed
+
+A reconstructed spec is a different kind of document from a planned one, and it should look different.
+
+For each entry, I noted the source. "From the commit message and the review findings" is a strong source. "From the commit and my recollection of the earlier bug" is weaker. "Inferred from the code" is the weakest, and it deserves a flag.
+
+I used a simple convention: entries I was sure of had no marker, and entries I had to rebuild carried a short note saying so. It looked fussy while I was doing it, and it's what makes the document trustworthy later. A reader who finds a marked entry knows to check the code before relying on it.
+
+An as-built record that pretends to a certainty it doesn't have is worse than one that admits the gaps.
+
+## Reading commit messages as evidence
+
+The reconstruction ran on commit messages, so it's worth being specific about what made some of them useful.
+
+The useful ones said what changed and why, in a sentence: the display maths used the wrong divisor for one figure, so I've corrected it against the backend's real units. From that one line I could write a spec entry with its reason.
+
+The unhelpful ones said "fixes" or "updates". They told me a commit existed and nothing else, and for those I had to read the diff and guess the intent.
+
+The loop writes its own commit messages, and the quality varies with how the instructions are written. The fix is to ask for the message to state which criteria the story satisfied and what changed. It costs the agent nothing, and it turns the commit log into the raw material of a spec.
+
+## Using the as-built spec to brief the next loop
+
+The most practical benefit is for whatever comes next. When the next piece of work touches the same area, the agent's brief can begin with the as-built spec.
+
+That mattered because an agent will build on whatever it's told is true. Handed the original spec, it would have believed in a feature that no longer existed in that form. Handed the as-built one, it started from the code as it was, including the decisions, such as which controls are locked while something runs.
+
+It also keeps the planner honest. Reading the as-built spec before planning shows which parts need care, because they've been fixed once already.
+
+## A checklist you can use
+
+For anyone facing the same gap, this is the sequence I'd follow.
+
+1. Walk the history for the feature, in order, and write one line per story from the code.
+2. Add the reason for each, from messages, review findings or your memory, and mark which it is.
+3. List the decisions, each with the alternative.
+4. List the known limits.
+5. Check the result against the code for any entry you marked as inferred.
+6. Add "update the spec" to the end of every story's criteria.
+
+It takes an afternoon for a feature of this size. The sixth step is what stops you doing it again.
+
+## Where it falls over
+
+It's still work after the fact, and after-the-fact work is where details are lost. The longer you leave it, the more of the why is gone.
+
+A spec reconstructed from commits is only as good as the commit messages. A loop that writes vague ones produces a vague record, and I'd now check that the messages say what changed and why.
+
+And it adds a step to every story, which a team may resent for a small feature. For a three-story change it's more process than it's worth.
+
+## The position
+
+**When a loop outruns its plan, write the spec back from what was built, before anyone forgets why.** Rebuild it from the commit history, mark the decisions, be honest about what you reconstructed, and make "update the spec" the last line of every story so you don't need to do it again.
+
+Look at the last feature you built with an agent and compare its spec to its commit history. The gap between them is the size of the job you've been deferring.
+
+The rest of my writing is on [the blog](/blogs/).
