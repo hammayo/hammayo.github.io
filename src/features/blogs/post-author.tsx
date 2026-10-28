@@ -88,7 +88,7 @@ export function PostAuthor() {
                 Hammy Babar
               </p>
               <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">
-                Backend Software Engineer
+                Senior Software Engineer
               </p>
             </div>
           </div>

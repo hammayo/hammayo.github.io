@@ -11,7 +11,7 @@ export type CareerEntry = {
 export const about = {
   name:            'Hammayo',
   shortName:       'Hammy',
-  tagline:         'Senior Software Engineer · Agentic Engineering with Claude Code · C# / .NET',
+  tagline:         'Senior Software Engineer · Agentic Engineering',
   careerStartYear: 2001,
 
   // Homepage bio — {stardate} and {years} tokens computed client-side.

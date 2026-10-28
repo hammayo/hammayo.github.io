@@ -15,7 +15,7 @@ export const cv = {
   linkedIn: SOCIAL.linkedin,
   github:   SOCIAL.github,
 
-  headline: 'Senior Software Engineer · Agentic Engineering with Claude Code · C# / .NET',
+  tagline:  'Senior Software Engineer · Agentic Engineering',
   facts:    ['20+ years', 'Previously SC cleared', 'Basingstoke · open to remote and hybrid roles'],
 
   requestCv: {

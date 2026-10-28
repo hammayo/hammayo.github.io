@@ -2,9 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Container } from '@/features/shared/container';
 import { PageTransitionWrapper } from '@/features/shared/page-transition-wrapper';
+import { PageHeader } from '@/features/shared/page-header';
 import { PageViewEvent } from '@/features/shared/analytics-event';
 import { createPageMetadata } from '@/lib/metadata';
-import { accentTag, ctaButton, glowCard, gradientText } from '@/design/variants';
+import { accentTag, ctaButton, glowCard } from '@/design/variants';
 import { cn } from '@/lib/utils';
 import { cv } from '../../../content/cv';
 
@@ -21,10 +22,8 @@ export default function CVPage() {
       <PageViewEvent page="cv" />
       <Container className="py-8 space-y-10">
         {/* Header */}
-        <div className="space-y-3">
-          <h1 className={gradientText({ size: 'heading' })}>CV</h1>
-          <div className="h-0.5 w-10 rounded-full gradient-bg scheme-glow" />
-          <p className="text-base md:text-lg text-foreground/90">{cv.headline}</p>
+        <div>
+          <PageHeader title="CV" subtitle={cv.tagline} className="mb-4" />
           <ul className="flex flex-wrap gap-2">
             {cv.facts.map((fact) => (
               <li key={fact} className={accentTag({ variant: 'muted' })}>{fact}</li>

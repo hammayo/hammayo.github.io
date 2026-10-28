@@ -27,10 +27,10 @@ export default function OgImage() {
             Hammy Babar
           </div>
           <div style={{ fontSize: '22px', color: '#f0f0f0', lineHeight: 1.5 }}>
-            Backend engineer · 20+ years · Finance, Justice, Public Service
+            Senior Software Engineer · 20+ years · Finance, Justice, Public Service
           </div>
           <div style={{ fontSize: '14px', color: '#a78bfa', letterSpacing: '1px' }}>
-            {'C# · .NET · Azure · Docker · SC Cleared · Sutton, London'}
+            {'C# · .NET · Azure · Claude Code · Previously SC Cleared · Basingstoke'}
           </div>
         </div>
       </div>
