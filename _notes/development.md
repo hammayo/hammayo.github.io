@@ -54,7 +54,7 @@ I hardcode `SITE_URL` (`https://hammayo.co.uk`) in `src/lib/constants.ts` — it
 
 `.github/workflows/sonarcloud.yml` analyses every pull request and every push to `main`, and the quality gate shows as a check on the PR. The project key is `hammayo_hammayo.github.io` and the organisation is `hammayo`. Scanner settings (project, sources, exclusions) live in `sonar-project.properties`, shared by the workflow and the local script. The scanner is `@sonar/scan`, pinned to the same version in both; it downloads its own JRE.
 
-The quality gate looks at new code only. On PR 47 its conditions were: reliability, security and maintainability ratings all A, duplicated lines under 3%, and every security hotspot reviewed. A failing gate shows as a failed check on the PR.
+The quality gate looks at new code only. Its conditions: reliability, security and maintainability ratings all A, duplicated lines under 3%, every security hotspot reviewed, and 80% coverage. This repo has no tests, so `sonar-project.properties` excludes every file from coverage (`sonar.coverage.exclusions=**/*`); otherwise the coverage condition would fail at 0%. Remove that line when tests and a coverage report exist. The security rating also flags GitHub Actions that are not pinned to a full commit SHA, so pin any action you add. A failing gate shows as a failed check on the PR.
 
 **One-time setup**
 
@@ -62,7 +62,7 @@ The quality gate looks at new code only. On PR 47 its conditions were: reliabili
 2. Create a token at <https://sonarcloud.io/account/security>.
 3. Add it as the [`SONAR_TOKEN` repository secret](https://github.com/hammayo/hammayo.github.io/settings/secrets/actions) for CI, and as `SONAR_TOKEN` in `.env.local` (gitignored by `.env*`) for local scans. Never commit it. `src/lib/env.ts` does not validate it.
 
-Once Automatic Analysis is off, the PR check comes from the workflow (its check name is `SonarCloud / analyse`, not "SonarCloud Code Analysis"). If branch protection requires the old name, update it. Pull requests from forks are skipped because GitHub gives them no secret.
+Once Automatic Analysis is off, the analysis comes from the workflow, which shows as the job check `SonarCloud / analyse`. The quality gate result still appears as the **SonarCloud Code Analysis** check, posted by the SonarCloud app, so branch protection on that name keeps working. Pull requests from forks are skipped because GitHub gives them no secret.
 
 **Scanning from your machine:** `bash scripts/sonar-scan.sh`. It reads only `SONAR_TOKEN` from `.env.local` and publishes under the current branch name. It refuses to run on `main`.
 
