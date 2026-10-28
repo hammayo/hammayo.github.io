@@ -34,18 +34,14 @@ export default function CVPage() {
         {/* Stack */}
         <section className="space-y-3">
           <h2 className={sectionLabel}>Stack</h2>
-          <div className="space-y-3">
+          <dl className="grid gap-x-8 gap-y-4 md:grid-cols-2">
             {cv.skillGroups.map((group) => (
-              <div key={group.label} className="space-y-1.5">
-                <p className="text-sm font-medium text-foreground">{group.label}</p>
-                <ul className="flex flex-wrap gap-2">
-                  {group.items.map((item) => (
-                    <li key={item} className={accentTag()}>{item}</li>
-                  ))}
-                </ul>
+              <div key={group.label} className="border-l-2 border-[var(--scheme-border)] pl-4">
+                <dt className="text-sm font-medium text-foreground">{group.label}</dt>
+                <dd className="mt-1 text-sm text-muted-foreground leading-relaxed">{group.items.join(' · ')}</dd>
               </div>
             ))}
-          </div>
+          </dl>
         </section>
 
         {/* Selected work */}
