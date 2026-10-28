@@ -1,0 +1,117 @@
+---
+title: "Spec-Driven, Part 9: The Loudest Log Line Wasn't the Bug"
+date: "2026-06-05"
+summary: "My AI-assisted log analysis built a confident case around the noisiest pattern in the logs, and a reviewer rejected it in capitals. The name on the write-up was mine, the mistake was mine, and the fix went into the tool's first instruction."
+tags: ["ai", "productivity", "tooling", "architecture"]
+series:
+  name: "Spec-Driven"
+  part: 9
+published: true
+---
+
+A site reported stuck sales on its outdoor payment terminals, and I went after the loudest thing in the logs. A warning followed by an automatic clear had fired well over a hundred times that day, and the example quoted on the ticket pointed straight at it. My first write-up built the whole case around that pattern.
+
+It was wrong. The reviewer struck the example off the ticket and wrote, in capitals, that it was not a stuck sale. They were right, and this post is about how I got there, what I did the second time, and where that lesson lives now.
+
+I'd produced that first write-up with my **AI-assisted log analysis** workflow. The name on it was mine. So is this post. Parts 4 to 8 were mostly about habits that worked; this one is about a habit I didn't have yet, and the reviewer who taught it to me.
+
+## Three complaints and a very loud pattern
+
+The site's complaints were specific. One terminal went to "sale cancelled" as soon as a card went in. A couple of pumps showed a sale in progress when nobody was using them. And the till couldn't print a receipt, because the transaction didn't show up.
+
+The logs had something much louder than any of that. A warning and an automatic clear, over and over, all day. When one pattern dominates a day's logs and the ticket's own example points at it, it feels like the investigation has done itself.
+
+That's the trap, and I walked straight into it. I asked the workflow to explain the logs, it found the loudest thing in them and explained that very well, and I built three symptoms on top of it. The write-up was structured, confident and well argued. It was also answering a question the customer hadn't asked.
+
+## The weak method: count what's loud
+
+Here's the method I was actually running, even if I wouldn't have described it that way.
+
+Take the logs. Find the pattern that fires most. Assume the customer's symptoms are downstream of it. Write it up.
+
+It's a natural method for a person and an even more natural one for an assistant. Counting is easy, frequency looks like evidence, and a model asked to "explain these logs" will reach for the most prominent thing in them, because that's what explaining usually means. **Volume is not evidence.** It's just volume.
+
+The specific failure was worse than that, though. I'd adopted the ticket's example without checking which terminal it came from. It came from a different terminal. The customer's own pumps barely showed the pattern at all.
+
+## The better method: start from the customer's exact complaint
+
+So I started again, from the customer's words: their terminal, their pumps, their three symptoms. Everything else in the logs was background until it could be shown to touch one of those.
+
+The first check was simple. How many of those warnings landed on the customer's pumps? One on one pump, two on another. The worst pump on the site, on a different terminal, had dozens.
+
+If the loud pattern doesn't land on the customer's pump, it isn't the customer's problem, however loud it is.
+
+The second check was reading the code that raises the warning, instead of counting how often it appears. When a sale finishes, two paths race to clear it: a slow one driven by polling the pump controller, and a fast one driven by the terminal saying payment has cleared. When the fast path wins, the service logs a warning and clears the buffer itself. That's the designed fallback, not a fault, and it cleared in about a second.
+
+So "sale in progress when nobody's using the pump" was that one-second clear. The noisiest pattern in the logs was a safety net working as designed.
+
+### Then the symptoms came apart into ordinary things
+
+"Sale cancelled" as soon as a card went in was the payment gateway declining a card, one driver's card three times in a row. More days of logs later showed the other cancels too: a pre-authorisation check the gateway rejected for one card range, and drivers backing out of the PIN prompt.
+
+The proof for those was an absence, which I've come to like. When the terminal cancels a card straight after it's inserted, our service log is almost silent: a card-in notice, a receipt with no card number, back to ready. There's no authorise request at all. That missing request is the evidence that the cancel happened upstream of us, between the terminal and the gateway.
+
+The receipt was the one real defect. My best reading is that the reprint looks the receipt up with a different transaction number from the one it was stored under, so the lookup finds no row. That matched the till's "the transaction didn't show up", and it was the only customer symptom that pointed at our service.
+
+I've kept the words "best reading" on purpose. The logs showed the reprint's update matching no row, and the key mismatch explains that neatly. But I hadn't confirmed it against the stored data, and after the first write-up I wasn't going to present an inference as a finding twice in one ticket.
+
+## The tool wasn't the problem, the starting point was
+
+It would be easy to read this as a story about AI-assisted log analysis failing. It isn't, quite.
+
+On the second pass, the same workflow did most of the heavy lifting. It pulled in more days of logs, counted hits per pump, and lined up what the terminal, the service and the pump controller each said on one timeline. Those are the jobs an assistant is genuinely good at: tireless, mechanical and quick, across more log lines than I'd ever read by hand.
+
+What it can't do is decide which question matters. That comes from the customer's words, and it has to be given to the tool, not discovered by it. The first time, I gave it the logs and asked for an explanation. The second time, I gave it the complaint and asked for evidence, and the difference was entirely in what I asked.
+
+## The claim I retracted
+
+The first draft had another problem I only found on the second pass. It said a sale on another pump had been stuck for about a day.
+
+It hadn't. That sale ran in about twenty-five seconds. What fooled me was a stale timestamp from the day before, sitting inside a later log entry because an old per-pump state entry hadn't been pruned. It's cosmetic, and I'd built a claim on it.
+
+I retracted it in the new version, in writing, rather than quietly deleting it. That felt uncomfortable and it was the right call. A reviewer who's already caught you once needs to see you correct the record, not tidy it.
+
+The lesson I took from that one is narrower than the main one, and just as useful. A surprising number deserves a second source before it goes in a write-up. "Stuck for a day" was surprising. One look at when the sale's next state arrived would have killed it before anyone else read it.
+
+## Was it the AI's mistake or mine?
+
+Mine. The workflow did what I'd told it to, which was to explain the logs. I didn't make it start from the customer's complaint, and I didn't check the ticket's example before building on it.
+
+It's tempting to frame this as "the AI chased the loudest signal", and in a narrow sense it did. But a tool can't take the blame for a write-up with my name on it. The reviewer's time and the site's patience were spent on my analysis, not the model's.
+
+What I could do was fix the instructions as well as the write-up. The same principle as [writing a script when a mistake happens twice](/blogs/spec-driven-part-6-if-it-happens-twice-its-a-script/): a lesson that only lives in my head will get forgotten on a busy day. This one isn't mechanical enough for a script, so it went into the first thing the log-analysis skill reads. Here's the gist, made generic:
+
+```markdown
+## Before anything else
+
+1. Pin the customer's exact terminal and pump from the ticket. Quote them.
+2. For every loud pattern, count how many hits land on those. If the answer
+   is "almost none", it's background, however loud it is.
+3. Before calling a warning a fault, read the code that raises it.
+   A designed fallback that clears in a second is noise.
+4. Map each customer symptom to one mechanism, then prove it or kill it.
+```
+
+It's the same judgement a good colleague brings. The point is that the assistant now starts there too, instead of at the top of a frequency table.
+
+None of this replaces review. It was human review that caught me, and that's the step I'd never take out.
+
+## Where it falls over
+
+**The first write-up cost real time.** The reviewer's, the site's and mine. A better first instruction would have saved it, and I only wrote that instruction after being caught. Lessons written after the fact are better than none, but they're still after the fact.
+
+I didn't see the receipt fix through. The ticket moved on to a colleague, so the one real defect I found is a recommendation with a likely cause, not a change I shipped. I recommended confirming it with a query against the stored receipts first, then aligning the key or making the reprint cope with a missing row. What happened after that isn't mine to claim.
+
+The instruction is an instruction, not a check. Nothing stops me, or the assistant, skimming past step one on a busy day. It's harder to ignore now it's the first thing the skill reads, but it isn't impossible.
+
+And "start from the customer" has limits too. Sometimes the loud pattern really is the fault, and it's hitting every terminal, including the customer's. The method doesn't say ignore the noise. It says check whether the noise touches the complaint before you build on it.
+
+There's also a cost to being this careful. Pinning the terminal, counting per pump and reading the code behind each warning takes longer than a frequency table. On a site that's losing sales, that feels slow. It's still quicker than a confident write-up that gets rejected and has to be done again, which is the comparison I can actually vouch for.
+
+## Start where the customer is standing
+
+My position: the loudest pattern in a log is usually innocent, and an assistant asked to explain the logs will find it first. Start from the customer's exact terminal and complaint, check whether the noise even touches it, and read the code behind a warning before you call it a fault.
+
+And when a reviewer catches you out, write the correction into your process, not just the write-up. Put it where your assistant will read it first, then keep the human review that caught you in the first place.
+
+That's the run so far: interview first, keep context lean, script the mechanical mistakes, pin the values, distrust the docs, and start from the customer. All of it ends in the same place, a normal PR with human review and CI, and [Part 10](/blogs/spec-driven-part-10-review-the-batch-not-the-diff/) is about that last step: how I review a batch of agent-written changes. The earlier parts are on [the blog](/blogs/) if you're catching up.

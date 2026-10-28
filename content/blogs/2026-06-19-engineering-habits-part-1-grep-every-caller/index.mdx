@@ -1,0 +1,115 @@
+---
+title: "Engineering Habits, Part 1: Grep Every Caller"
+date: "2026-06-19"
+summary: "I fixed a till button that put pumps in the wrong payment mode, then found the same wrong mapping in a legacy path, guarded by a skipped test that asserted the bug. The fix was one argument. The habit that found its twin is the post."
+tags: ["dotnet", "debugging", "testing", "productivity"]
+series:
+  name: "Engineering Habits"
+  part: 1
+published: true
+---
+
+A cashier pressed a till button meant to switch a pump to pay-at-pump only, and the pump went to mixed mode instead, where customers can pay either at the pump or inside. The cashier then had to block the kiosk side by hand to get where they wanted. Small annoyance, but it's the kind of thing that makes people stop trusting the buttons.
+
+The fix at the spot the ticket pointed to was one argument. The more useful part came afterwards, when I went looking for every other place that handled the same command. This post is about that habit, **fix every call site**, and about the skipped test I found that had been quietly asserting the bug.
+
+This is the first post in Engineering Habits, a short series about how I work rather than what I built. Each one comes from a moment where a habit changed the outcome, including a couple where it changed it because I'd got something wrong first.
+
+## Trace it before you touch it
+
+The till talks to our service in short plain-text commands. The button sends one, our handler matches its prefix, and asks for a mode change.
+
+I traced the whole flow in a dev capture before changing anything. Every layer did exactly what it was told. The handler was just telling it the wrong thing: it mapped this command to mixed, which made it a duplicate of the till's own "go mixed" button.
+
+I also checked it wasn't a race.
+
+The logs showed the operator switching the same pump back and forth between modes repeatedly. Every press of this button landed in mixed, every press of the kiosk button landed in kiosk-only, and pay-at-pump only never appeared once. The terminal's own log agreed. It was a deterministic wrong mapping, not a timing problem.
+
+And the right target wasn't a guess. Our own conversion table already mapped pay-at-pump only to the right mode change, and a neighbouring command already used it.
+
+## The weak fix: change the line the ticket names
+
+The weak fix is to change that one argument, check the button works, and close the ticket. It's correct, it's small, and it's what the logs exercised.
+
+I nearly did exactly that. My first scope for the fix was the live path only, because that's what the site was using. Then I asked the question that's become a habit: where else does this command get handled?
+
+## The better fix: search for the pattern, not the line
+
+I searched for the command, the enum value and the method it should call, not just the line I'd been pointed at. Something like this, generalised:
+
+```bash
+# Every place that mentions the command, however it's spelled
+git grep -n -i "setpaytype\|set_pay_type\|SetPayType"
+
+# Every place that maps to the mode I think is wrong, near the command
+git grep -n "ModeChange.Mixed" -- "*.cs"
+```
+
+That turned up three hits. The live handler I already knew about. A comment describing the old mapping, which had no behavioural effect, so I left it. And a legacy path in a different class, handling the same command through a switch statement, doing the same wrong mapping in different words.
+
+The logs never touched that legacy path, so on the evidence alone I could have left it. I changed my mind and fixed it too, for one reason. Two call sites drifting apart is exactly how this bug got in. Leaving a second copy mapped the wrong way means a different caller could reach it tomorrow, and then someone else gets to find this bug again.
+
+**Fix the pattern, not the line the ticket named.** The second fix was as small as the first: one changed method name. It's the same audit that made a one-line fix safe in [a forecourt bug I wrote about](/blogs/forecourt-engineering-part-2-the-side-effect-that-gave-the-fuel-away/), just pointed the other way: there it proved no caller needed a side effect, here it found a caller with the same mistake.
+
+### Reading the hits
+
+A search only gives you candidates. Each hit still needs a decision, and I sort them into three piles: live code that runs today, legacy code that could still run, and text that only describes behaviour, like comments and docs.
+
+Live code gets fixed. Legacy code gets fixed too if the fix is as small as the original, because "nobody calls it" is a claim, and claims about call paths age badly. Comments get fixed only if they'd mislead the next reader; this one described the old mapping, which was harmless enough to leave for the cleanup.
+
+## The skipped test that asserted the bug
+
+Then I looked for the tests. There was exactly one for this command, and it was skipped, with a note saying the command was no longer used.
+
+It still asserted the old, wrong behaviour. If anyone had un-skipped it without reading it, it would have passed against the bug and failed against the fix.
+
+That's worse than no test at all. No test is an honest gap: everyone can see there's nothing there. A skipped test that encodes a bug looks like coverage in every report, and it points the next person in the wrong direction.
+
+So I un-skipped it and rewrote it to assert the right mode, following the pattern of the neighbouring command's test:
+
+```csharp
+[Fact]
+public void Pay_at_pump_command_sets_pump_to_outside_only()
+{
+    // Arrange
+    var pump = GivenAKioskOnlyPump(1);
+
+    // Act
+    _worker.HandleCommand(PayAtPumpCommandFor(pump));
+
+    // Assert
+    pump.Received(1).SetOutsideOnly(Arg.Any<string>());
+}
+```
+
+The worker in that test class is a real object, not a substitute, so the test exercises the genuine call chain rather than a mock of it. A second test elsewhere still expected mixed, so I updated that too.
+
+**A skipped test that asserts old behaviour is a trap, not coverage.** When you find one, either fix it to assert the truth or delete it. Leaving it skipped is the one option that's always wrong.
+
+An automated review then flagged my updated assertion, suspecting the pump's state should read "outside only". I checked the model rather than arguing.
+
+The pump's state and its payment mode are separate things: the state has closed, open, kiosk-only and mixed, and outside-only is a mode. So "open, in outside-only mode" was the right contract, and I left it. Reviews, human or automated, are questions; the model is the answer.
+
+## Proving a failure isn't yours
+
+One unrelated test in the same project was already failing. Before assuming anything, I stashed my changes, ran the test on the untouched branch, and watched it fail the same way.
+
+It takes a minute, and it means the PR can say "this failure predates my change" with evidence instead of confidence. Reviewers deserve to know which red is yours.
+
+## Where it falls over
+
+**I didn't finish closing the drift.** The two commands now do the same thing, and nothing in the code says so. Review suggested a comment at both call sites marking one as a legacy alias of the other, and I didn't add it. That's the very drift risk I was trying to close, so I'd add it now.
+
+I also left a note on the legacy path calling it a duplicate that's no longer the active route. Review pointed out, fairly, that it reads oddly next to my fixing it. Removing that path properly is its own cleanup, and it hasn't been done.
+
+And the command handling is still a long chain of prefix checks. A lookup table from command to mode would make an alias like this visible at a glance. It's only worth doing if the chain keeps growing, but it's the structural fix, and grep is the workaround.
+
+Grep itself has limits too. It finds the spellings you think to search for. A call site that builds the command name at runtime, or reaches the same behaviour through a different method, won't show up, so the search is only as good as the list of terms you give it.
+
+## Search before you call it fixed
+
+My position: a bug in one call site usually has a sibling somewhere else, and the ticket only ever names the one someone noticed. Finding the siblings is almost always cheaper than finding the bug was.
+
+Before you close your next bug fix, search for the command, the value and the method involved, not just the line you changed. Read each hit and decide whether it's live, legacy or just a comment. Look for tests of the same behaviour, especially skipped ones. And if a test is failing that isn't yours, prove it on a clean branch before you say so.
+
+Next in the series: a code review where the reviewer showed me a smaller fix, and the right answer was to delete about 25 lines of my own. The rest of my writing is on [the blog](/blogs/).
