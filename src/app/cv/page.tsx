@@ -123,7 +123,7 @@ export default function CVPage() {
         </section>
 
         {/* CTA */}
-        <section className="space-y-3">
+        <section className="space-y-6">
           <div className="flex flex-wrap gap-3">
             <a href={cv.requestCv.mailto} className={ctaButton({ variant: 'gradient' })}>
               {cv.requestCv.label}
@@ -135,7 +135,7 @@ export default function CVPage() {
               GitHub
             </a>
           </div>
-          <p className="text-xs text-muted-foreground max-w-xl">{cv.requestCv.note}</p>
+          <p className="text-xs text-muted-foreground lg:whitespace-nowrap">{cv.requestCv.note}</p>
         </section>
       </Container>
     </PageTransitionWrapper>
