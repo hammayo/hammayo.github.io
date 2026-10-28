@@ -67,7 +67,7 @@ export const PAGE_META = {
   },
   cv: {
     title:       "CV | Hammayo's Portfolio",
-    description: "Hammy Babar's professional CV — C#, .NET, Azure, Docker, microservices. SC cleared. 20+ years across finance, justice, and public service.",
+    description: "Selected work, stack and how I work: Senior Software Engineer, 20+ years in C# and .NET, agentic engineering with Claude Code. SC cleared. CV on request.",
   },
   projects: {
     title:       "Projects | Hammayo's Portfolio",
@@ -75,7 +75,7 @@ export const PAGE_META = {
   },
   contact: {
     title:       "Contact | Hammayo's Portfolio",
-    description: 'Currently open to backend and DevOps roles. SC cleared. Based in Sutton, open to hybrid and remote across the UK.',
+    description: 'Open to senior software engineering roles: C#, .NET, agentic engineering with Claude Code. Previously SC cleared. Based in Basingstoke, covering Berkshire and London. Open to remote and hybrid roles.',
   },
   series: {
     title:       "Spec-Driven | Hammayo's Portfolio",

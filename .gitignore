@@ -70,3 +70,6 @@ public/blog-assets/
 
 # Keep screenshots for README.md
 !public/screenshots/
+
+# Specs, plans and progress notes (not tracked)
+_tasks/

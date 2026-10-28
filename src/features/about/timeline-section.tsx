@@ -7,7 +7,7 @@ interface TimelineSectionProps {
 
 export function TimelineSection({ timeline }: TimelineSectionProps) {
   return (
-    <div className="space-y-2">
+    <div id="career" className="space-y-2">
       <h2 className="text-xs uppercase tracking-widest text-muted-foreground">Career</h2>
       <div className="relative">
         {/* Vertical rule */}

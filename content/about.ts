@@ -11,8 +11,8 @@ export type CareerEntry = {
 export const about = {
   name:            'Hammayo',
   shortName:       'Hammy',
-  tagline:         'Backend & Infrastructure Engineer',
-  careerStartYear: 2004,
+  tagline:         'Senior Software Engineer · Agentic Engineering with Claude Code · C# / .NET',
+  careerStartYear: 2001,
 
   // Homepage bio — {stardate} and {years} tokens computed client-side.
   homepageBioTemplate: "Captain's log, stardate {stardate}: For last {years} years, I've boldly navigated the digital frontier, charting solutions across uncharted sectors—finance's nebulae, justice's asteroid belts, and the bureaucratic wormholes of public service.",
@@ -22,45 +22,51 @@ export const about = {
     'Mission priority: To seek out new patterns, elevate civilizations with scalable tech, and ensure no enterprise is left stranded in the alpha quadrant of obsolescence. Engage at will — let\'s pioneer the final frontier of software, where no challenge has gone before. 🖖',
   ],
 
-  bio: "I've spent 20+ years building backend systems that run in places where failure isn't an option — prison service platforms for the Ministry of Justice, payment integrations where every penny has to reconcile, and retail systems processing thousands of transactions a minute at Ocado.\n\nMy day-to-day is C#, .NET, Azure, Docker, and SQL Server. I containerise services, set up CI/CD pipelines, tune slow queries, and build the kind of monitoring that catches problems before anyone has to file a ticket. I've held SC security clearance and I'm comfortable working in regulated environments where compliance and audit trails are part of the job, not an afterthought.\n\nRight now I'm at PDI Technologies, working on real-time enterprise integrations. Before that I was at Ocado Group building Azure-native backend services, and at Unilink delivering software for HMPPS.\n\nI care about writing code that the next person can actually read, deploy, and trust. I'm not chasing the latest framework — I'm interested in things that work reliably at 2am when nobody's watching.",
+  bio: "I'm a senior full-stack engineer with 20+ years building production systems in C# and .NET, with front ends in React, Angular and Vue.js. Most of that career has been where a wrong answer costs money or trust: pay-at-pump payments on fuel forecourts, HMRC tax submission, PCI card-payment compliance, and justice-sector platforms for the MoJ and HMPPS. I've held SC security clearance and I'm comfortable in regulated environments where audit trails are part of the job.\n\nI work AI-first. At PDI Technologies, where I'm a Senior Software Engineer II, I built a spec-driven Claude Code workflow, since adopted team-wide for larger pieces of work: the assistant agrees every acceptance criterion before writing a spec, well-specified features run through an agent loop as small, gated stories, and no change is committed without human review.\n\nMy day-to-day is C#, .NET, TypeScript, Azure, Docker and SQL Server.\n\nI care about writing code that the next person can actually read, deploy, and trust. I'm not chasing the latest framework; I'm interested in things that work reliably at 2am when nobody's watching.",
 
   sectors: [
-    'Distributed Systems',
-    'Platform Engineering',
-    'FinTech',
+    'Agentic Engineering',
+    'Fuel & Retail Technology',
+    'Payments & FinTech',
     'Justice & Public Service',
-    'Microservices',
+    'Legacy Modernisation',
+    'Event-Driven Systems',
     'Azure Cloud',
     'DevOps & CI/CD',
-    'Retail & E-Commerce',
   ],
 
   philosophy: 'Build for the next engineer, not just the next deadline.',
 
   careerTimeline: [
     {
-      period: '2024 – Present',
+      period: 'Jan 2025 – Present',
       company: 'PDI Technologies',
-      role: 'Backend / Integration Engineer',
-      description: 'Real-time enterprise integrations for fuel forecourt systems — pump controllers, site controllers, DOMS and OPT data feeds, POS kiosk systems, payment transactions, and third-party loyalty integrations. Docker, Azure, TeamCity CI/CD.',
+      role: 'Senior Software Engineer II',
+      description: 'Built a spec-driven Claude Code workflow adopted team-wide, and delivered a 27-story Angular feature through a gated agent loop. Built and supported a .NET forecourt service integrating pump controllers, payment terminals, POS tills and back-office systems; designed least-privilege site-staff access across 21 API controllers.',
     },
     {
-      period: '2024',
+      period: 'Jun – Dec 2024',
       company: 'Ocado Group',
-      role: 'Backend Engineer',
-      description: 'Azure Functions, Service Bus, and data pipelines supporting online retail operations at scale.',
+      role: 'Software Engineer (Contract)',
+      description: "Integrated and migrated MiOcado, Ocado's internal employee system, to Clean Architecture on Azure Functions and Service Bus.",
     },
     {
-      period: '2020 – 2024',
+      period: 'Nov 2020 – Feb 2024',
       company: 'Unilink Software',
-      role: 'Software Engineer',
-      description: 'Microservices for the prison service (MoJ/HMPPS). Kafka, Jenkins, Docker containerisation of legacy .NET services. SC security cleared.',
+      role: 'Backend Software Developer',
+      description: 'Services for UCase, the microservices platform replacing legacy kiosk and in-cell device software for 70,000+ people in custody across 74 facilities (MoJ/HMPPS). Kafka with a transactional outbox, Docker, 95% unit-test coverage on three owned services. SC cleared.',
     },
     {
-      period: '2018 – 2020',
+      period: 'Aug 2018 – Jul 2020',
       company: 'IN-SYNC Group',
-      role: 'Software Engineer',
-      description: 'Payment integrations, Vue.js, RabbitMQ, and Octopus Deploy. FinTech domain.',
+      role: 'Full-Stack Software Developer',
+      description: "VAT and Self Assessment submission to HMRC including Making Tax Digital, payment processing and Open Banking integrations over RabbitMQ, and the ASP.NET MVC to Vue.js migration.",
+    },
+    {
+      period: '1996 – 2018',
+      company: 'Earlier career',
+      role: 'Full-Stack Engineer & Consultant',
+      description: 'Context Software (2010–18): PCI-compliance payment service and booking for 300 estate-agency branches. ACL Software (2001–10): technical lead on a property portal with 1M+ hits a week for MoD, Panasonic and TMX. Earlier roles included third-line application support.',
     },
   ] satisfies CareerEntry[],
 

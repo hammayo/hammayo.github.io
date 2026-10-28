@@ -257,6 +257,7 @@ code[data-theme] span {
     transition: opacity 0.35s ease;
     animation: border-rotate 2.5s linear infinite paused;
     z-index: 0;
+    pointer-events: none;
   }
 
   .gradient-border-hover:hover::before {
@@ -290,6 +291,7 @@ code[data-theme] span {
     opacity: 1;
     animation: border-rotate 2.5s linear infinite;
     z-index: 0;
+    pointer-events: none;
   }
 
   .gradient-border-active:hover::before {

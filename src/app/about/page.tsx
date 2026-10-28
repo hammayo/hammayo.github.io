@@ -9,7 +9,7 @@ import { getAllPostsMeta } from '@/features/blogs/pipeline';
 export const metadata: Metadata = createPageMetadata('about', '/about');
 
 export default function AboutPage() {
-  const recentPosts = getAllPostsMeta().slice(0, 3);
+  const recentPosts = getAllPostsMeta().filter((p) => p.published).slice(0, 3);
 
   return (
     <PageTransitionWrapper>
