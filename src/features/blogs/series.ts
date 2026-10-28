@@ -7,7 +7,7 @@ import { series as flagship } from '../../../content/series';
 
 export type SeriesGroup = { slug: string; name: string; posts: PostMeta[] };
 
-const slugify = (name: string) =>
+export const slugify = (name: string) =>
   name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
 /** Published series, flagship first, then most recently updated first. */
