@@ -1,0 +1,53 @@
+name: SonarCloud
+
+# Analyses every pull request and every push to main, and reports the quality gate on the PR.
+# Settings (project key, sources, exclusions) are in sonar-project.properties.
+# One-time setup (full steps in _notes/development.md, Code quality):
+#   - Turn off Automatic Analysis, or this job fails:
+#       https://sonarcloud.io/project/analysis_method?id=hammayo_hammayo.github.io
+#   - Create a token: https://sonarcloud.io/account/security
+#   - Add it as the SONAR_TOKEN repository secret:
+#       https://github.com/hammayo/hammayo.github.io/settings/secrets/actions
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  analyse:
+    runs-on: ubuntu-latest
+    # Pull requests from forks have no access to SONAR_TOKEN, so they are skipped.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0 # the full history lets SonarCloud blame new code correctly
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # Branch names are user input, so they reach the shell through env vars, not inline ${{ }}.
+      - name: Analyse pull request
+        if: github.event_name == 'pull_request'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          PR_KEY: ${{ github.event.pull_request.number }}
+          PR_BRANCH: ${{ github.head_ref }}
+          PR_BASE: ${{ github.base_ref }}
+        run: >
+          bunx @sonar/scan@5.0.2
+          -Dsonar.pullrequest.key="$PR_KEY"
+          -Dsonar.pullrequest.branch="$PR_BRANCH"
+          -Dsonar.pullrequest.base="$PR_BASE"
+
+      - name: Analyse main
+        if: github.event_name == 'push'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: bunx @sonar/scan@5.0.2 -Dsonar.branch.name=main

@@ -24,11 +24,6 @@ BRANCH="$(git branch --show-current)"
 : "${BRANCH:?Detached HEAD: check out a branch first}"
 [ "$BRANCH" = "main" ] && { echo "Refusing to publish a local scan as main; use a branch." >&2; exit 1; }
 
-# Pinned scanner version; it downloads its own JRE, so no local Java is needed.
-bunx @sonar/scan@5.0.2 \
-  -Dsonar.projectKey=hammayo_hammayo.github.io \
-  -Dsonar.organization=hammayo \
-  -Dsonar.host.url=https://sonarcloud.io \
-  -Dsonar.branch.name="$BRANCH" \
-  -Dsonar.sources=. \
-  -Dsonar.exclusions="node_modules/**,out/**,.next/**,public/**,content/blogs/**,_tasks/**,.playwright-mcp/**"
+# Project settings live in sonar-project.properties. The scanner is pinned and downloads its own
+# JRE, so no local Java is needed. Keep the version in step with .github/workflows/sonarcloud.yml.
+bunx @sonar/scan@5.0.2 -Dsonar.branch.name="$BRANCH"
