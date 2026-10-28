@@ -46,8 +46,29 @@ Copy `.env.local.example` to `.env.local` and fill in what you need — I've kep
 | `GITHUB_USERNAME`       | For projects page | Set via repo secret                        | GitHub username for API calls                              |
 | `GITHUB_TOKEN`          | For projects page | Set via repo secret                        | GitHub PAT — enables pinned repos via GraphQL              |
 | `GA_MEASUREMENT_ID`     | No                | Set via repo secret                        | Google Analytics — omit to disable                         |
+| `SONAR_TOKEN`           | No                | Not used by the current workflows          | SonarCloud token for `scripts/sonar-scan.sh`               |
 
 I hardcode `SITE_URL` (`https://hammayo.co.uk`) in `src/lib/constants.ts` — it's not an env var.
+
+## Code quality (SonarCloud)
+
+Pull requests get a **SonarCloud Code Analysis** check. The project key is `hammayo_hammayo.github.io` and the organisation is `hammayo`. The repo has no Sonar workflow or `sonar-project.properties`, and the analysis history shows no CI scanner, so this appears to be SonarCloud's own Automatic Analysis.
+
+The quality gate looks at new code only. On PR 47 its conditions were: reliability, security and maintainability ratings all A, duplicated lines under 3%, and every security hotspot reviewed. A failing gate shows as a failed check on the PR.
+
+The project is public, so results can be read without a token:
+
+```bash
+K=hammayo_hammayo.github.io; PR=47
+curl -s "https://sonarcloud.io/api/qualitygates/project_status?projectKey=$K&pullRequest=$PR"
+curl -s "https://sonarcloud.io/api/issues/search?componentKeys=$K&pullRequest=$PR&resolved=false&ps=100"
+```
+
+`SONAR_TOKEN` is only needed to scan from your machine or from a workflow. Create it at <https://sonarcloud.io/account/security>, put it in `.env.local` (gitignored by `.env*`) and never commit it; in CI it would be a repository secret of the same name. `src/lib/env.ts` does not validate it.
+
+To scan locally run `bash scripts/sonar-scan.sh`. It reads only `SONAR_TOKEN` from `.env.local`, runs the pinned `@sonar/scan` through `bunx` (it downloads its own JRE, so no Java is needed) and publishes the result under the current branch name. It refuses to run on `main`. It analyses the whole repo except `node_modules`, build output, `public`, `content/blogs` and `_tasks`.
+
+A manual scan cannot run alongside Automatic Analysis: SonarCloud answers "You are running manual analysis while Automatic Analysis is enabled" and uploads nothing. Turn Automatic Analysis off first, under the project's Administration, Analysis Method. The PR check then has to come from a workflow, so add one before switching it off, or PRs lose their quality gate.
 
 ## CI/CD Pipeline
 

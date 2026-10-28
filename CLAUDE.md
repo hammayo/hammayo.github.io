@@ -27,7 +27,7 @@ bun run serve             # serve out/ locally after build (no client-side nav*)
 - `bun dev` — full client-side navigation, dev features, but search unavailable
 - `bun run serve` — search works, but link clicks don't navigate (use direct URLs like `/about/`). This is a static export limitation; GitHub Pages deployment unaffected.
 
-There are no automated tests — `bun run type-check` and `bun run lint:strict` are the quality gates.
+There are no automated tests — `bun run type-check` and `bun run lint:strict` are the quality gates. SonarCloud also gates pull requests on new code (ratings A, duplication under 3%); setup and how to read its results are in `_notes/development.md`.
 
 The build runs three steps in order:
 1. `node scripts/copy-blog-assets.mjs` — copies `content/blogs/*/assets/` → `public/blog-assets/[slug]/`

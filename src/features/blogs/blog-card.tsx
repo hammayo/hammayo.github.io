@@ -16,7 +16,7 @@ interface BlogCardProps {
   query?: string;
 }
 
-export function BlogCard({ post, index, query = '' }: BlogCardProps) {
+export function BlogCard({ post, index, query = '' }: Readonly<BlogCardProps>) {
   // Lift the line clamps while searching so a match is never hidden in the clipped text.
   const searching = query.trim() !== '';
   return (

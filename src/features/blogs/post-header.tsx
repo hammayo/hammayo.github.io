@@ -32,7 +32,7 @@ function getHeroPath(slug: string): string | null {
   return null;
 }
 
-function SeriesLink({ post, className }: { post: PostMeta; className: string }) {
+function SeriesLink({ post, className }: Readonly<{ post: PostMeta; className: string }>) {
   if (!post.series) return null;
   const { name, part } = post.series;
   return (

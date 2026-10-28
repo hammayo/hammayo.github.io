@@ -7,11 +7,39 @@ import { PageViewEvent } from '@/features/shared/analytics-event';
 import { createPageMetadata } from '@/lib/metadata';
 import { accentTag, ctaButton, glowCard } from '@/design/variants';
 import { cn } from '@/lib/utils';
-import { cv } from '../../../content/cv';
+import { cv, type SelectedWork } from '../../../content/cv';
 
 export const metadata: Metadata = createPageMetadata('cv', '/cv');
 
 const sectionLabel = 'text-xs uppercase tracking-widest text-muted-foreground';
+
+/** One selected-work card: personal projects get the featured style, employer work the plain one. */
+function WorkCard({ work }: Readonly<{ work: SelectedWork }>) {
+  const isOpen = work.kind === 'open';
+  return (
+    <article className={cn(glowCard(isOpen ? { variant: 'featured' } : undefined), 'p-5', isOpen ? 'space-y-3' : 'space-y-2')}>
+      {isOpen ? (
+        <div className="flex items-baseline justify-between gap-2">
+          <h3 className="text-base font-semibold text-foreground">{work.title}</h3>
+          <span className="text-xs text-muted-foreground">Personal, open</span>
+        </div>
+      ) : (
+        <h3 className="text-sm font-semibold text-foreground">{work.title}</h3>
+      )}
+      <p className="text-sm text-muted-foreground leading-relaxed">{work.summary}</p>
+      <ul className="flex flex-wrap gap-2">
+        {work.tags.map((tag) => (
+          <li key={tag} className={accentTag({ variant: 'muted' })}>{tag}</li>
+        ))}
+      </ul>
+      {work.href ? (
+        <Link href={work.href} className="inline-block text-sm text-[var(--scheme-accent-text)] hover:underline underline-offset-2">
+          {`${work.hrefLabel} →`}
+        </Link>
+      ) : null}
+    </article>
+  );
+}
 
 export default function CVPage() {
   const open     = cv.selectedWork.filter((w) => w.kind === 'open');
@@ -48,43 +76,10 @@ export default function CVPage() {
         <section className="space-y-4">
           <h2 className={sectionLabel}>Selected work</h2>
           <div className="grid gap-4 md:grid-cols-2">
-            {open.map((work) => (
-              <article key={work.title} className={cn(glowCard({ variant: 'featured' }), 'p-5 space-y-3')}>
-                <div className="flex items-baseline justify-between gap-2">
-                  <h3 className="text-base font-semibold text-foreground">{work.title}</h3>
-                  <span className="text-xs text-muted-foreground">Personal, open</span>
-                </div>
-                <p className="text-sm text-muted-foreground leading-relaxed">{work.summary}</p>
-                <ul className="flex flex-wrap gap-2">
-                  {work.tags.map((tag) => (
-                    <li key={tag} className={accentTag({ variant: 'muted' })}>{tag}</li>
-                  ))}
-                </ul>
-                {work.href ? (
-                  <Link href={work.href} className="inline-block text-sm text-[var(--scheme-accent-text)] hover:underline underline-offset-2">
-                    {`${work.hrefLabel} →`}
-                  </Link>
-                ) : null}
-              </article>
-            ))}
+            {open.map((work) => <WorkCard key={work.title} work={work} />)}
           </div>
           <div className="grid gap-4 md:grid-cols-2">
-            {employer.map((work) => (
-              <article key={work.title} className={cn(glowCard(), 'p-5 space-y-2')}>
-                <h3 className="text-sm font-semibold text-foreground">{work.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{work.summary}</p>
-                <ul className="flex flex-wrap gap-2">
-                  {work.tags.map((tag) => (
-                    <li key={tag} className={accentTag({ variant: 'muted' })}>{tag}</li>
-                  ))}
-                </ul>
-                {work.href ? (
-                  <Link href={work.href} className="inline-block text-sm text-[var(--scheme-accent-text)] hover:underline underline-offset-2">
-                    {`${work.hrefLabel} →`}
-                  </Link>
-                ) : null}
-              </article>
-            ))}
+            {employer.map((work) => <WorkCard key={work.title} work={work} />)}
           </div>
         </section>
 

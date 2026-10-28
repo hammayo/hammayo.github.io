@@ -15,7 +15,7 @@ interface SeriesCardProps {
   featured?:  boolean;
 }
 
-export function SeriesCard({ slug, title, meta, blurb, index, featured = false }: SeriesCardProps) {
+export function SeriesCard({ slug, title, meta, blurb, index, featured = false }: Readonly<SeriesCardProps>) {
   return (
     <Link href={`/series/${slug}`} className="block h-full">
       <CardEffects

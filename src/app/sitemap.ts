@@ -62,7 +62,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   const seriesRoutes: MetadataRoute.Sitemap = getAllSeries().map(({ slug, posts }) => ({
     url:             `${SITE_URL}/series/${slug}/`,
-    lastModified:    new Date(posts.map(p => p.date).sort().pop()!),
+    lastModified:    new Date(Math.max(...posts.map(p => +new Date(p.date)))),
     changeFrequency: 'monthly' as const,
     priority:        0.7,
   }));

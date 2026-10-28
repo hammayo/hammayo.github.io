@@ -35,7 +35,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function SeriesDetailPage({ params }: Props) {
+export default async function SeriesDetailPage({ params }: Readonly<Props>) {
   const group = getSeriesBySlug((await params).slug);
   if (!group) notFound();
 
@@ -53,8 +53,8 @@ export default async function SeriesDetailPage({ params }: Props) {
 
         {isFlagship ? (
           <div className="space-y-3">
-            {flagship.description.map((paragraph, i) => (
-              <p key={i} className="text-sm md:text-base text-muted-foreground leading-relaxed">
+            {flagship.description.map((paragraph) => (
+              <p key={paragraph} className="text-sm md:text-base text-muted-foreground leading-relaxed">
                 {paragraph}
               </p>
             ))}

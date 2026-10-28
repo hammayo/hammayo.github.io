@@ -15,10 +15,11 @@ interface TagFilterProps {
 
 const chip = 'cursor-pointer transition-opacity';
 
-export function TagFilter({ pinned, allTags, active, onSelect }: TagFilterProps) {
+export function TagFilter({ pinned, allTags, active, onSelect }: Readonly<TagFilterProps>) {
   const [open, setOpen]   = useState(false);
   const [filter, setFilter] = useState('');
   const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Visible chips: pinned tags, plus the active tag when it lives in the popover.
   const visible = active && !pinned.includes(active) ? [...pinned, active] : pinned;
@@ -27,6 +28,7 @@ export function TagFilter({ pinned, allTags, active, onSelect }: TagFilterProps)
 
   useEffect(() => {
     if (!open) return;
+    inputRef.current?.focus();
     const close = (e: MouseEvent | KeyboardEvent) => {
       if (e instanceof KeyboardEvent ? e.key === 'Escape' : !rootRef.current?.contains(e.target as Node)) setOpen(false);
     };
@@ -62,7 +64,7 @@ export function TagFilter({ pinned, allTags, active, onSelect }: TagFilterProps)
       {open && (
         <div className="absolute left-0 top-full z-20 mt-2 w-full max-w-xl rounded-xl border border-[var(--scheme-border)] bg-white p-3 shadow-[0_8px_40px_-4px_rgba(0,0,0,0.15)] dark:bg-zinc-900 dark:shadow-2xl">
           <input
-            autoFocus
+            ref={inputRef}
             value={filter}
             onChange={e => setFilter(e.target.value)}
             placeholder="Find a tag…"

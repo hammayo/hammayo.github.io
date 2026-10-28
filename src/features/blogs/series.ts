@@ -21,7 +21,7 @@ export function getAllSeries(): SeriesGroup[] {
   const groups = [...byName].map(([name, posts]) => ({
     slug:  slugify(name),
     name,
-    posts: posts.sort((a, b) => a.series!.part - b.series!.part),
+    posts: posts.toSorted((a, b) => a.series!.part - b.series!.part),
   }));
 
   const latest = (g: SeriesGroup) => Math.max(...g.posts.map(p => +new Date(p.date)));

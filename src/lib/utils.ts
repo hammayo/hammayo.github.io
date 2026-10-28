@@ -16,7 +16,10 @@ export function metaDescription(text: string, max = META_DESCRIPTION_MAX): strin
     if (next.length > max) break;
     out = next;
   }
-  return out || `${text.slice(0, max - 1).replace(/\s+\S*$/, '')}…`;
+  if (out) return out;
+  const cut = text.slice(0, max - 1);
+  const space = cut.lastIndexOf(' ');
+  return `${space > 0 ? cut.slice(0, space).trimEnd() : cut}…`;
 }
 
 export function formatDistanceToNow(date: Date): string {

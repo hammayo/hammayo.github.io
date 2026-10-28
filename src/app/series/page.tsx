@@ -12,7 +12,7 @@ import { series as flagship, featuredSeries, featuredBlurbs } from '../../../con
 export const metadata: Metadata = createPageMetadata('series', '/series');
 
 const range = (dates: string[]) => {
-  const [first, last] = [dates[0], dates[dates.length - 1]].map(d => format(new Date(d), 'MMM yyyy'));
+  const [first, last] = [dates[0], dates.at(-1) ?? dates[0]].map(d => format(new Date(d), 'MMM yyyy'));
   return first === last ? first : `${first} – ${last}`;
 };
 
@@ -28,7 +28,7 @@ export default function SeriesPage() {
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           {all.map(({ slug, name, posts }, i) => {
             const isFeatured = featuredSeries.includes(name);
-            const dates = posts.map(p => p.date).sort();
+            const dates = posts.map(p => p.date).toSorted((a, b) => a.localeCompare(b));
             return (
               <SeriesCard
                 key={slug}
