@@ -1,0 +1,95 @@
+---
+title: "Shared Code, Shared Problems, Part 1: Shared Code as Packages, Not Copied Source"
+date: "2021-06-15"
+summary: "Copying a helper into every service is the fastest way to share code on day one and the slowest by day ninety. We moved messaging, authentication and HTTP clients into versioned packages. The post covers what that bought us, and the drift it introduced."
+tags: ["dotnet", "nuget", "architecture", "microservices"]
+series:
+  name: "Shared Code, Shared Problems"
+  part: 1
+published: true
+---
+
+Someone fixes a bug in the way a service retries an HTTP call. It's a good fix, a three-line change, merged on a Wednesday. Then someone asks the obvious question: where else is this code?
+
+The honest answer, in a system built from copied source, is "I don't know". The same helper exists in a dozen repositories, each one slightly different, because each was copied at a different moment and edited by a different person. The fix landed in one of them.
+
+This series is about the code that many services share, and the problems that come with sharing it. The first problem is how you share it at all. I'll argue for **shared NuGet packages** over copied source, and be straight about what that costs.
+
+## Why people copy
+
+Copying isn't laziness. It's the sensible response to a real pressure.
+
+A new service needs logging, an HTTP client with sensible defaults, some authentication plumbing and a way to talk to the message broker. A previous service already has all of that. Copying the files takes ten minutes. Building a shared library takes a week and needs everyone to agree.
+
+On day one, copying wins. The service is running by the afternoon and no other team was disturbed.
+
+## What day ninety looks like
+
+By day ninety, the copies have diverged. One service added a timeout. Another fixed a header bug. A third never got either change. Nobody can say which version is correct, because each is correct for the service that owns it.
+
+Bugs now have to be fixed per service, and finding the affected services means searching every repository. Security fixes are worse, because a fix you can't distribute is a fix you haven't made.
+
+New joiners meet a codebase where the same concept appears in many slightly different shapes. They can't tell which differences are deliberate and which are accidents, so they copy one at random and add a further variation.
+
+## The better approach: one implementation, versioned
+
+We moved the common pieces into shared packages: messaging, authentication, HTTP clients, and a few smaller utilities. Each is one implementation, built once, tested once and published to an internal package feed with a version number.
+
+A service takes a dependency on a version.
+
+```xml
+<ItemGroup>
+  <PackageReference Include="Platform.Messaging" Version="2.4.0" />
+  <PackageReference Include="Platform.Http" Version="1.9.2" />
+</ItemGroup>
+```
+
+When the retry fix is made, it's made in one place and released as a new version. Every service gets it, but each on its own schedule.
+
+That second half matters. A shared package that forces every service to upgrade at once is just a shared codebase with extra steps. Versioning is what lets a service pick up a change when it's ready: after its own release, not in the middle of it.
+
+## What you get
+
+**A fix reaches everyone.** The retry fix is one change and one release. Teams still have to upgrade, but they know exactly what to upgrade to.
+
+**One place to look.** When someone asks how the system authenticates a call, there is one answer, not a different one per service.
+
+**Tests that mean something.** The package has its own tests, written once and run on every change, instead of a dozen untested copies.
+
+**Smaller services.** A service contains only what's specific to it. That's easier to read and quicker for a new developer to understand.
+
+## The weak spot: version drift
+
+Here's the cost, and it's the honest centre of this post. If services upgrade when they're ready, then some services are never ready.
+
+Within a few months you have services on three or four different versions of the same package. A bug fixed in the newest is still live in the oldest. You've recreated the copy-and-diverge problem, but with version numbers as evidence instead of guesswork.
+
+It's a better situation, because you can see it. A package feed can tell you exactly which version each service uses. But seeing a problem isn't fixing it, and someone has to chase the laggards.
+
+Two habits help. First, keep the gap small: release often, in small steps, so that upgrading is a minor event and not a project. Second, decide what you'll support. If the answer is "the last two minor versions", say so, and let that drive the nudging.
+
+## A changelog people actually read
+
+Packages that change without explanation get ignored. Nobody upgrades something they can't judge the risk of.
+
+Every release needs a short, honest note: what changed, whether it can break callers, and what to do about it. Written for the person deciding whether to upgrade on a Friday afternoon, not for the person who made the change.
+
+The format matters less than the habit. A line in a changelog costs a minute. Not having it costs somebody an hour of reading a diff.
+
+## Where it falls over
+
+A shared package is a public API for your own team. That brings obligations. You can't change a signature casually, you have to think about compatibility, and you inherit the problem of every consumer's needs at once.
+
+It also creates a bottleneck. If every small change to shared behaviour has to go through the package, and the package has three owners, services wait. The shortcut of copying a file starts to look attractive again.
+
+Shared code can also pull in the wrong things. A package that begins as a clean HTTP client and slowly accumulates every service's special case becomes a heap nobody wants to touch. Keep packages small, with a single purpose, and resist adding something just because two services happen to need it.
+
+Finally, not everything should be shared. Business logic that belongs to one service should stay there. Sharing it couples services that were meant to be independent.
+
+## The takeaway
+
+**Copying shared code is simple on day one and a mess by day ninety.** Put the common pieces in versioned packages, let services upgrade when they're ready, and write a changelog that someone will read.
+
+If you want a quick test of where you stand, pick a bug fixed recently in something many services use and ask how many services have the fix. If you can't answer, you know where to start.
+
+Coming next in Shared Code, Shared Problems: one pipeline for about twenty-five services.

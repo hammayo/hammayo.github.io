@@ -24,13 +24,13 @@ export default function OgImage() {
             HAMMAYO.CO.UK
           </div>
           <div style={{ fontSize: '52px', fontWeight: 700, color: '#ffffff', lineHeight: 1.2 }}>
-            Backend Software Engineer
+            Senior Software Engineer
           </div>
           <div style={{ fontSize: '22px', color: '#f0f0f0', lineHeight: 1.5 }}>
-            {'20+ years · SC Cleared · Sutton, London'}
+            {'20+ years · Previously SC Cleared · Basingstoke'}
           </div>
           <div style={{ fontSize: '14px', color: '#a78bfa', letterSpacing: '1px' }}>
-            {'C# · .NET · Azure · Docker · Microservices'}
+            {'C# · .NET · Azure · Claude Code · Agentic Engineering'}
           </div>
         </div>
       </div>

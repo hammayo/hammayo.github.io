@@ -1,0 +1,94 @@
+---
+title: "Building Tewe Diary, Part 4: Integration Tests Against a Real Postgres"
+date: "2026-09-17"
+summary: "When the SQL is the logic, a mocked connection tests nothing that matters. My movie diary API spins up a throwaway Postgres with Testcontainers, applies the real migrations once and wipes the data between tests. The post also covers what it costs to run."
+tags: ["dotnet", "testing", "testcontainers", "postgres"]
+series:
+  name: "Building Tewe Diary"
+  part: 4
+published: true
+---
+
+There's a particular kind of test that passes for ever and proves nothing. You mock the database connection, set it to return a movie, call the repository, and assert that you got a movie back. You've tested your mock.
+
+In my movie diary API the SQL is the logic. The slug uniqueness, the filtering, the paging, the way a rating upserts: all of it lives in queries. A mock can't tell me whether those queries are right. Only a real database can.
+
+This is Part 4 of **Building Tewe Diary**, following [Part 3](/blogs/building-tewe-diary-part-3-policy-based-authorisation-plus-an-api-key-filter/). It's about **integration testing with Testcontainers**, and the shape that keeps it fast enough to use.
+
+## The decision
+
+No mocking of the data layer. Integration tests start a real Postgres in Docker and run the real code against it.
+
+The reasoning is short. A mocked `IDbConnection` verifies that I called it. It can't verify that the SQL parses, that the column names match the migrations, or that a unique index rejects a duplicate. The failures I actually care about are all in that gap.
+
+## One fixture, shared
+
+The container, the migrations and the clean-up live in exactly one place, a shared fixture that every integration and repository test uses.
+
+```csharp
+public sealed class PostgresFixture : IAsyncLifetime
+{
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:latest")
+        .Build();
+
+    public string ConnectionString => _container.GetConnectionString();
+
+    public async Task InitializeAsync()
+    {
+        await _container.StartAsync();
+        MigrationRunner.Run(ConnectionString);
+    }
+
+    public Task DisposeAsync() => _container.DisposeAsync().AsTask();
+
+    // Wipe all data (schema stays) so each test starts from a known-empty state.
+    public async Task ResetAsync()
+    {
+        await using var connection = new NpgsqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        await connection.ExecuteAsync("truncate movie_metadata, genres, ratings, movies cascade;");
+    }
+}
+```
+
+Two things make this practical. The container starts once for the whole run, because starting a database per test would make the suite unusable. And the schema comes from the real migration runner, the same code that sets up the production database. That means the tests are also a test of the migrations: if a migration breaks, the whole suite fails at set-up.
+
+## Reset the data, keep the schema
+
+Between tests, `ResetAsync` truncates the tables with a cascade. The schema stays, so there's no cost of re-running migrations, and each test starts from empty.
+
+That is a small thing with a big effect on test design. Because each test begins from a known state, tests don't depend on each other's leftovers, and I can run them in any order. The usual source of flaky database tests, shared state, has nowhere to hide.
+
+## Deterministic data
+
+Test data comes from a data generator, not hand-written literals. That keeps each test about the behaviour under test and not about inventing a plausible title and year.
+
+The convention that sits on top is plain: every test has Arrange, Act and Assert sections, named for the behaviour it checks, with `[Theory]` where the inputs vary and no logic inside an assertion. It reads the same way every time, which matters when you come back to it in six months.
+
+## What it catches
+
+The sort of bug this finds is the kind a mock would pass. A migration that renames a column the repository still uses. A slug collision that should be rejected by the unique index. A query that returns the wrong rows when a filter is combined with a sort and a page.
+
+It also checks things in layers a unit test can't reach. The API tests boot the real application against that database and send real requests, so authorisation, validation and caching are exercised as a request meets them.
+
+## The cost
+
+Docker has to be running, and that's a real cost. Anyone who wants to run the whole suite needs it, and so does the build machine. A laptop with Docker stopped can run the unit tests and not the integration ones.
+
+The suite is also slower than pure unit tests. The container takes a few seconds to start, and every test that touches the database does real work. The shared fixture keeps that to a one-off start-up and per-test truncation, and I think the trade is clearly worth it. I'd still want to know the cost, and now you do.
+
+## Where it falls over
+
+A real database in a container is not the production database. Version, extensions, collation and configuration can differ. This fixture uses the latest Postgres image, which means a future major version could change behaviour under me. Pinning a version would be more reproducible, at the cost of remembering to move it.
+
+Truncating with a cascade is blunt. If I added a table and forgot to add it to the reset, data would leak between tests, and the failure would look like a test ordering problem.
+
+And tests that hit a real engine tell you the SQL is right, not that it's fast. Performance on a real data volume is a different question, and a fresh, empty container won't answer it.
+
+## The position
+
+**When the SQL is the logic, test it against the engine that runs it.** One container per run, the real migrations as set-up, and a truncate between tests keeps it honest without making it slow.
+
+If your tests mock the database, ask which bugs they could ever catch. If the honest answer is "none that involve the database", you have a gap.
+
+Next in Building Tewe Diary: output caching with tag-based eviction. The rest of the series is on [the blog](/blogs/).

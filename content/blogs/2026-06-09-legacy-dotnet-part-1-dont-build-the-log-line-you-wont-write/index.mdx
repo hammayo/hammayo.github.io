@@ -1,0 +1,149 @@
+---
+title: "Legacy .NET That Still Pays, Part 1: Don't Build the Log Line You Won't Write"
+date: "2026-06-09"
+summary: "An interpolated debug log line gets built, formatted and thrown away even when debug logging is off. The framework I work in has a boring fix that's older than most of the modern alternatives, and it still earns its keep."
+tags: ["dotnet", "csharp", "logging", "performance"]
+series:
+  name: "Legacy .NET That Still Pays"
+  part: 1
+published: true
+---
+
+Here's a line of C# I've written hundreds of times, and you probably have too:
+
+```csharp
+_logger.Debug($"Pump {pump.Id}; state {pump.State}; sale {sale.Id}; amount {sale.Amount:C}");
+```
+
+With debug logging switched off, that line still does nearly all its work. It reads four properties, calls `ToString` on each, formats a currency value, allocates a new string, and hands it to a logger that immediately throws it away. **Deferred logging in C#** is the fix, and the version I use every day is older than most of the modern alternatives.
+
+This is the first post in a series about patterns from a long-lived .NET codebase that still earn their keep. The service I work on at PDI multi-targets .NET Framework 4.8 and .NET 8, and most of what's here works unchanged in either. Most of these patterns come from the in-house framework we build on, so I'm writing up how they work and where they bite, not claiming I invented them. Every example uses neutral names.
+
+## What interpolation costs when nobody's listening
+
+The problem is evaluation order, and it's easy to forget because the syntax looks so cheap.
+
+C# evaluates method arguments before it calls the method. An interpolated string is an argument, so the whole string gets built before the logger ever sees it. By the time the logger checks whether debug is enabled, the work's already done.
+
+In a request handler that runs a few times a minute, none of that matters. In a service that processes a steady stream of device messages, it's different. A worker that handles every state change on every pump, with a debug line or two in each branch, is building strings all day long that nobody will ever read.
+
+I'm not going to put a number on what that costs in our service, because I haven't measured it, and the answer depends entirely on how hot the path is and what the arguments do. What I can say is that the work is real, it's wasted, and it's the easiest kind of waste to remove.
+
+The costs also hide in the arguments, not just the formatting. A property that looks like a field might hit a lock, walk a collection or serialise an object for display. Put that in an interpolated debug line, and you've made every call pay for it.
+
+## The weak version: build it, then ask
+
+Here's the weak version in full, the way it tends to look in a real worker:
+
+```csharp
+public void OnStateChanged(Pump pump, PumpState newState)
+{
+    _logger.Debug($"Pump {pump.Id} moving from {pump.State} to {newState}; " +
+                  $"sale {pump.CurrentSale?.Id}; nozzle {pump.NozzleStatus}");
+
+    // ... the actual work ...
+}
+```
+
+A lot of people's first fix is to guard it by hand:
+
+```csharp
+if (_logger.IsDebugEnabled)
+{
+    _logger.Debug($"Pump {pump.Id} moving from {pump.State} to {newState}; ...");
+}
+```
+
+That works. It's also three lines instead of one, repeated at every call site, and it's the kind of thing people stop doing about a week after they've been told to. The guard is correct and nobody writes it consistently, which in practice means it isn't there.
+
+## The better version: pass a lambda, let the base class check
+
+The framework I work in solves it once, in the base class every component inherits from. Instead of passing a string, you pass a function that builds the string. The base class checks the level first, and only calls the function if the message will actually be written.
+
+Here's the shape of the base-class helper, with neutral names:
+
+```csharp
+protected void LogDeferred(
+    LogLevel level,
+    string header,
+    Func<string[]> buildMessages,
+    Exception exception = null,
+    [CallerMemberName] string methodName = null)
+{
+    if (!Logger.IsEnabled(level))
+        return;                                  // buildMessages is never called
+
+    var messages = buildMessages?.Invoke();
+    Logger.Write(level, Format(TypeName, methodName, header, messages), exception);
+}
+```
+
+And the call site barely changes:
+
+```csharp
+LogDeferred(LogLevel.Debug, "StateChange", () => new[]
+{
+    $"Pump {pump.Id} moving from {pump.State} to {newState}",
+    $"Sale {pump.CurrentSale?.Id}; nozzle {pump.NozzleStatus}"
+});
+```
+
+With debug off, the lambda is never invoked. None of the property reads happen, nothing gets formatted, and no message string is allocated. **The check happens before the work, not after it**, and it happens in one place, so nobody has to remember to write it.
+
+### What the base class adds on top
+
+Once logging lives in a base class, a few other things come for free, and they're the reason I'd defend this design even if the performance argument vanished.
+
+The method name comes from `[CallerMemberName]`, so every line says where it was written without anyone typing it. The type name is a property on the instance, and a class can set it to something more specific than its type. A pump model that sets its type name to include its own number makes every log line from that pump searchable by pump, which is exactly how you want to read logs when one pump out of many is misbehaving.
+
+The header is a short, consistent marker, like "Begin", "End" or "Exception", that the whole codebase shares. That sounds trivial until you're grepping a day of logs and every component uses the same words for the same events.
+
+And there's a correlation reference that flows through the call chain, so one sale can be followed across several workers. I used exactly that to follow a single sale end to end in [the forecourt series](/blogs/forecourt-engineering-part-2-the-side-effect-that-gave-the-fuel-away/).
+
+## What belongs in the lambda, and what doesn't
+
+Deferral changes when code runs, and that has two consequences people don't always see.
+
+The first is side effects. Anything inside the lambda only happens when the level is enabled. A lambda that bumps a counter, calls a method that caches something, or advances an enumerator changes the program's behaviour depending on the log level. Keep the lambda to reading values and formatting them, nothing else.
+
+The second is exceptions. If building the message throws, say a null reference on a sale that doesn't exist yet, it only throws when the level is on. So the bug appears exactly when someone turns up logging to diagnose a different problem, which is the worst possible moment. Null-conditional operators in log lambdas aren't fussiness, they're defensive programming for the day someone needs those logs.
+
+## Where deferral really pays: levels you change at runtime
+
+The part of this I find most useful isn't the hot loop. It's what deferral makes possible when log levels can change while the service is running.
+
+The framework reads some of its log levels from configuration, and a support engineer can change them from the web UI without restarting anything. A category of developer-only logging can sit at "off" by default on every site, and when a site has a problem, someone raises it for that one category, reads what they need and turns it back down.
+
+That only works if "off" really costs nothing. If every one of those developer lines built its message and threw it away, you'd be paying for the diagnostics on every site, all the time, to benefit the one site that needs them this week. With deferred messages, the detailed logging is free until someone asks for it, and then it's there.
+
+That changes what people are willing to write. When a detailed debug line is free, people add them to the tricky branches, where they're most useful. When it's visibly expensive, people leave them out, and then the one site that needs them doesn't have them.
+
+## How modern .NET does the same thing
+
+This pattern predates most of what modern .NET offers, and it's worth knowing how the newer tools compare, because none of them is quite the same thing.
+
+`Microsoft.Extensions.Logging` has `IsEnabled`, which is the manual guard from earlier. It also has message templates, where you pass a format string and arguments separately. The formatting is deferred until the level check passes, which saves the string building. The arguments are still evaluated at the call site, though, and value types get boxed into the argument array, so an expensive property is still read.
+
+The `[LoggerMessage]` source generator goes further. It generates a strongly typed logging method that checks the level before doing any formatting, and it avoids the boxing. It's the right answer for new code on modern .NET. The arguments are still evaluated before the call, because they're ordinary method parameters, so the rule about expensive properties still applies.
+
+The lambda version is the only one of these where the arguments themselves are deferred. That's its real advantage, and on a codebase that still targets .NET Framework 4.8, it has the added merit of working the same way on both targets.
+
+## Where it falls over
+
+**A lambda that captures state still allocates.** When the lambda uses local variables or parameters, the compiler creates a closure object to hold them, and a delegate to call it. Those allocations happen at the call site whether the level is enabled or not. So deferral removes the expensive part, the formatting and the property reads, but it isn't zero-cost. A lambda that captures nothing can be cached by the compiler, and one that captures a lot allocates on every call.
+
+C# 9 lets you mark a lambda `static`, which makes the compiler reject any capture. That's a neat way to prove a lambda allocates nothing. It's rarely useful for log lines, though, because the whole point of a log line is to include the local values.
+
+It only works if everyone uses the helper. One string-built call in a hot loop undoes the saving for that loop, and nothing stops someone writing it. An analyser rule that flags interpolated strings passed straight to the logger would catch it. We don't have one, so it's down to review.
+
+And I haven't measured the saving in our service. I know the work being skipped is real, and I know which paths are hot. I don't have a before-and-after number, and I'm not going to borrow someone else's benchmark and present it as ours. If you care about the number for your own service, BenchmarkDotNet will tell you in an afternoon.
+
+There's also a readability cost that's easy to wave away. A lambda returning an array of strings is noisier than a single interpolated string, and new starters find it odd. It's worth it on a hot path. On a path that runs once at start-up, a plain log line is fine, and I wouldn't argue with anyone who wrote one.
+
+## Make the check happen before the work
+
+My position: in a long-running service, the log lines you don't write should cost as close to nothing as you can get, because that's what lets people write detailed ones in the first place. Deferral is the cheapest way I know to get there, and putting it in a base class means nobody has to remember it.
+
+If you're on modern .NET, use the `[LoggerMessage]` source generator for new hot-path logging, and keep expensive work out of the arguments. If you're on a codebase that has to run on .NET Framework too, a small base-class helper that takes a `Func<string[]>` and checks the level first gives you most of the benefit on both targets. Either way, find your hottest loop and look at what its debug lines are building while nobody's listening.
+
+Next in the series: disposal in two phases, and why the framework I work in splits it so an event can never fire into a half-disposed object. The rest of my writing is on [the blog](/blogs/).

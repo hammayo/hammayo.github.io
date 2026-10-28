@@ -1,0 +1,136 @@
+---
+title: "Forecourt Engineering, Part 3: When Every Client Reconnects at Once"
+date: "2026-05-20"
+summary: "A whole bank of card terminals went dark overnight, and the payment switch that fell over was perfectly healthy until every terminal signed in at the same moment. The burst was ours to prevent, the main fix was someone else's, and the timeline everyone believed was wrong."
+tags: ["architecture", "reliability", "payments", "dotnet"]
+series:
+  name: "Forecourt Engineering"
+  part: 3
+published: true
+---
+
+Half a forecourt stopped taking cards. Every so often, a whole side of the site's pay-at-pump terminals went dark together, and the workaround on site was restarting things by hand. The dependency that had fallen over was a payment switch that had been perfectly healthy all day, right up until every terminal on that side signed in to it at the same moment.
+
+That's the **thundering herd problem**, and it's one of the most ordinary ways a healthy system falls over. This post walks through how I lined up the evidence, why the burst was something our side created, what I recommended, and the uncomfortable bit: none of it has been picked up yet.
+
+This is Part 3 of Forecourt Engineering. [Part 1](/blogs/forecourt-engineering-part-1-why-the-pump-holds-100-on-your-card/) explained how a pay-at-pump sale talks to the payment switch. This one is about what happens when the switch can't cope with how that talking starts.
+
+## Who talks to whom
+
+It helps to be clear about the architecture first, because it decides who owns which fix.
+
+The card terminals don't send card data through the service I work on. Each terminal talks straight to the payment switch, a server on site that forwards to the bank. Our service configures the terminals and runs the pumps around them.
+
+That configuration is where our side comes in. Our service builds the terminal configuration and pushes it out, and applying new configuration makes each terminal sign out of the switch and sign back in. That's by design: new config, new session.
+
+That boundary is also why the incident was hard to see from any one place. The switch team saw a server under strain, we saw terminals dropping, and the site saw pumps that wouldn't take cards. Only lining the logs up across the boundary showed it was one event.
+
+So our service can't break a card payment directly. But it can decide when every terminal on a site starts a new session with the switch, and that turned out to matter a great deal.
+
+## Lining up three lanes
+
+I worked the incident in three lanes: the terminal logs, our service log, and what the pump side was doing. The pump side had its own background noise, but nothing there lined up with the outage, so I set it aside early. That's worth doing deliberately. A lane you've ruled out is a lane you stop being distracted by.
+
+Then I lined the other two up by timestamp. Twice a day a scheduled config download goes out to the terminals. On the bad night, our service sent the config, each terminal logged the download and applied it, and then each one signed out of the switch.
+
+Our own heartbeat monitoring registered every one of those disconnects within a few seconds. Then the terminals all sent their sign-ins in a tight window.
+
+The first terminal's sign-in looked fine. Its first real pre-authorisation was then cut off mid-conversation, with the connection reset. One of the terminals got a refusal that said, in effect, that the switch had run out of memory.
+
+After that, the terminal logs tell a clear story of a server falling over in stages. First connections were being reset. Then TLS handshakes were failing. Then the TCP connections themselves were refused, because nothing was listening at all.
+
+### Reading a failure in stages
+
+That progression is worth learning to read, because it tells you where the problem is. A reset mid-conversation means the server accepted you and then couldn't carry on. A failed handshake means it's still listening but can't complete the work of setting up a secure session. A refused connection means nothing is listening at all.
+
+Resets, then handshakes, then refusals is the signature of a server degrading, not of a network dropping packets. A network problem tends to look the same from start to finish. This got steadily worse, which pointed at the thing on the other end of the connection.
+
+## The timeline everyone believed was wrong
+
+The part nobody had seen was how it ended.
+
+The ticket gave a much shorter outage and credited a manual restart with ending it. The full terminal logs said otherwise. The failures ran straight through the night, and the recovery lined up with the terminals' own scheduled nightly reboot, each one printing its boot banner and then signing in cleanly.
+
+There was nothing in the logs that matched a restart earlier in the night. The terminals kept retrying all night, and every retry went to a switch that was out of memory and later not listening at all. Nothing on the terminals reset their state until the scheduled reboot came round. The ticket's estimate had come from a short extract of the logs, and the full logs told a longer story.
+
+**Correct the timeline, even when it's awkward.** If the story is "a restart fixed it", the next incident gets handled with a restart, and a restart didn't fix this one. The next night on site depends on the story being right.
+
+## Why the burst was ours
+
+Here's the uncomfortable part for our side. The switch ran out of memory, and its memory sizing belongs to the team that runs it. But the burst of sign-ins that exhausted it was a load spike we created.
+
+Every terminal on that side got the config at the same moment, applied it at the same moment and signed in at the same moment. A dependency that copes fine with a steady trickle of sign-ins can fall over when they all arrive at once. None of the clients was misbehaving. They were all behaving identically, and that was the problem.
+
+The weak design lets every client reconnect the instant it can, and waits for someone to notice the outage. It's the default in most systems, because it's what happens when nobody thinks about it. Everyone gets the same event, reacts to it straight away, and the dependency sees the combined result.
+
+We already had one defence. Our service only pushes config when the fetched set actually changes, so a routine refresh with nothing new doesn't make every terminal re-sign-in for no reason. That rule came from exactly this kind of experience. It just doesn't help on the nights when the config really has changed.
+
+## The better design: spread the load and watch for the drop
+
+My recommendations split by owner, and I think that split is the most useful thing in the write-up.
+
+Memory sizing and any leak in the switch belong to the team that runs it. The switch should cope with every terminal on a site signing in together, because sooner or later they will, whether we cause it or a power cut does. That's the real fix, and I said so plainly.
+
+On our side, three things.
+
+### Stagger the config push
+
+Config goes to every connected terminal at the same moment. A small, randomised per-terminal delay is cheap and turns a spike into a slope. Here's the shape, as generic C#:
+
+```csharp
+// Spread "new config available" across a window instead of one instant.
+foreach (var terminal in connectedTerminals)
+{
+    var jitter = TimeSpan.FromMilliseconds(_random.Next(0, (int)spread.TotalMilliseconds));
+    _scheduler.Schedule(jitter, () => terminal.NotifyConfigAvailable());
+}
+```
+
+The randomness matters more than the delay. A fixed stagger in terminal order puts the same terminal first every time, and a sorted list has a way of lining up with other sorted lists. Random jitter spreads the load whatever else is going on.
+
+### Stagger the reboots
+
+The nightly reboots fired within minutes of each other, so every terminal came back and signed in at roughly the same time. The same idea applies. On this night the reboot happened to be what ended the outage, but a synchronised reboot is just a scheduled thundering herd.
+
+### Alert when many clients drop together
+
+Our heartbeat monitoring already sees every disconnect. One terminal dropping is routine. A whole side dropping within a few seconds is an incident, and it should wake someone up.
+
+```csharp
+// Raise an alert when too many terminals disconnect inside a short window.
+public void OnTerminalDisconnected(DateTime at)
+{
+    _recent.Enqueue(at);
+    while (_recent.Count > 0 && at - _recent.Peek() > _window)
+        _recent.Dequeue();
+
+    if (_recent.Count >= _threshold)
+        _alerts.Raise("Many terminals dropped together; check the payment switch");
+}
+```
+
+That's a small change. It would have turned a silent night into a phone call. **Of the three, it's the cheapest, and the one I'd push hardest for.**
+
+If you own the clients as well as the server, add jitter on the client side too. Exponential backoff with jitter on reconnect is the standard answer, and it protects the dependency even when the trigger isn't yours. The terminals here run firmware my team doesn't own, so our levers were the push and the alert.
+
+## Nobody's money was at risk
+
+It's worth saying clearly, because "half a forecourt stopped taking cards" sounds worse than it was for customers. The terminals switch the card reader off when they can't sign in, so no card is taken that can't be authorised.
+
+Anything in flight when the link dropped was reversed, and finished sales were stored on the terminal to send later. That's the store-and-forward behaviour from Part 1, doing its job on a bad night. The site lost card sales on one side for a while. Nobody was charged for fuel they didn't get.
+
+## Where it falls over
+
+**My cause is an inference, not a measurement.** The out-of-memory refusal is one line from one terminal. It's strong evidence the switch was struggling, and it's the only line in the logs that names a cause. But I never had the switch's own memory figures, so "the burst of sign-ins exhausted it" is my best reading, not a proven fact.
+
+A second write-up floated a configuration or certificate theory, based on a malformed record our service logged around the same time. I don't think it holds, because that warning is about one record and the memory refusal is the only line that names a failure. But it's a reasonable alternative, and I'd rather say it exists than pretend the evidence was unanimous.
+
+And none of the recommendations has been actioned yet. The memory fix, the staggered pushes and the alert all still sit with the teams that own them. Writing a clear recommendation isn't the same as getting it done, and a site is exposed to the same burst until someone picks them up. That's its own lesson about who owns a fix, and it's the part of this incident I'm least satisfied with.
+
+## Design for the moment everyone arrives
+
+My position: any dependency that clients connect to will eventually see all of them arrive at once, and "it's healthy under normal load" tells you nothing about that moment. If you trigger the reconnects, you own the burst, even when the thing that falls over belongs to someone else.
+
+Look for anything in your system that tells every client to do something at the same time: a config push, a scheduled job, a deployment, a reboot window. Add jitter to it. Then add an alert for the moment many clients drop together, because that's the signal a whole dependency has gone, and it's cheaper than waiting for a customer to ring.
+
+Next in the series: the opposite failure, a socket that died so quietly nothing on our side noticed. The rest of my writing is on [the blog](/blogs/).

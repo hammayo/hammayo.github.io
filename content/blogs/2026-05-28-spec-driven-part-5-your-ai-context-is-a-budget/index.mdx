@@ -1,0 +1,129 @@
+---
+title: "Spec-Driven, Part 5: Your AI Context Is a Budget"
+date: "2026-05-28"
+summary: "My sessions felt heavy before I'd typed a word, so I measured what every one of them loaded. I moved 742 lines of always-on guidance into rules that only load for the files they govern, and switched off a plugin that was quietly fighting my process."
+tags: ["ai", "productivity", "tooling", "automation"]
+series:
+  name: "Spec-Driven"
+  part: 5
+published: true
+---
+
+By the summer, my Claude Code sessions felt heavy. There was a lot loaded before I'd typed anything, and every so often I got advice that belonged to a completely different stack. I could have trimmed on instinct, but I didn't know what was actually in there, so I measured **Claude Code context** before I touched any of it.
+
+This post is about treating that context as a budget. I'll show the weak setup I'd drifted into, how I audited it, the one change that removed 742 lines from every session, and the plugin I switched off because it contradicted the way I work. There's an honest section at the end, because I can show what changed and not what improved.
+
+Part 4 was about what the assistant asks before it builds. This one is about what it reads before it asks anything.
+
+## Why a heavy session is a quiet problem
+
+A heavy session doesn't fail loudly. Nothing errors. The assistant still answers, the code still compiles, and the tests still pass.
+
+What you lose is weight. The more the model reads at the start, the less any single instruction counts, so the rule you really care about sits in a pile with a hundred rules that don't apply to the file you're editing. When I asked for help on an Angular component, the assistant had already read our C# conventions, our dependency wiring guide and a glossary of payment terms.
+
+None of it was wrong. Most of it was irrelevant to the file in front of me, and all of it was competing for the same attention as the one rule that did apply.
+
+The odd off-stack advice was the clue I should have followed sooner. It wasn't the model being daft. It was the model faithfully using something I'd loaded and forgotten about.
+
+**Context is the one resource every instruction competes for.** Once I thought of it that way, "might help" stopped being a good enough reason to load something into every session.
+
+## The weak setup: import everything, just in case
+
+Here's how I got there, and I suspect it's a common path.
+
+You start with a short project brief. Then you write a proper development rules doc, and it's good, so you import it.
+
+Then a patterns guide, because the assistant keeps reinventing helpers that already exist. Then a guide to one subsystem's wiring, because the assistant once added a dependency that broke start-up. Each import fixed a real problem on the day it went in.
+
+Add the plugins and integrations you've switched on over a few months, and the skills you installed to try once, and you've got a session that loads a small library before it reads your first message. No single step was a mistake. The sum was.
+
+The weak version of the fix is to go through it by feel and delete whatever looks old. I nearly did that. The problem is that "looks old" and "isn't used" aren't the same thing, and I'd have had no way to explain afterwards why anything went.
+
+## Measure what loads before you type
+
+So I audited it first, in four passes.
+
+- What loads at the start of every session: the project brief and everything it imports.
+- How often each connected integration had actually been called, counted from my session transcripts.
+- The skills I'd installed against the skills I'd actually used.
+- Every plugin that was switched on, read against my own working rules.
+
+The transcript pass is the one people tend to skip, and it's the cheapest evidence you'll get. Every session leaves a record of which tools it called. Counting those by integration turns "I think I use that" into a number, and a number is much easier to act on than a feeling.
+
+The first pass was the big one. Three of our core docs were imported into every session, whatever I was doing.
+
+The development rules stayed exactly where they were. They hold a handful of laws, like "reuse before creating" and "route calls between subsystems through the agreed channel, not a direct dependency", and those apply to nearly any code change in any language we use. That's the test for always-on: not "is it important", but "does it apply to almost everything I'll ask for".
+
+The other two only matter some of the time. The patterns guide matters when you're writing C#. The subsystem wiring guide matters when you're touching that subsystem or its dependency registration. Loading both for a TypeScript change or a docs edit was pure cost.
+
+The project brief had its own duplication too. It carried an inline glossary and a table of shared libraries, both of which already lived in reference docs. I swapped each for a link and added a one-line instruction to keep responses concise, which cost almost nothing.
+
+## Scope rules to the files they govern
+
+The change that did most of the work was scoping. Claude Code can load a rule file only when the files in play match a path pattern in its frontmatter, so a rule can be always true without being always loaded.
+
+I turned the two conditional guides into short rule files. Each one is a summary of the rules that matter most, plus a pointer to the full guide for when the detail is needed. Here's the shape, made generic:
+
+```markdown
+---
+paths:
+  - "**/*.cs"
+---
+
+# C# patterns (summary)
+
+- Reuse before creating: search for an existing helper or extension first.
+- Log through the base class helpers, never Console.WriteLine.
+- Dispose through the framework's two-phase pattern; always call the base.
+- Full guide, with examples: docs/core/patterns.md
+```
+
+A TypeScript change doesn't pay for that file. A C# change always gets it. The wiring rules work the same way, scoped to the handful of paths where the wiring actually lives.
+
+**That took 742 lines out of the always-on set.** The full guides still exist, unchanged, and the assistant still reads them when a rule file tells it to. What changed is when the cost gets paid, not whether the knowledge is there.
+
+The rule I use now is simple. If a piece of guidance applies to nearly every change, it can be always-on. If it applies to a kind of file, it's scoped to that kind of file. If it applies to one task, it belongs in the skill for that task, not in the session at all.
+
+## Remove anything that fights your process
+
+The plugin pass turned out to be the most interesting part, and it's the one I'd tell anyone to do first.
+
+A commit plugin was switched on. My rule, which I wrote about in [the interview-first post](/blogs/spec-driven-part-4-interview-first-code-second/), is that the assistant stages and never commits. It stages the files for a unit of work, drafts a one-line message and stops, so I review every change before it goes into history, and then the PR goes through normal human review and CI.
+
+A plugin that commits for you quietly removes that review step. It's a perfectly good tool in someone else's workflow. In mine it was a contradiction sitting in every session, and **a tool that contradicts your process is worse than no tool**, because you only notice when it wins.
+
+I disabled it. I also switched off a plugin built for a different stack, which explained the off-stack advice in one go. And one plugin registered every skill twice, so the assistant saw duplicate entries for everything. That one wasn't mine to fix, so I reported it upstream and moved on.
+
+One integration was connected globally and showed no calls in my count, so it went. Another showed no calls and stayed, by choice, because I knew I'd need it soon. The audit records that as a decision, with the reason next to it.
+
+That's the part people skip. Writing down what you kept and why means the next audit doesn't have the same argument again. I kept the personal skills from my side projects for the same reason: unused here, used elsewhere, deliberately left alone.
+
+Some things I analysed and left alone for a different reason. Moving document-writing subagents to a cheaper model looked worthwhile, but their definitions live in plugin caches that get overwritten on every update. Any change there would have been lost silently, and a silent revert is worse than no change.
+
+## Make the audit repeatable
+
+Every change went into a table with its before and after, so any of it can be reverted in a minute. Every phase of the audit is marked either done or deliberately excluded, with nothing left as "maybe later".
+
+Then I turned the audit into a small read-only script. It reports calls per integration from the transcripts, skills used against skills installed, and the always-on line budget against the scoped one. It never changes any config, it just reports. The point is to notice when the budget creeps back up, because it will: every new doc feels like it deserves to be always-on on the day you write it.
+
+Running the script also humbled me a little. My manual count had said one of the integrations I removed had never been called. The scripted re-run found some old calls the manual pass had missed. The removal still stands, but it's a good reminder that "I checked by hand" is weaker evidence than it feels.
+
+## Where it falls over
+
+**I didn't measure before and after.** "Felt heavy" started this, and the evidence afterwards is a list of what changed, not what improved. I think the sessions are better, and the off-stack plugin explained the odd advice. But I didn't set up a comparison, so I can't show you a percentage, and I'm not going to invent one.
+
+The largest always-on piece is still there. The development rules apply to nearly everything, so they stayed. A second pass would split them into a short always-on core and scoped detail, and I haven't done that yet.
+
+Path scoping only works if the paths are right. A rule scoped too narrowly is a rule that silently doesn't load, and that's harder to notice than one that loads too often. I check the patterns when I add a rule, but nothing checks them for me.
+
+And a budget needs someone to keep it. The script tells me when the always-on set grows. It doesn't stop anyone adding to it, including me.
+
+## Spend the budget on purpose
+
+My position: every line an assistant reads before your first message is a line competing with the instruction you actually care about. Keep the always-on set short, scope everything else to the files it governs, and remove any tool that contradicts the way you review work.
+
+You don't need a script to start. Open your project's assistant brief, list everything it imports, and ask of each one: does this apply to nearly every change?
+
+If not, scope it. Then go through your plugins and switch off anything that does something you've told the assistant not to do. The output still goes through the same PRs, human review and CI as everything else, and now the rules that protect that process are the ones the assistant sees first.
+
+Next in the series is the other half of this: the mistakes an instruction can't fix, and why I stopped adding reminders and started writing scripts. The earlier parts are on [the blog](/blogs/) if you're catching up.

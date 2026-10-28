@@ -1,0 +1,183 @@
+---
+title: "Legacy .NET That Still Pays, Part 4: Keep Async Ordering Without Blocking on .Result"
+date: "2026-06-21"
+summary: "Two async steps had to happen in a fixed order, and the call site was synchronous. The obvious fix was .Result. The better one chains the second step as a continuation, so the order holds and no thread sits waiting."
+tags: ["dotnet", "csharp", "async", "architecture"]
+series:
+  name: "Legacy .NET That Still Pays"
+  part: 4
+published: true
+---
+
+Two async steps had to happen in a fixed order: send a message, wait for the other side to acknowledge it, and only then send the next one. The code that had to start all this was a synchronous callback inside a framework, with a signature I couldn't change. So the obvious fix was sitting right there: call the async method and block on `.Result` until it finished.
+
+It would have worked on my machine. It's also one of the most reliable ways to deadlock a .NET Framework service or starve its thread pool. This post is about **async without .Result**: why blocking is so tempting at a synchronous boundary, why it's dangerous, and how chaining the second step as a continuation keeps the ordering without any thread sitting and waiting.
+
+This is Part 4 of Legacy .NET That Still Pays. The example is a neutral "send, then wait for acknowledgement" flow. The real one was in a test tool, and I wrote about the ordering decision itself in [the forecourt series](/blogs/forecourt-engineering-part-7-the-simulator-was-too-polite/).
+
+## The synchronous boundary
+
+Most async advice assumes you can go "async all the way": the caller awaits, its caller awaits, and so on up to the framework, which knows how to handle a task. On a long-lived codebase, you regularly hit a point where that chain stops.
+
+Mine was a request-processing callback. The framework calls it synchronously, expects a return value straight away, and has no idea what a task is. Inside it, I needed to send a message, wait for an acknowledgement that arrives on another connection, and then send a response. Changing the framework's callback signature wasn't on the table for one ticket.
+
+That's not unusual in older frameworks. A lot of message-handling code predates the task-based async pattern entirely. Handlers are plain methods that take a message and return a reply, and the framework's own threading model was designed around that contract long before `async` existed.
+
+So the question was how to start async work from synchronous code, and keep its steps in order, without blocking the caller.
+
+## The weak version: block on .Result
+
+Here's the tempting version, with neutral names:
+
+```csharp
+private Response OnRequest(Request request)
+{
+    // Send, wait for the acknowledgement, then carry on.
+    var acked = SendAndWaitForAckAsync(request).Result;   // blocks this thread
+    if (!acked)
+        return Response.Failed(request);
+
+    SendFollowUp(request);
+    return Response.Ok(request);
+}
+```
+
+It reads beautifully. It's in order, it's synchronous, it returns a real answer. And there are three problems with it.
+
+The first is deadlock. On .NET Framework, a lot of code runs with a synchronisation context, the classic ASP.NET request context or a UI thread. `.Result` blocks the current thread.
+
+If the async method's continuation needs to get back onto that same context to finish, it waits for the thread, and the thread waits for it. Nothing moves, and nothing errors either.
+
+The second is thread starvation, which bites even without a synchronisation context. A thread blocked on `.Result` is a thread-pool thread doing nothing. Under load, enough of them and the pool runs out, and the async work they're waiting for can't get a thread to run on. The service slows down, then stops, and it looks like a performance problem rather than a bug.
+
+The third is smaller but annoying. `.Result` wraps any exception in an `AggregateException`, so the stack trace you get in the log is the wrapper's, and the real error is one level down.
+
+**Blocking on async code doesn't make it synchronous; it makes it fragile.** It usually works, and when it stops working, it stops in a way that's hard to see.
+
+## The better version: chain the second step
+
+The alternative is to start the async work, attach the next step as a continuation, and return straight away. The continuation runs when the first task finishes, so the order is guaranteed. No thread waits in between.
+
+```csharp
+private Response OnRequest(Request request)
+{
+    _ = SendAndWaitForAckAsync(request).ContinueWith(task =>
+    {
+        if (task.IsFaulted)
+        {
+            var error = task.Exception.GetBaseException();   // unwrap the AggregateException
+            _log.Error(error, "Send or acknowledgement failed; follow-up not sent");
+            return;
+        }
+
+        if (task.IsCanceled)
+        {
+            _log.Warning("Send was cancelled; follow-up not sent");
+            return;
+        }
+
+        if (!task.Result)
+        {
+            _log.Warning("No acknowledgement; follow-up withheld");
+            return;
+        }
+
+        SendFollowUp(request);   // only ever runs after a successful acknowledgement
+    }, TaskScheduler.Default);
+
+    return null;   // the framework's "nothing to send yet" answer
+}
+```
+
+The caller is free the moment `OnRequest` returns. The send and the wait happen on the thread pool. When the acknowledgement arrives, or doesn't, the continuation decides what happens next, and the follow-up can never run before the acknowledgement or without it.
+
+### The details that matter
+
+That code has a few details that are easy to get wrong, and each one is a real trap.
+
+Check `IsFaulted` before touching `Result`. Reading `Result` on a faulted task throws, and in a continuation nobody's watching, that exception disappears.
+
+`task.Exception` is still an `AggregateException`. The continuation doesn't unwrap it for you, so use `GetBaseException()`, or `Flatten()` if several tasks could have failed, to log the real error.
+
+Handle cancellation separately. A cancelled task isn't faulted, and `Result` on a cancelled task throws too.
+
+Pass `TaskScheduler.Default`. By default, `ContinueWith` uses `TaskScheduler.Current`, which is whatever scheduler happens to be running the calling code. Usually that's the default one, and occasionally it isn't, and then your continuation runs somewhere you didn't expect. Being explicit costs nothing.
+
+You could split this into several continuations instead, one per outcome, using the continuation options that run only on success or only on failure. I don't, because it scatters the error handling across several lambdas and makes it easy to miss a case. One continuation that checks every outcome in order is longer, and it's much easier to review.
+
+### The same thing, more readably
+
+`await` is also a continuation. The compiler just writes the `ContinueWith` for you. So the same logic can live in an async method, started from the synchronous callback without being awaited:
+
+```csharp
+private Response OnRequest(Request request)
+{
+    _ = SendThenFollowUpAsync(request);
+    return null;
+}
+
+private async Task SendThenFollowUpAsync(Request request)
+{
+    try
+    {
+        if (await SendAndWaitForAckAsync(request).ConfigureAwait(false))
+            SendFollowUp(request);
+        else
+            _log.Warning("No acknowledgement; follow-up withheld");
+    }
+    catch (Exception ex)
+    {
+        _log.Error(ex, "Send or acknowledgement failed; follow-up not sent");
+    }
+}
+```
+
+The behaviour is the same: the caller returns at once, the order holds, and failures are logged. The try/catch is not optional. An exception in a task nobody awaits goes nowhere, so the method has to handle its own failures.
+
+On newer code I'd write it this way. On a codebase already full of explicit continuations, matching the surrounding style has value too.
+
+`ConfigureAwait(false)` tells the await not to come back to the original synchronisation context. In library code on .NET Framework, it's the habit that stops a caller's `.Result` somewhere else from deadlocking on your code.
+
+## What fire-and-forget still owes you
+
+Starting work without awaiting it doesn't mean you stop caring what happens to it. It means the work has to look after itself.
+
+It needs to log its own failures, because nobody else will see them. The wait for the acknowledgement needs a timeout, or a missing acknowledgement leaves a task waiting forever. And somewhere, a log line or a counter should record the outcome, so "did the follow-up go out?" can be answered without a debugger.
+
+On modern ASP.NET Core there's no synchronisation context, so the classic deadlock is much rarer than on .NET Framework. The thread-starvation problem is still there, though, so the advice holds on both.
+
+## When blocking is acceptable
+
+Blocking isn't always wrong, and a post that says "never" isn't much use to someone with a real constraint.
+
+It's survivable where there's no synchronisation context and no thread-pool pressure. A console app's entry point is the classic case, though since C# 7.1 you can make `Main` async and avoid the question. A dedicated thread you created yourself, for a long-running loop, can block without starving anyone else's work.
+
+In unit tests, prefer async test methods. The test frameworks all support them, and a test that blocks can hide the very deadlock you'd want it to catch.
+
+At the very top of a synchronous API you can't change, `GetAwaiter().GetResult()` avoids the `AggregateException` wrapping, and is sometimes the least bad option. It still blocks a thread, and it's only safe if everything below it avoids capturing the context. I'd treat it as a last resort and leave a comment saying why.
+
+## Where it falls over
+
+**Continuations are harder to read than straight-line code.** A reviewer has to follow the flow across a lambda boundary, and the error paths, which are the important part, are the easiest to skim. The async-method version helps, but "started and not awaited" is still a pattern people misread.
+
+The caller can't know the outcome. `OnRequest` returns before anything has been sent, so its return value can't say whether the follow-up went out. For this flow that was fine, because the protocol itself carries the outcome. In a flow where the caller needs an answer, a continuation isn't enough, and the right fix is to make the boundary async.
+
+Testing gets fiddlier. A test can't just call `OnRequest` and check what was sent, because nothing has been sent yet when it returns. It has to wait, with a timeout, until the messages appear, which is slower and flakier than a direct assertion.
+
+Work you don't await can also outlive the thing that started it. If the service shuts down while a send is waiting for its acknowledgement, the continuation can run after the worker that owns it has been disposed, which is exactly the half-disposed state from Part 2. Passing the worker's shutdown cancellation token into the async work, and checking it in the continuation, closes most of that gap.
+
+And the ordering guarantee only covers the chain. The follow-up always comes after its own acknowledgement. It says nothing about other traffic on the same connection, which can still interleave between them.
+
+## Finding the risky ones
+
+The blocking calls are easy to find and tedious to judge. Search for `.Result`, `.Wait()` and `GetAwaiter().GetResult()` on tasks, and you'll have the list.
+
+An analyser helps keep it short. The Visual Studio threading analysers include a rule that flags synchronous waits on tasks, so new ones show up in the build instead of in production. On a legacy codebase, turning it on as a warning rather than an error is a reasonable start: the existing calls stay visible without failing the build.
+
+## Chain it, don't wait for it
+
+My position: when a synchronous boundary needs async steps in a fixed order, chain the steps as a continuation and return, instead of blocking a thread until they're done. The order is the same, and the deadlock isn't there.
+
+Search your codebase for `.Result` and `.Wait()` on tasks. For each one, ask whether a thread really has to wait there, or whether the next step could simply run when the task finishes. Where it can, chain it, check faults and cancellation explicitly, and log the real exception. Where it can't, leave a comment saying why, so the next person knows it was a decision.
+
+Next in the series: forty endpoints converted to one async pattern, and why grouping them into five shapes made review possible. The rest of my writing is on [the blog](/blogs/).

@@ -1,0 +1,110 @@
+---
+title: "Services in Practice, Part 4: Your Readiness Probe Is Lying"
+date: "2021-12-14"
+summary: "An open port isn't a healthy service. A container whose database connection has expired can pass a TCP probe all day while it fails every real request. What readiness and liveness should each check, and how to avoid taking every instance out of rotation at once."
+tags: ["dotnet", "kubernetes", "health-checks", "operations"]
+series:
+  name: "Services in Practice"
+  part: 4
+published: true
+---
+
+An API's database credentials expired on a Sunday night. The service itself was perfectly happy: the process was running, the port was open, and the orchestrator's health check passed. Every single request that touched the database failed.
+
+For the best part of an hour, traffic kept being sent to instances that could not do their job, because the thing deciding whether they were healthy was only asking whether anyone was home.
+
+This is Part 4 of the series, after [Part 3](/blogs/services-in-practice-part-3-circuit-breakers-for-calls-between-services/), and it's about **readiness probes and health checks**. It's another thing I'd change in how a lot of services are set up, including some I've worked on.
+
+## What a TCP probe tells you
+
+The simplest health check opens a connection to the service's port. If it connects, the service is healthy.
+
+That check answers a very narrow question: is there a process listening? It says nothing about whether the process can do anything useful. A service with a broken database connection, a full disk or a dead downstream dependency still listens on its port.
+
+So the orchestrator carries on routing traffic to it, because by its only measure, nothing is wrong. The probe reports health, and the users find out otherwise.
+
+## Two questions, not one
+
+The fix starts with seeing that "is it healthy?" is really two different questions, and they need different answers.
+
+**Readiness:** can this instance serve requests right now? If not, stop sending it traffic, but don't kill it. It may recover by itself, or it may be starting up.
+
+**Liveness:** is this instance stuck in a way that only a restart will fix? If so, restart it.
+
+Mixing them up causes trouble. A liveness check that depends on the database will restart every instance when the database has a bad minute, turning a database blip into a full outage. A readiness check that's too shallow sends traffic to instances that can't use it.
+
+## A readiness check that tells the truth
+
+Readiness should check the things the service genuinely needs in order to handle a request, and nothing more.
+
+For an API backed by a database, that means: can I get a connection, and can I run a trivial query? If the credentials have expired, the answer is no, and the instance leaves rotation until it can.
+
+```csharp
+public sealed class DatabaseReadinessCheck : IHealthCheck
+{
+    private readonly IDbConnectionFactory _db;
+
+    public DatabaseReadinessCheck(IDbConnectionFactory db) => _db = db;
+
+    public async Task<HealthCheckResult> CheckHealthAsync(
+        HealthCheckContext context, CancellationToken ct = default)
+    {
+        try
+        {
+            using var connection = await _db.OpenAsync(ct);
+            await connection.ExecuteScalarAsync("SELECT 1");
+            return HealthCheckResult.Healthy();
+        }
+        catch (Exception ex)
+        {
+            return HealthCheckResult.Unhealthy("Database unavailable", ex);
+        }
+    }
+}
+```
+
+Registered against a readiness endpoint, this is what stops traffic going to an instance with a dead connection.
+
+Keep it cheap. A probe runs often, from every instance, forever. A query that scans a table will itself become a source of load.
+
+## A liveness check that stays simple
+
+Liveness has the opposite temperament. It should be so basic that it can almost only fail when the process is genuinely wedged.
+
+Typically that's a plain endpoint that returns success if the process can respond at all. It doesn't touch the database, a cache or other services. If it did, then a failure somewhere else would look like a failure here, and the orchestrator would restart healthy instances in response to someone else's problem.
+
+The rule I use: a liveness failure should mean "restarting me will help". If a restart won't help, it isn't a liveness failure.
+
+## Don't take everyone out at once
+
+A readiness check that depends on a shared dependency has a sharp edge. If the database goes away, every instance fails its readiness check at the same time and every one is removed from rotation. The service now has no instances to serve even the requests that didn't need the database.
+
+Sometimes that's right. An API that cannot do anything without its database should say so. But many services have endpoints that can work without it, such as a status page, cached reference data or something served from memory.
+
+Think about what the right behaviour is for each service. Options include checking only the dependencies a majority of requests need, returning a degraded status that still lets traffic through, or keeping a minimum number of instances in service regardless. What you don't want is a design where one shared dependency's blip removes the whole fleet by accident.
+
+## Start-up is a readiness problem too
+
+A service that takes a while to warm up, loading reference data or building a cache, shouldn't take traffic until it's done. That is readiness at its simplest.
+
+A separate start-up probe, or a readiness check that reports not-ready until warm-up completes, stops the first requests failing against an instance that hasn't finished arriving.
+
+Without it, every deployment includes a few seconds of errors that nobody quite chases down, because they pass.
+
+## Where it falls over
+
+A deep readiness check is a dependency itself. If the check calls the database and the database is slow, the check is slow, and the orchestrator may decide the instance is unhealthy because the check timed out. Give probes sensible timeouts and failure thresholds, so one slow answer doesn't remove an instance.
+
+It also checks only what you thought to check. A service can pass a database check and still fail because a different dependency, a cache or a downstream API, is broken. The probe is a sample of health, not proof of it.
+
+And frequent, deep checks cost something. On a large fleet, thousands of probe queries per minute is a real load. Cache the result for a few seconds and the cost nearly disappears.
+
+I'd also be honest that this is what I'd change. Many services get by on the simple port check for years, until the day an expired credential makes that choice obvious.
+
+## The takeaway
+
+**An open port isn't a healthy service.** Separate readiness from liveness, make readiness check the dependencies a request really needs, keep liveness trivial, and think about what happens when every instance fails the same check together.
+
+Try it on your busiest service: break its database credentials in a test environment and watch whether it leaves rotation. If it doesn't, your probe is lying.
+
+Coming next in Services in Practice: bridging Kafka and RabbitMQ for systems you don't own.

@@ -1,0 +1,150 @@
+---
+title: "Engineering Habits, Part 8: 401 or 403? Say Which Problem It Is"
+date: "2026-07-23"
+summary: "'Who are you?' and 'you can't do that' need different fixes, so they deserve different status codes. An internal admin API returned 401 for both. The post covers why I left it that way at the time and wrote both options down, and how to change it without breaking callers that only check for 401."
+tags: ["api-design", "security", "dotnet", "debugging"]
+series:
+  name: "Engineering Habits"
+  part: 8
+published: true
+---
+
+A support engineer pasted an error into a chat: "the API says 401". The question that followed took an hour to answer. Was the key wrong, or was it the right key for a role that wasn't allowed to do that?
+
+Both cases returned 401. From the outside, they were identical. From the inside, they had completely different fixes: one needs a new credential, the other needs a different permission, or a different caller.
+
+This is Part 8 of **Engineering Habits**, and it's about a small, specific decision: **401 versus 403**, and what I did when I noticed an API wasn't telling them apart.
+
+## Two different questions
+
+Authentication asks "who are you?". A 401 means the answer wasn't acceptable: no credential, a bad one, an expired one.
+
+Authorisation asks "are you allowed to do this?". A 403 means the system knows exactly who you are, and the answer is no.
+
+They sound like pedantry until you're the person debugging. A 401 sends you to look at keys, headers and expiry. A 403 sends you to look at roles and policy. Sending someone to look in the wrong place for an hour is a real cost.
+
+## What the API did
+
+The internal admin API I was working with had a small number of callers, each with a key that mapped to a role. A custom piece of middleware read the key, looked up the role and attached it to the request. Controllers then listed the roles they accepted.
+
+Anything not on the list got a 401. A completely unknown key got a 401. A valid key for a role the controller didn't accept got a 401.
+
+It was consistent, in the sense that it always gave the same answer. And it was a consistent kind of unhelpful.
+
+## Why I left it alone, and wrote it down
+
+I had been working on access control for a new role, and I noticed this. It would have been easy to fix on the spot.
+
+I didn't, and I think that was right. The change I was making was about who could reach which controllers, and I was trying to keep it small and reviewable. Changing what every refusal looked like would have touched every caller's error handling in the same change. Mixing a behaviour change for existing clients into an access-control change makes both harder to review.
+
+So I did the next best thing. I wrote down both options, with the risks of each, and put them in the description of the change: leave it as it is, consistent with every existing client, or split the codes so a known-but-forbidden caller gets 403.
+
+The option list is a habit from [Part 7](/blogs/engineering-habits-part-7-write-the-options-down/), and it earned its place again here. The choice was recorded, so the decision to defer was a decision and not an oversight.
+
+## How the split speeds up support
+
+With 403 for a known caller who isn't permitted, the conversation changes.
+
+"It's a 401" now means a credential problem, and you check the key. "It's a 403" means the role is wrong, and you check the permissions matrix. The first question the support engineer asks has an answer in the status code, before anyone opens a log.
+
+It also helps whoever reads the logs later. A burst of 403s from one role looks like a client calling something it shouldn't. A burst of 401s looks like a key that has expired or been mistyped. Those are different incidents with different owners.
+
+## Making the change safely
+
+The risk in the split is that some callers only check for 401. A script that treats 401 as "re-authenticate and retry" would see the new 403 and do something it was never written to handle.
+
+So the sequence matters.
+
+**Find the callers.** For an internal API, there are only a handful. Check how each handles refusals, rather than assuming.
+
+**Change the callers first.** Make them treat 401 and 403 correctly, or at least treat 403 as a refusal and not a crash. That change is safe to ship while the server still sends 401 for both.
+
+**Then change the server.** Once the clients can cope, the server starts sending 403 where it should.
+
+**Keep the body informative.** Whatever the code, the response should say which problem it was, in words, so a person reading it doesn't need to know the convention.
+
+## Map who can call what, first
+
+Before deciding what to return, I wanted to know which callers and which controllers were involved.
+
+The service had a small number of caller types, each with a key that mapped to a role: the admin interface, a documentation tool used by engineers, third-party integrations, and one particular till. On the other side were all the controllers, each listing the roles it accepted.
+
+I mapped every controller against every role before changing anything. It's a table with controllers down one side and roles across the top, and a mark where access is allowed. It took an afternoon and it answered most of the questions in this post in advance: which controllers a 403 could ever apply to, which callers would see the new code, and which had never been refused at all.
+
+That map is also the cure for the most common objection to splitting the codes: "we don't know who depends on 401". You can find out, and for an internal API it's usually a short list.
+
+## What the middleware knows
+
+The way the service identified callers was custom middleware: read a key from a header, look it up, attach a role to the request. After that, the framework's standard authorisation checked the role against the controller's list.
+
+That structure shows where the two cases really diverge.
+
+If the key isn't in the table, the middleware knows the caller is unknown. That is a 401 in the strict sense: we don't know who you are.
+
+If the key is in the table and the role isn't on the controller's list, the middleware did its job and the authorisation check refused. That's a 403: we know exactly who you are, and the answer is no.
+
+The two cases were already distinguishable inside the system. They were being flattened on the way out. The change isn't to learn something new, it's to stop discarding something we already know.
+
+## A sketch of the change
+
+In the framework, the usual place to adjust this is the handling of a failed authorisation. A small change turns the response for an authenticated-but-refused caller into a 403 and leaves the unauthenticated case alone.
+
+```csharp
+protected override void HandleUnauthorizedRequest(HttpActionContext context)
+{
+    var authenticated = context.RequestContext.Principal?.Identity?.IsAuthenticated == true;
+
+    context.Response = context.Request.CreateErrorResponse(
+        authenticated ? HttpStatusCode.Forbidden : HttpStatusCode.Unauthorized,
+        authenticated
+            ? "This key is valid but its role may not call this endpoint."
+            : "No valid key was supplied.");
+}
+```
+
+The message does as much work as the code. A person reading the response doesn't need to remember a convention. It says which of the two problems it was.
+
+## Testing the matrix
+
+The same table that mapped controllers to roles becomes the test.
+
+For each role, call representative endpoints and assert the outcome: allowed, refused with 403, or refused with 401 when there's no key at all. The test names say the role and the endpoint, so a failure tells you which cell of the matrix is wrong.
+
+It's repetitive to write, and a parameterised test keeps it short. What it buys is a guard against the two silent regressions: a controller that starts accepting a role it shouldn't, and a controller that stops accepting one it should.
+
+## What to do about the callers
+
+I said to fix the callers first. In practice that meant a short conversation with the owner of each, plus a look at the code.
+
+The questions were simple. When you get a 401, what do you do? Retry? Re-authenticate? Show an error? And what would you do with a 403? Most callers did something sensible with a generic failure. The ones that needed a change were the ones that retried on 401, because a retry on a refusal that will never succeed is wasted effort and noise in the logs.
+
+The result is small: a line in each client to treat 403 as final. It's the kind of work that's easy to skip, and it's the reason the server change is safe.
+
+## What a client can rely on
+
+Once the codes are split, it helps to write down what each status promises, so that callers and support are working from the same table.
+
+| Status | Meaning | What the caller should do |
+|---|---|---|
+| 200 | The call worked | Carry on |
+| 401 | The key is missing or unknown | Check the credential, and don't retry the same call |
+| 403 | The key is valid, but its role can't do this | Use a different role, or ask for access. Retrying will not help |
+| 404 | The thing you asked for does not exist | Check the identifier |
+
+A table like this belongs next to the API's documentation. It takes ten minutes, and it saves the question that started this whole post.
+
+## Where it falls over
+
+Not everything can be split cleanly. Sometimes revealing that a resource exists, by saying "forbidden" instead of "not found", is itself a leak. For some endpoints, an unhelpful refusal is the safer one.
+
+It also needs care at the edge. A caller with a valid key for the wrong role and a caller with a made-up key are distinguishable once you split, which tells an attacker that a particular key exists. On an internal network that's an acceptable trade. On a public API it deserves a second thought.
+
+And deferring has a cost too. I left a known imprecision in place, and until someone does the follow-up, the support engineer still has the original problem.
+
+## The position
+
+**"Who are you?" and "you can't do that" need different fixes, so they deserve different status codes.** Write down the option of splitting them when you see it, defer it if bundling would make the change hard to review, and when you do it, fix the callers before the server.
+
+Next time someone says "it returns 401", ask whether it could have been a 403. If the API can't tell you, that's the finding.
+
+The rest of my writing is on [the blog](/blogs/).

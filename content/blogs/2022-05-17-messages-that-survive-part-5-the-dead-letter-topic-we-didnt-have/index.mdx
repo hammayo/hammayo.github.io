@@ -1,0 +1,92 @@
+---
+title: "Messages That Survive, Part 5: The Dead-Letter Topic We Didn't Have"
+date: "2022-05-17"
+summary: "Marking a message 'terminated' in a table stops it hurting anything. It doesn't get it processed. What happens to a failed message in our setup today, why that isn't a recovery plan, and what a dead-letter topic, a replay tool and a runbook would change."
+tags: ["dotnet", "kafka", "reliability", "operations"]
+series:
+  name: "Messages That Survive"
+  part: 5
+published: true
+---
+
+Support rang with a simple question: a customer's invoice hadn't been generated, could someone find out why? The answer was in the system. A message asking for the invoice had failed, been retried, and been marked as terminated. It was sitting in a table, with an error attached, exactly as designed.
+
+And nobody could do anything with it. To get that invoice generated, a developer had to find the row, work out what had gone wrong, fix the cause, and put the message back by hand. By then the customer had asked twice.
+
+That's the gap this part is about. In [Part 3](/blogs/messages-that-survive-part-3-retry-back-off-then-stop/) I said a **dead-letter topic** was on my list. This is the honest account of what it would be, and why I wanted it.
+
+## What "terminated" actually means
+
+When a message fails every retry, or a handler decides it can never succeed, our shared messaging library marks it as terminated. That does two useful things. It stops the retries, so a bad message no longer burns worker time. And it keeps the message and its error, so there's something to investigate.
+
+We keep failed messages for seven days. That's long enough to look into most problems and short enough that the table doesn't grow without limit.
+
+What "terminated" does not do is get the work done. The message isn't lost, but it isn't going anywhere either. It's parked, and parking is not recovery.
+
+## The weak setup: a table and a developer
+
+This is where we are, so I'll describe it plainly. A failure ends up in a database table. Someone has to notice it, and noticing depends on someone looking, because nothing tells you when a terminated count goes up.
+
+Then it takes a developer. Finding the message means querying the table. Understanding it means reading the error and probably the handler. Replaying it means writing an update or a one-off script and running it against a live database.
+
+Every step of that is manual, slow, and carried out by the most expensive person available. And on day eight the evidence is gone.
+
+## The better setup: somewhere failures go
+
+The usual answer is a dead-letter topic. When a message is given up on, it's published to a separate topic, with the error attached, and it stays there.
+
+The point is not the topic itself. It's what becomes possible once failures have a proper home.
+
+**They can be seen.** A dead-letter topic has a depth, and a depth can be graphed and alerted on. "There are four failed invoice messages" becomes a number someone is told about, not a thing discovered in a query.
+
+**They carry their context.** The original message, the handler that rejected it, the exception and the number of attempts, all together in one record. Nobody has to reconstruct what happened from logs.
+
+**They can be replayed.** Once the cause is fixed, a failed message can be put back onto its original topic and processed again, with no hand-written update.
+
+## A replay tool, kept small
+
+A dead-letter topic without a way to use it is another place to park things. The piece that makes it useful is a small tool, and it needs very little.
+
+List the failed messages, with their type, time and error. Show one in full. Replay one, or all of one type, back onto the topic it came from. Discard one, with a reason recorded.
+
+```csharp
+public async Task ReplayAsync(string deadLetterId, CancellationToken ct)
+{
+    var failed = await _deadLetters.GetAsync(deadLetterId, ct);
+
+    // Same message ID, so the consumer's inbox still treats a repeat as a repeat.
+    await _producer.ProduceAsync(failed.OriginalTopic, failed.Key, failed.Payload, ct);
+
+    await _deadLetters.MarkReplayedAsync(deadLetterId, _user.Name, DateTime.UtcNow, ct);
+}
+```
+
+Keeping the original message ID matters. Because of the inbox from [Part 2](/blogs/messages-that-survive-part-2-every-message-arrives-twice/), a replayed message that had in fact been processed in the meantime does nothing the second time. Replay becomes safe to run without first working out whether it's needed.
+
+The tool should record who replayed what and when. For anything touching a regulated process, "someone re-ran it" is not an acceptable audit trail.
+
+## The runbook matters as much as the tool
+
+The part people skip is writing down what to do. A tool in the hands of someone who doesn't know when to use it is a way to make an incident worse.
+
+The runbook is short. It says what the alert means, how to look at the failed messages, and the questions to ask before replaying anything. Was the cause a bug that's now fixed, or bad data that will fail again? Would replaying produce a duplicate effect that the consumer can't absorb? Who needs to be told?
+
+It also says when not to replay. A message that failed because the data was wrong will fail again, and replaying a thousand of them just fills the dead-letter topic a second time.
+
+## Where it falls over
+
+I should be clear that this is what I'd build, not a description of what we run. Today it's the table and the developer. If I'm describing a design here, treat it as a design.
+
+A dead-letter topic can also hide a problem. When failures have somewhere tidy to go, it's tempting to stop caring about them. A growing depth that nobody looks at is worse than a noisy error log, because it feels handled.
+
+Replay has its own risks. Messages replayed long after they failed may no longer make sense: the record they refer to has changed, or the business rule has moved on. A replay tool should be able to say "this is old" before it sends anything.
+
+And it adds moving parts. Another topic, another retention setting, another tool to secure and maintain. For a system with very few failures, a table and a careful developer may be enough.
+
+## The takeaway
+
+**"Terminated" in a table isn't a recovery plan.** Give failures somewhere to go that can be seen, carry their error with them, and be replayed safely by someone who isn't a developer.
+
+If you do one thing this week, count how many steps there are between "a message failed" and "it was processed". If the answer involves writing a script against production, you know what to build.
+
+Coming next in Messages That Survive: the consumer that waited forever for a topic.

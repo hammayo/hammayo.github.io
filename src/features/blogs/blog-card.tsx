@@ -1,17 +1,24 @@
+'use client';
+
 import Link from 'next/link';
 import { CardContent } from '@/features/shared/ui/card';
 import { CardEffects, cardBaseClasses } from '@/features/shared/ui/card-effects';
 import { gradientText, accentTag } from '@/design/variants';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { Highlight } from './highlight';
 import type { PostMeta } from './schema';
 
 interface BlogCardProps {
   post: PostMeta;
   index: number;
+  /** Search words to highlight in the title and summary. */
+  query?: string;
 }
 
-export function BlogCard({ post, index }: BlogCardProps) {
+export function BlogCard({ post, index, query = '' }: Readonly<BlogCardProps>) {
+  // Lift the line clamps while searching so a match is never hidden in the clipped text.
+  const searching = query.trim() !== '';
   return (
     <Link href={`/blogs/${post.slug}`} className="block h-full">
       <CardEffects delay={Math.min(index * 0.1, 0.5)} bordered>
@@ -25,13 +32,13 @@ export function BlogCard({ post, index }: BlogCardProps) {
             </div>
 
             {/* Title */}
-            <h2 className={cn(gradientText({ size: 'body' }), 'text-lg font-semibold mb-2 line-clamp-2')}>
-              {post.title}
+            <h2 className={cn(gradientText({ size: 'body' }), 'text-lg font-semibold mb-2', !searching && 'line-clamp-2')}>
+              <Highlight text={post.title} query={query} />
             </h2>
 
             {/* Summary */}
-            <p className="text-sm text-muted-foreground line-clamp-3 flex-1">
-              {post.summary}
+            <p className={cn('text-sm text-muted-foreground flex-1', !searching && 'line-clamp-3')}>
+              <Highlight text={post.summary} query={query} />
             </p>
 
             {/* Tags */}

@@ -1,0 +1,135 @@
+---
+title: "Spec-Driven, Part 7: Green Isn't Right"
+date: "2026-06-01"
+summary: "I ran a real feature through an AI agent loop: 27 stories, a green test suite at every boundary, and some of the later stories were quietly fixing maths an earlier story had got wrong. What the gates caught, what they didn't, and what I'd put in every story now."
+tags: ["ai", "automation", "tooling", "architecture"]
+series:
+  name: "Spec-Driven"
+  part: 7
+published: true
+---
+
+The test suite stayed green for 27 stories. The last recorded run was 257 tests out of 257, after story 25, and there were no regressions in the existing view at any story boundary. It was also true that some of those later stories were fixing maths an earlier story had got wrong, and the suite had been green before those fixes too.
+
+That's the lesson from running a real feature through an **AI agent loop**, and it's the one I'd most like someone to have told me first: "done" means the agent said so, and "green" means the tests you wrote passed. Neither means the feature is right.
+
+Part 3 set up the loop: a PRD, Ralph TUI as the foreman and Claude Code as the builder. This is what happened when I used it for real, what the gates caught, what they missed, and the two things I'd now put into every story.
+
+## Why this work suited a loop
+
+The feature was a new UI view for an internal test tool our QA and integration engineers use. The existing view was sparse, and they wanted a denser one with more information and quicker controls. I'll keep the detail generic, because the shape is what matters.
+
+It was the right kind of work for a loop. It was well specified, each piece could be checked on its own, and the blast radius was small: if a story got something wrong, the worst case was a wrong number on a test tool's screen, not a wrong charge on someone's card.
+
+That last point is a rule, not a preference. **Anything on the money path stays interactive.** Pump and payment logic gets reproduced on a test rig, with me in the loop on every change. A loop is for work where a mistake is cheap to find and cheap to fix, and a UI for a test tool is exactly that.
+
+## Most of the effort went into the spec
+
+If you read [how I run a PRD through a loop with Ralph TUI](/blogs/spec-driven-part-3-prd-as-program-ralph-tui/), you'll know the claim: the spec is the program. Running it for real made me believe that more, not less.
+
+I wrote the requirements with a skill that interviews me first, the same habit as Part 4, with loop-specific questions added. Is this one story or several? Which commands must pass for every story?
+
+Then the two I'd now call essential. What's out of scope? And which open questions must the agent never guess at?
+
+The rule of thumb for sizing is blunt. If you can't describe a story in two or three sentences, it's two stories. Every story names real files, routes and services, because an agent needs concrete anchors, not prose about intent.
+
+Every story also carried two kinds of acceptance criterion: one the machine could check, and one about how it fails. "The view renders the list" is a criterion. "The view shows a clear empty state when the list hasn't loaded, not a blank panel" is the failure-mode one, and it's the one that stops a story being "done" in the happy path only.
+
+The stories went into our work-item tracker with their dependencies wired. The loop picked the next unblocked story, handed it to the agent, waited for it to report completion, marked it done and moved on.
+
+The very first story wasn't a feature at all. It checked that the skills every later story relied on were actually installed, so the loop failed on story one rather than halfway through story twelve. It's a boring story, and it's the one I'd copy first.
+
+## The gates on every story
+
+Every story had the same gates appended to its criteria, whatever else it said.
+
+- The build, the linter and the test suite all pass.
+- A code-review step comes back with its critical and high findings resolved.
+- The agent reads the progress file first and updates it before it finishes.
+
+The loop commits locally and never pushes. Nothing went up until the whole branch built cleanly on my machine, and then it went up as a normal PR, for normal human review and CI, like any other change. The loop doesn't get a shortcut past review because it wrote a lot of code quickly.
+
+The progress file deserves a word, because it's what makes a loop hang together. Each story starts in a fresh agent context with no memory of the last one. The progress file is the only thread running through all of them: what's been built, what was decided, what the next story should know. Reading it first and updating it last is a gate like any other.
+
+Those gates did real work. They kept every story compiling, kept the existing view free of regressions, and caught review findings that would otherwise have piled up for one enormous PR. At 27 stories, that matters.
+
+## The maths the suite didn't see
+
+The feature shows money and rates. The backend sends amounts as whole pence and one rate at a finer precision than that, and the view has to convert both for display.
+
+Some of the early stories used the wrong divisors. The view showed numbers that were plausible, formatted nicely, and wrong. And the tests passed, because the tests checked what the code did, not whether the pounds and pence were right. A test written by the same agent in the same story, from the same misunderstanding, will happily assert the wrong answer.
+
+The fix came later, in a correctness pass that corrected the conversions against the backend's real units. Green before, green after. Nothing in the gates could tell the two apart.
+
+It's worth asking why the review step didn't catch it either. A reviewer reading the diff, human or model, sees an amount divided by a number and a nicely formatted result. Nothing about that line is wrong unless you know what unit the backend sends.
+
+Review checks the code against good practice. It can't check it against a contract it hasn't been shown.
+
+The weak gate, then, is the one I'd started with: the story builds, lints, passes its tests and survives review. It proves the story is internally consistent. It says nothing about whether the story agrees with the world.
+
+### The better gate pins the values
+
+The better story carries acceptance criteria that pin expected values, written by me, from the backend's contract, before the agent writes a line. Here's the shape, made generic:
+
+```markdown
+### Story: show the running amount and rate
+
+Acceptance criteria
+- [ ] `npm run lint`, `npm test` and `npm run build` all pass
+- [ ] Given an amount of 1234 (pence), the view shows £12.34
+- [ ] Given a rate of 1459 (tenths of a penny), the view shows 145.9p
+- [ ] Given no amount yet, the view shows a dash, not £0.00
+- [ ] The feature spec is updated to describe what this story shipped
+```
+
+And the agent's test has to assert those exact values:
+
+```typescript
+it('converts whole pence to pounds for display', () => {
+  expect(formatAmount(1234)).toBe('£12.34');
+});
+
+it('converts tenths of a penny to pence for display', () => {
+  expect(formatRate(1459)).toBe('145.9p');
+});
+```
+
+Now a wrong divisor fails the gate. The expected value came from outside the agent's reasoning, so the agent can't make the test agree with its own mistake. **The numbers in the criteria are the part of the spec the agent can't talk its way round.**
+
+## The spec that fell behind the code
+
+The second surprise was scope. The feature grew as it went, which is normal, and the loop coped fine. The documentation didn't.
+
+When I came to close the work, the ticket's own criterion said the spec should describe what shipped. It couldn't. The work had spread across several task files, one of which was an early draft of three stories that a later version replaced, and one of which was empty. The correctness pass, nine stories in all, had never been written down anywhere.
+
+So I rebuilt the spec as an as-built record, reconstructing those nine stories from four commits. It's accurate now. It also took time that a one-line criterion per story would have saved.
+
+The next person extending the feature needs one document that says what's there. Nine shipped stories with no spec is exactly the gap that turns their change into guesswork, and in a loop the gap grows at the loop's speed, not yours.
+
+That's why the last line in the example above exists. Every story now ends with a spec update, as a criterion, checked like any other. The docs move with the code, one story at a time, instead of in a heroic catch-up at the end.
+
+## What I do while the loop runs
+
+People sometimes picture an agent loop as the engineer stepping away. That wasn't my experience, and I don't think it should be.
+
+My job moved to the front and the back. At the front: the spec, the story sizes, the pinned values and the list of decisions the agent mustn't guess. At the back: reading the review findings, checking the board, building the whole branch before anything is pushed, and raising the PR. The middle belongs to the gates.
+
+The spec records decisions, not just outcomes, and that turned out to be useful mid-flight. When a story needed a choice between two reasonable controls, or whether a setting should stay editable while something was running, the answer was already written down. The agent didn't have to guess, and I didn't have to be at my desk when it asked.
+
+## Where it falls over
+
+**Completion in the loop is a token the agent prints.** "Done" means the agent said so. The gates narrow the gap between "said so" and "right", and pinned values narrow it further, but nothing closes it.
+
+Pinned values only catch the cases someone thought to write down. If I'd pinned the amount and not the rate, the rate bug would have gone through exactly as before. The criteria are only as good as my knowledge of the backend's contract, and on a day I get that wrong, the agent will faithfully implement my mistake with a passing test attached.
+
+I learnt the spec-update rule by skipping it. Nine stories went in with no written spec, and that's on me, not the loop. I set up the gates, and I didn't include the one that would have kept the docs honest.
+
+And I didn't time it against building the feature by hand, so I don't know whether it was faster. It shipped, with the gates green and a normal PR at the end. I can't give you a speed-up and I'm not going to guess one.
+
+## Pin the numbers before the agent starts
+
+My position: an agent loop is only as good as its spec and its gates, and a green suite is a floor, not a verdict. The tests an agent writes in the same story as the code will agree with the code, right or wrong.
+
+On the next story you hand to an agent, write the expected values into the acceptance criteria yourself, from the contract, before it starts. Add a failure-mode criterion. Add "update the spec" as the last line. Keep commits local, build the whole branch before you push, and put the result through the same PRs, human review and CI as everything else.
+
+Next in the series: the docs themselves. I audited our engineering docs against the code, and some of the wrong facts were ones an assistant had helped write. The earlier parts are on [the blog](/blogs/) if you're catching up.

@@ -27,10 +27,10 @@ export default function OgImage() {
             Hammy Babar — CV
           </div>
           <div style={{ fontSize: '22px', color: '#f0f0f0', lineHeight: 1.5 }}>
-            {'20+ years · Backend Software Engineer · SC Cleared'}
+            {'20+ years · Senior Software Engineer · SC Cleared'}
           </div>
           <div style={{ fontSize: '14px', color: '#a78bfa', letterSpacing: '1px' }}>
-            {'C# · .NET · Azure · Docker · Microservices · CI/CD'}
+            {'C# · .NET · Azure · Claude Code · Agentic Engineering'}
           </div>
         </div>
       </div>

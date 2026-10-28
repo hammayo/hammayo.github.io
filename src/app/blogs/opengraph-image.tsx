@@ -30,7 +30,7 @@ export default function OgImage() {
             Practical posts on .NET, Docker, CI/CD, and regulated environments
           </div>
           <div style={{ fontSize: '14px', color: '#a78bfa', letterSpacing: '1px' }}>
-            {'Backend engineering · HMPPS · Finance · Public Service'}
+            {'Software engineering · HMPPS · Finance · Public Service'}
           </div>
         </div>
       </div>

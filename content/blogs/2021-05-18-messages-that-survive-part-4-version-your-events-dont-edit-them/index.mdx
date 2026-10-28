@@ -1,0 +1,100 @@
+---
+title: "Messages That Survive, Part 4: Version Your Events, Don't Edit Them"
+date: "2021-05-18"
+summary: "A producer can change its payload in an afternoon. Its consumers can't all change that fast. We treat a changed event as a new version that lives next to the old one. This covers how long both stay, and what happens when nobody remembers to retire the old one."
+tags: ["dotnet", "kafka", "event-driven", "api-design"]
+series:
+  name: "Messages That Survive"
+  part: 4
+published: true
+---
+
+The change looked harmless. An order service wanted to tell the world which delivery slot the customer had picked, so a developer added one field to the "order placed" event. The producer was deployed on a Tuesday. By Tuesday afternoon one of the consumers had stopped processing orders.
+
+Nothing was wrong with the new field. The consumer simply hadn't been told about it, and it had been written to reject payloads it didn't recognise. One extra property, and an entire service went quiet.
+
+This is the problem with **versioning events**: the producer and its consumers don't deploy together, and they never will. This part is about how we handle that, and it follows on from [Part 3](/blogs/messages-that-survive-part-3-retry-back-off-then-stop/), where the subject was messages that fail.
+
+## Why an event isn't like a method call
+
+When you change a method signature in a single codebase, the compiler finds every caller. You fix them all and ship the lot together.
+
+An event has no compiler between its producer and its consumers. They're separate services, built and released by separate people, often in a different order. At any moment, some consumers are on last month's code and some are on this morning's.
+
+So an event contract is closer to a public API than to an internal method. Once other services depend on it, you don't get to change it just because you're the one who owns it.
+
+## The weak fix: edit the payload and tell people
+
+The version of this I used to accept goes like this. Add the field. Post a message in the team channel. Deploy and hope everyone has read it.
+
+For an additive change that sometimes works, if every consumer tolerates properties it doesn't know about. But "sometimes works" is the problem. The failures are quiet and they land on whoever deployed last, not on whoever made the change.
+
+It gets worse for anything that isn't additive. Rename a field, change a type, split one property into two. Every consumer that reads the old shape is now reading something that doesn't match, and the message is still perfectly valid JSON.
+
+## The better fix: a new version next to the old one
+
+The rule we settled on is simple. **A changed payload is a new event, not an edit to the old one.** The version goes in the type name.
+
+```csharp
+public sealed record OrderPlacedV1(Guid OrderId, Guid CustomerId, decimal Total);
+
+public sealed record OrderPlacedV2(
+    Guid OrderId,
+    Guid CustomerId,
+    decimal Total,
+    DateTime DeliverySlotStart,
+    DateTime DeliverySlotEnd);
+```
+
+Two types, two topics or two clearly different type names on the same one. Consumers subscribe to the one they understand. Nobody is forced to move on the producer's schedule.
+
+Putting the version in the name, not in a header or a field inside the payload, is deliberate. It means a consumer can't accidentally deserialise a V2 message as a V1 and get half a picture. The name is checked before the content is looked at.
+
+## The transition: publish both
+
+A new version is only useful if consumers can move to it. During the changeover, the producer publishes both.
+
+```csharp
+await _outbox.AddAsync(new OrderPlacedV1(order.Id, order.CustomerId, order.Total), ct);
+await _outbox.AddAsync(new OrderPlacedV2(
+    order.Id, order.CustomerId, order.Total,
+    order.DeliverySlot.Start, order.DeliverySlot.End), ct);
+```
+
+Both go through the outbox from [Part 1](/blogs/messages-that-survive-part-1-kafka-was-down-and-nobody-noticed/), so they're written in the same transaction as the order. Either both exist or neither does.
+
+Consumers then move over one at a time. The billing service can stay on V1 for as long as it needs to. The email service can take V2 the day it wants the delivery slot. Neither blocks the other, and neither has to deploy in a particular order.
+
+## How long does the old version live?
+
+This is the part that gets forgotten. Publishing both is cheap, so it's tempting to leave it running.
+
+An old version that nobody retires is a cost that keeps growing. Every change to the order now has to be mapped into two events. Every bug fix has to be checked against both. New developers read the producer and wonder which one is real. And you can no longer tell, from the code, which consumers still depend on V1.
+
+We settle the end date when the new version is introduced, not afterwards. Write down who still consumes V1, agree a date, and put it somewhere that will be seen when the date arrives. A calendar reminder works better than good intentions.
+
+Then, on that date, check the consumers. If anyone is still reading V1, either they move or the date moves, but make it a conscious choice. When nobody is left, delete the V1 publishing code and the type. Deleting it is the point.
+
+## Additive changes are not always safe
+
+A tempting shortcut is to say that adding an optional field never needs a new version. Often that's right. It's only right when every consumer ignores unknown properties, and that's something you have to know, not assume.
+
+So we ask two questions before deciding. Does any consumer reject unknown fields? And would a consumer be wrong, not just unaware, if the new field were missing from an older message? If both answers are no, an additive change can go out in place. If either is yes, it's a new version.
+
+When in doubt, version it. The cost of an unnecessary V2 is a little tidying later. The cost of a missing one is a stopped service.
+
+## Where it falls over
+
+It's more work. Two types, two code paths, a mapping step and a retirement date. For a one-field change it can feel heavy, and the temptation to skip it is real.
+
+It also depends on knowing your consumers. If you can't list who reads an event, you can't say when V1 is safe to remove, and the old version stays forever. Versioning without a list of consumers is just hoarding.
+
+And it doesn't help with stored history. Events that were already written, say in a log you keep for a long time, are still in their original shape. Anything that replays them has to cope with every version that ever existed. Versioning the contract going forward doesn't rewrite the past.
+
+## The takeaway
+
+**Consumers upgrade on their own schedule, so a changed payload is a new version next to the old one.** Put the version in the type name, publish both while consumers move, and write down the date the old one goes.
+
+If you only do one thing this week, find the event that has changed most often in your system and check how its changes were handled. The answer will tell you whether you have a versioning policy or just a set of lucky deployments.
+
+Coming next in Messages That Survive: the dead-letter topic we didn't have.

@@ -1,0 +1,160 @@
+---
+title: "Engineering Habits, Part 11: The Secret That Hasn't Settled"
+date: "2026-09-10"
+summary: "Where secrets live is a decision you may revisit, and that's fine if each step is safe on its own. The keys for a service that runs on customers' own networks moved from constants in source, to seeded and locked configuration with fail-fast start-up. The post covers what stayed true through each step."
+tags: ["security", "configuration", "dotnet", "design"]
+series:
+  name: "Engineering Habits"
+  part: 11
+published: true
+---
+
+I'd like to tell you where the keys for our service finally live. I can't, because they haven't finished moving.
+
+They started as constants in source code. They then moved into configuration that is seeded once and locked. A later decision is to move back toward code, alongside a restricted mode for the web interface. Each step was reasonable when it was taken, and each was safe on its own.
+
+This is Part 11, the last of this run of **Engineering Habits**, following [Part 10](/blogs/engineering-habits-part-10-hiding-a-tab-isnt-access-control/). It's about living with a decision that hasn't settled, and what to hold constant while it moves.
+
+## The setting
+
+The service I work on runs on customers' own networks, not in a data centre we control. Callers use keys to identify themselves, and each key maps to a role. There is one shared secret per role, not one per person.
+
+That shape matters. There's no sign-in page and no password reset. A key is installed, and the service has to cope with that on a machine we don't operate.
+
+## Step one: keys as constants in source
+
+The first version was the simplest. The keys were constants in the code, compiled into the build.
+
+It worked, and it had an obvious weakness: a secret in source control is a secret in every copy of the repository, every build and every backup. An automated review on an earlier change pointed it out, and it was right to.
+
+## Step two: seeded, locked configuration
+
+The next step moved the keys out of the code and into a locked category of configuration in the database.
+
+The details were chosen to be safe at each point:
+
+- On first start, the service reads the keys from a file shipped next to the application and writes them into the database. The upsert is idempotent, so a partial run is harmless to repeat.
+- Once the file has been read, it is deleted, and the deletion is in a finally block so a database error part-way through can't leave plaintext keys on disk.
+- If the file is missing on a fresh install, the service refuses to start.
+
+That last point is the one that sounds harsh. A service that won't start is an annoyance. The alternative is a service that starts, appears healthy and runs with no working authentication, and I would rather find that out at install time than in production.
+
+## Step three: partway back to code
+
+The later decision is to unwind the database sourcing and go back to constants in code, alongside a restricted mode for the web interface.
+
+I'm not going to defend or attack it here, because the reasons are about the operating environment and the trade-offs between moving parts. Database-sourced keys mean seeding, locking, a migration and a seed file to manage on every install. Keys in code mean none of that, and a different set of risks.
+
+What matters for this post is that the database approach is what's on the main branch today, and it isn't the final design.
+
+## What stayed true through each step
+
+When a decision keeps moving, it helps to know what doesn't.
+
+**Fail fast.** Whatever the source of the keys, a service without working authentication must not start looking healthy. Every version of this refused to run without keys.
+
+**No plaintext left behind.** The seed file is deleted after use, and the deletion can't be skipped by an error.
+
+**Deny by default.** Which role can do what is a separate question from where its key lives, and it stayed deny-by-default throughout. The key store changed; the access matrix didn't.
+
+**Tests don't use real keys.** The tests check the format and uniqueness of keys, using arbitrary values, and not the real secrets. That was a review comment, and it applies to every version.
+
+If I had to summarise, the location moved and the properties didn't.
+
+## What's weak, and what's missing
+
+Honesty about the limits matters more here than most places.
+
+One secret per role means there's no record of which person did what. A shared key can't be tied to an individual, and it doesn't expire.
+
+Anything that ships to a browser can be read by whoever can open the developer tools, so a key used by a front end is a convenience-level control, tolerable only because of where the service lives.
+
+And I've left some things unsaid. The security of a design like this depends on details of its environment that I won't set out in public, and that's deliberate.
+
+## Fail fast, in code
+
+The rule that stayed constant through every version is easy to state: a service without working authentication must not start looking healthy.
+
+In practice it's a few lines at start-up, before the service begins listening.
+
+```csharp
+var keys = keyStore.LoadRoleKeys();
+if (keys.Count == 0)
+    throw new InvalidOperationException(
+        "No role keys are configured. Install the key file next to the application and restart.");
+```
+
+The message matters as much as the check. Whoever is installing the service is not the person who wrote it, and an exception that says what to do about the problem is a kindness. A silent start with an empty key table, by contrast, is a service that seems fine and rejects everything, or worse, accepts everything.
+
+I'd take a harsh failure at install time over a polite one in production.
+
+## Seed, then delete
+
+The seeding step has a precise order, and each part of it is there for a reason.
+
+```csharp
+try
+{
+    var seed = ReadSeedFile(path);
+    store.UpsertRoleKeys(seed);          // idempotent: safe to repeat
+}
+finally
+{
+    File.Delete(path);                    // plaintext never outlives the run
+}
+```
+
+The upsert is idempotent, so if the process dies half-way and runs again, nothing breaks. The delete sits in a `finally` block, so an error part-way through can't leave the plaintext file behind. That second point came from a reviewer, and it's the sort of detail I'd have missed.
+
+There's a trade-off I accepted. Deleting the file means a failed seed can't simply be retried from the same file. The fix is to ship the file again, which is a small cost for not leaving secrets lying around.
+
+## Tests that never use real keys
+
+The tests for this code check the format and uniqueness of keys, not the keys themselves.
+
+A test that uses a real deployment key has two problems. It puts a real secret into source control, which is the thing we were trying to get away from. And it ties the test to a value that will change.
+
+So the tests use arbitrary values: strings that look like keys, generated for the test. They assert that two roles can't share a key, that an unknown key is rejected, and that the table inverts correctly. None of that needs a real secret.
+
+It was a review comment on the first version, and I'd now make it a rule from the start.
+
+## How to decide whether to move again
+
+A decision that's moved twice invites the question of when to stop. I use a short set of tests before moving a secret again.
+
+- **Is the current location unsafe, or just inconvenient?** Unsafe is a reason to move now. Inconvenient is a reason to schedule it.
+- **Does the move keep every property that mattered?** If any of fail-fast, no plaintext left behind or deny-by-default would be lost, the move isn't ready.
+- **What does it cost the people installing it?** A change to the installer or the documentation lands on someone who didn't ask for it.
+- **Can each step be released alone?** If the move needs three things to land together, the risk is the gap between them.
+
+If a move passes all four, I'm comfortable that it's a decision and not a drift.
+
+## Telling the people who install it
+
+The part that is easy to forget is the audience for all of this. Whoever installs the service on a customer's network needs to know where the keys are, how they get there, and what to do when it doesn't start.
+
+Each move changed that. So each came with a note for installers: what's different, what to check, and the message they'll see if something is missing. The note is part of the change, not a follow-up.
+
+It's the cheapest way to make a moving decision survivable. People can cope with change if they know it's coming and what to do about it.
+
+## A short runbook for the person installing it
+
+The most useful document to come out of this was small. It was a runbook for whoever installs the service on a customer's network.
+
+It says where the key file goes, what the service does with it, and what you'll see when it's missing. It lists the exact message, so someone who sees it can find the section by searching for it. It says what to do if a seed fails part-way: ship the file again and restart. And it says what not to do, which is leave a copy of the file lying about.
+
+That last item is the point of everything above. The best secret handling in the world is undone by a copy in an email attachment, so the runbook says plainly where the file should and shouldn't be.
+
+## Where it falls over
+
+Changing your mind in public is uncomfortable, and moving a secret three times looks like indecision. Sometimes it is. The test I'd apply is whether each step was safe on its own and whether the properties that matter were held constant. If so, the moves are costs of learning, not mistakes.
+
+There's also a cost in churn. Each move touches installers, documentation and people's understanding of how the thing is configured.
+
+And a decision that hasn't settled leaves other work waiting. Anything that depends on where the keys live has to be written to survive it moving again.
+
+## The position
+
+**Where secrets live is a decision you may revisit, and that's fine if each step is safe on its own.** Decide what must stay true however the storage changes, refuse to start without working authentication, leave no plaintext behind, and keep the access rules separate from the key store.
+
+That closes this run of Engineering Habits: grep every caller, take the smaller fix, deny by default, trace the bootstrap call, break the real build, believe the error, write the options down, split 401 from 403, count before you promise, don't mistake a hidden tab for access control, and hold the properties constant while the secret moves. The rest of my writing is on [the blog](/blogs/).

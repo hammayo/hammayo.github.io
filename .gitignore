@@ -36,6 +36,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+# SonarCloud scanner working folder (scripts/sonar-scan.sh)
+.scannerwork/
+
 # env files (can opt-in for committing if needed)
 .env*
 !.env.local.example
@@ -70,3 +73,6 @@ public/blog-assets/
 
 # Keep screenshots for README.md
 !public/screenshots/
+
+# Specs, plans and progress notes (not tracked)
+_tasks/

@@ -1,0 +1,80 @@
+---
+title: "Building Tewe Diary, Part 7: The ADR Habit, Decision, Rationale, Revisit When"
+date: "2026-09-28"
+summary: "Writing down when you'd change your mind is what makes a decision log worth keeping. The three-line format I use in my movie diary repo, a few real entries including the ones that say 'not done yet', and why it beats a long architecture document."
+tags: ["architecture", "documentation", "adr", "dotnet"]
+series:
+  name: "Building Tewe Diary"
+  part: 7
+published: true
+---
+
+Most architecture documents tell you what a system is. Very few tell you why it isn't something else, and almost none tell you what would make the author change it.
+
+In my movie diary repo, the document I'd show first isn't the architecture page. It's a decision log, and every entry in it has three parts: the decision, the rationale, and a line that begins "Revisit when". That last line is the one that makes it worth keeping.
+
+This is Part 7 of **Building Tewe Diary**, after [Part 6](/blogs/building-tewe-diary-part-6-schema-owned-by-migrations-with-separate-database-roles/). The earlier parts each came from one entry. This one is about the **architecture decision record** habit itself.
+
+## The format
+
+Each entry is short and has the same shape.
+
+**Decision.** What I chose, in a sentence or two.
+
+**Rationale.** Why, including what I weighed against it.
+
+**Revisit when.** The specific condition that would make me reconsider.
+
+That's all. There's no template with twelve headings, no status field, no approval workflow. It's a lightweight version of an architecture decision record, and the lightness is deliberate: the shorter it is, the more likely I am to write it at the moment I decide, and not weeks later from memory.
+
+## A real entry
+
+Here's the one for the data layer, almost in full:
+
+> **Decision.** Data access is Dapper over Npgsql with hand-written SQL.
+>
+> **Rationale.** The queries are simple and explicit; Dapper keeps them visible and fast without change-tracking or migration magic in the query path.
+>
+> **Revisit when.** The domain grows aggregates with complex object graphs where an ORM's identity map and change tracking would genuinely reduce hand-written plumbing.
+
+The third part is a promise to my future self, and a hint to anyone reading. It says: this is a decision for this size of problem. It is not a claim that ORMs are bad.
+
+## Why "revisit when" does the work
+
+A decision without a trigger hardens into a rule. People forget why it was made and treat it as permanent, or they reverse it on a whim because nobody wrote down what it protected against.
+
+A trigger turns a decision into a hypothesis. It says what has to be true for the choice to hold, and what to watch for. When the condition appears, the question isn't "should we change this?" It's "has the thing we said would change it happened?"
+
+It also makes the entry honest. If I can't write a revisit-when line, I usually haven't understood the decision. A few entries needed me to stop and think about what would actually invalidate them.
+
+## Entries that say "not done yet"
+
+The entries I like best are the ones that record what I chose not to do.
+
+The HATEOAS entry says the API carries one `self` link per movie in list responses, and why the single-movie response carries none. It then lists what is deliberately missing: no next and previous page links, because the list already returns page, size, total and a flag for another page, and no action links, because they depend on the caller's claims and advertising them unconditionally would mislead. It adds that both are easy to add.
+
+The deployment entry says purge protection on the key vault was skipped on purpose, because it's irreversible and would block reusing the vault name for ninety days after a tear-down, which fights the spin-up, demo, tear-down loop this project relies on. It says to enable it for a real environment.
+
+Neither of these is a gap I forgot. They're gaps I chose and can defend. A reviewer who finds them in the log knows I saw them first.
+
+## What it does for a reader
+
+Someone arriving at the repo can read the log in order and watch the design form. They see the one-project core, the Dapper choice, who owns the schema, how the services share a secret. Each choice has a reason attached and a limit stated.
+
+That is a better answer to "why is it like this?" than any amount of diagrams. A diagram shows the result. The log shows the reasoning, which is what a reviewer is actually trying to judge.
+
+## Where it falls over
+
+A log can go stale. If the code changes and the entry doesn't, it becomes a confident description of something that no longer exists. The cure is to treat an edit to a decision as part of the change, and I don't always manage it.
+
+It also records decisions, not discussions. The options I rejected are only mentioned if I thought to write them down, and some of the best context never makes it in.
+
+And the habit works for one author. On a team, entries need owners and some way of being challenged, otherwise the log is a list of one person's opinions with the force of fact.
+
+## The position
+
+**A decision log is only worth keeping if each entry says when you'd change your mind.** Keep it to three parts, write it when you decide, include the things you chose not to do, and update it in the same change as the code.
+
+Pick the last significant decision you made on a project and write its revisit-when line. If you can't, you've found out something about the decision.
+
+Next in Building Tewe Diary: what hosting costs, and why free is harder than it sounds. The rest of the series is on [the blog](/blogs/).

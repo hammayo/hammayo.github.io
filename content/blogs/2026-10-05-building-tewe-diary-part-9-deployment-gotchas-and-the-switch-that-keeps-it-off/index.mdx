@@ -1,0 +1,93 @@
+---
+title: "Building Tewe Diary, Part 9: Deployment Gotchas, and the Switch That Keeps It Off"
+date: "2026-10-05"
+summary: "A dry run can check syntax. It can't check ordering and timing. Here are the three problems that stopped my first Azure deployment, the fixes, the hardening I added for free, what I skipped on purpose, and the single variable that keeps the deploy job from failing before Azure exists."
+tags: ["azure", "devops", "github-actions", "postgres"]
+series:
+  name: "Building Tewe Diary"
+  part: 9
+published: true
+---
+
+The setup script for my movie diary API passed its dry run. Every command was valid, every resource name resolved, every step was in a sensible order. Then I ran it for real, and the app didn't start.
+
+The failures weren't syntax. They were about ordering and timing, which is exactly what a dry run can't see. This post is the list of what broke, because it's the useful kind of list: short, specific and likely to save someone an evening.
+
+It's Part 9 of **Building Tewe Diary**, following [Part 8](/blogs/building-tewe-diary-part-8-getting-hosting-to-zero-and-what-each-option-costs/). The subject is **Azure App Service container deployment gotchas**, and the switch that stops the pipeline failing early.
+
+## 1. Pulling from a private registry
+
+The web app's identity had been granted permission to pull from the container registry. That's necessary and not sufficient. App Service still defaults to admin or anonymous pulls, so a private image fails to pull and the app never starts.
+
+The fix is one setting per app, turning on managed-identity credentials for the pull:
+
+```bash
+az webapp config set -g "$RG" -n "$APP" \
+  --generic-configurations '{"acrUseManagedIdentityCreds": true}'
+```
+
+Granting a role and telling the service to use it are two separate steps. I'd done the first and assumed the second.
+
+## 2. Grants for tables that don't exist yet
+
+This is the one I'm most glad I wrote down, because it comes straight from the roles in Part 6.
+
+Migrations run as the DDL role and create the tables after setup. My original grants ran against all tables, of which there were none yet, and set default privileges without naming the role that would create the tables. So they only covered the admin's future objects.
+
+The result: the runtime and import roles got permission denied on tables created later by a migration, and the health check failed the deploy. The fix makes the admin a member of the DDL role and sets default privileges for that role:
+
+```sql
+GRANT movies_ddl TO current_user;
+ALTER DEFAULT PRIVILEGES FOR ROLE movies_ddl IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO movies_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE movies_ddl IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO movies_app;
+```
+
+Tables created later by that role are granted automatically. Least privilege only works if the grants follow the objects.
+
+## 3. A permission that isn't there yet
+
+The script grants the operator a role on the Key Vault and, a moment later, writes secrets into it. Role assignments can take minutes to propagate, so a fast run gets a 403.
+
+The fix is the unglamorous one: retry the secret write, ten times at fifteen-second intervals, until the permission takes effect. It's a timing problem and the honest answer to a timing problem is to wait with a limit.
+
+## Hardening that costs nothing
+
+While I was in there I added the cheap controls that don't change the bill: HTTPS only, a minimum TLS version of 1.2, FTPS disabled on both apps, and tags on the resource group. They're a handful of flags and they raise the floor for free.
+
+## What I deliberately skipped
+
+Purge protection on the key vault is off. It's irreversible, and it blocks reusing the vault name for ninety days after a tear-down. This project works by spinning up, demoing and tearing down, so it would fight the workflow. For a real environment I'd turn it on, and the log says so.
+
+There's also a list of what's still open and documented, not fixed: infrastructure as code instead of imperative CLI, private networking in place of a public database with a broad Azure-services rule, a narrower role for the pipeline than Contributor on the resource group, and monitoring. I kept the pipeline's role broad because getting a tighter one wrong silently breaks the deploy. These are demo-tier trade-offs, and I'd rather label them than hide them.
+
+## The switch
+
+Until the Azure resources exist, the deploy job has nothing to deploy to. If it runs anyway it fails at login, which turns every merge into a red build for a reason unrelated to the code.
+
+The deploy job is guarded by a repository variable:
+
+```yaml
+# Only deploy when Azure is configured. Set repo variable DEPLOY_ENABLED=true
+# once the AZURE_* secrets exist; otherwise the job is skipped instead of failing at login.
+if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+```
+
+A merge to the main branch runs the tests and stops there. When I want the deploy, I set the variable and the job turns on. The default state is safe.
+
+## Where it falls over
+
+A variable you have to remember to set is a variable you can forget. If I forget it, merges are green and nothing ships, which is a quiet failure. The README says deployment is off until it's set, so at least it's documented.
+
+The retry loop is a patch over a platform behaviour I don't control. If propagation ever takes longer than the limit, the script fails, and it fails with a permission error that doesn't mention timing.
+
+And everything above is specific to Azure's defaults at the time. Services change. The point is the habit, not the particular setting.
+
+## The position
+
+**Most of a first cloud deployment is small ordering and permission problems, so write each one down as you fix it.** Check that grants follow objects that don't exist yet, don't assume a permission is live because you granted it, and guard the deploy job so it doesn't fail before there's anything to deploy to.
+
+If you've a setup script that passes a dry run, run it for real against an empty subscription before you trust it.
+
+Next in Building Tewe Diary: v1 controllers running beside v2 Minimal APIs. The rest of the series is on [the blog](/blogs/).

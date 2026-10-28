@@ -1,6 +1,7 @@
 import { MetadataRoute } from 'next';
 import { SITE_URL } from '@/lib/constants';
 import { getAllPostsMeta } from '@/features/blogs/pipeline';
+import { getAllSeries } from '@/features/blogs/series';
 
 export const dynamic = 'force-static';
 
@@ -59,5 +60,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority:        0.7,
   }));
 
-  return [...staticRoutes, ...postRoutes];
+  const seriesRoutes: MetadataRoute.Sitemap = getAllSeries().map(({ slug, posts }) => ({
+    url:             `${SITE_URL}/series/${slug}/`,
+    lastModified:    new Date(Math.max(...posts.map(p => +new Date(p.date)))),
+    changeFrequency: 'monthly' as const,
+    priority:        0.7,
+  }));
+
+  return [...staticRoutes, ...seriesRoutes, ...postRoutes];
 }

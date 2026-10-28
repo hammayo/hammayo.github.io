@@ -1,0 +1,98 @@
+---
+title: "Messages That Survive, Part 6: The Consumer That Waited Forever for a Topic"
+date: "2022-06-14"
+summary: "Services don't start in the order you drew them on the whiteboard. A consumer that subscribes to a topic before any producer has created it can sit there doing nothing, and look perfectly healthy while it does. How that happens, and how to make it stop."
+tags: ["dotnet", "kafka", "reliability", "deployment"]
+series:
+  name: "Messages That Survive"
+  part: 6
+published: true
+---
+
+A new event was added to an order system: "order refunded". The producer would publish it whenever a refund went through, and a new consumer would react by updating a customer's balance. Both were ready the same afternoon, and the consumer happened to be deployed first.
+
+It started cleanly. It logged that it had connected. It showed as healthy. And it processed nothing at all, for hours, until someone noticed that refunds weren't reaching customers' balances. Worse, the messages hadn't been lost. They were being published perfectly well, to a topic the consumer wasn't properly listening to.
+
+This is a small problem with a nasty shape. It's about **Kafka consumer start-up order**, and it's the sixth part of Messages That Survive. [Part 5](/blogs/messages-that-survive-part-5-the-dead-letter-topic-we-didnt-have/) was about where failures go. This one is about the failure that never shows up as a failure.
+
+## The drawing and the deployment
+
+On the whiteboard, the order is obvious. The producer exists, it publishes to a topic, and consumers read from it. Arrows left to right.
+
+In real deployments, there is no left to right. Services are released by different people, on different days, through different pipelines. A consumer can arrive before its producer. A producer can arrive before anyone is listening. A new environment can come up with all of them at once, in whatever order the scheduler fancies.
+
+Any design that works only when things start in the drawn order will fail eventually, and it will fail in production on the one day the order was different.
+
+## What actually goes wrong
+
+In the case I described, the consumer subscribed to a topic that didn't exist yet. Depending on broker settings, that has a few possible outcomes, and several of them are bad.
+
+The broker may create the topic on demand, which is fine, but then the producer and consumer have to agree on its settings. Or it may not, and the subscription quietly refers to nothing. The consumer connects to the cluster successfully, which is all the health check looks at, and then waits for a topic that isn't there.
+
+The part that hurts is how that interacts with a processor that handles work in one loop. One topic that never appears can hold up the whole subscription. Nothing is failing, so nothing retries and nothing alerts. The service is up. It's just doing nothing.
+
+## The weak fix: restart it and move on
+
+When we found it, the quick answer was to redeploy the consumer after the producer had published once. It worked, as restarts do, and everyone went back to what they were doing.
+
+That fixes one instance and teaches nothing. The next new event with the same arrival order does exactly the same thing. It's the version of a fix that makes a team feel finished and leaves the trap in place.
+
+## The better fix: cope with a topic that isn't there
+
+The consumer should treat a missing topic as normal, not exceptional. There are two parts to that.
+
+**Make sure the topic can exist.** Have the consumer, or the shared library it uses, create the topic on demand if it isn't there, with agreed settings. Then it no longer matters who arrives first.
+
+```csharp
+public async Task EnsureTopicAsync(string topic, CancellationToken ct)
+{
+    var metadata = _admin.GetMetadata(TimeSpan.FromSeconds(10));
+    if (metadata.Topics.Any(t => t.Topic == topic && t.Error.Code == ErrorCode.NoError))
+    {
+        return;
+    }
+
+    await _admin.CreateTopicsAsync(new[]
+    {
+        new TopicSpecification { Name = topic, NumPartitions = _defaults.Partitions, ReplicationFactor = _defaults.Replication }
+    });
+}
+```
+
+The defaults are the point. If each service creates topics with whatever its own configuration says, you'll have the same topic created with different partition counts depending on who got there first. Put the settings in one shared place.
+
+**Don't let one missing topic stall the rest.** A consumer subscribed to several topics shouldn't wait for all of them before processing any. One that's late shouldn't hold up the ones that are ready.
+
+## Broker defaults are a decision, not a given
+
+Brokers differ on whether they create a topic when someone merely subscribes to it. That default was chosen by whoever set up the cluster, and it may be different between your test environment and production.
+
+That's a reason to be explicit. Don't depend on a broker setting nobody on your team can quote. Either create the topics you need deliberately, in code or in your infrastructure scripts, or know exactly what your cluster does and write it down.
+
+The environment difference is the dangerous one. A feature that works every time in a development setup that creates topics freely, and fails in an environment that doesn't, will pass every test you've got.
+
+## Alert on "connected but doing nothing"
+
+Even with all of that in place, you want to know when a consumer has gone quiet. A health check that only asks "can you reach the broker?" can't tell you.
+
+What you want is a check on progress. How long since this consumer last processed a message? How far behind is it, compared with how much has been produced? A consumer for a busy topic that has handled nothing for ten minutes is telling you something, even though it hasn't thrown an exception.
+
+The watchdog from [Part 3](/blogs/messages-that-survive-part-3-retry-back-off-then-stop/) catches a worker that has stopped looping. This is the different case where the loop runs happily and the work never arrives. You need both.
+
+Be careful with the threshold. A quiet topic is allowed to be quiet. A rule that fires on every low-traffic night teaches people to ignore it, so tie the alert to expected volume where you can.
+
+## Where it falls over
+
+Creating topics on demand is convenient and has a cost. A typo in a topic name now creates a new, empty topic instead of failing loudly, and the consumer happily listens to it forever. You've swapped a visible failure for a silent one.
+
+The progress check also needs tuning. Too tight and it cries wolf. Too loose and it misses the incident. I don't have a universal number, and I'd distrust anyone who says they do.
+
+And none of this helps if the producer never publishes. A consumer that copes perfectly with a late topic is no use against a producer that was never deployed. That needs its own check, usually in the release process.
+
+## The takeaway
+
+**Services don't start in the order you drew them, so a consumer must cope with a producer that hasn't arrived yet.** Make topic creation safe to do from either side, don't let one missing topic stall everything else, and alert on a consumer that's connected but processing nothing.
+
+Next time you add an event, deploy the consumer first in a test environment on purpose. If it sits there quietly, you've found the problem before a customer does.
+
+Coming next in Messages That Survive: the back-off setting nobody used.

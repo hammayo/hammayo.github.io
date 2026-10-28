@@ -3,7 +3,9 @@ import { existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { format } from 'date-fns';
 import { accentTag } from '@/design/variants';
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { slugify } from './series';
 import { HeroFallbackBackground } from './hero-fallback-background';
 import type { PostMeta } from './schema';
 
@@ -30,6 +32,16 @@ function getHeroPath(slug: string): string | null {
   return null;
 }
 
+function SeriesLink({ post, className }: Readonly<{ post: PostMeta; className: string }>) {
+  if (!post.series) return null;
+  const { name, part } = post.series;
+  return (
+    <Link href={`/series/${slugify(name)}`} className={cn('inline-block text-sm font-medium hover:underline underline-offset-2 mt-2', className)}>
+      {`Part ${part} of ${name} →`}
+    </Link>
+  );
+}
+
 export function PostHeader({ post }: PostHeaderProps) {
   const heroPath = getHeroPath(post.slug);
 
@@ -54,6 +66,7 @@ export function PostHeader({ post }: PostHeaderProps) {
             <span>·</span>
             <span>{post.readingTime} min read</span>
           </div>
+          <SeriesLink post={post} className="text-white/80 hover:text-white" />
         </div>
       </div>
     );
@@ -79,6 +92,7 @@ export function PostHeader({ post }: PostHeaderProps) {
           <span>·</span>
           <span>{post.readingTime} min read</span>
         </div>
+        <SeriesLink post={post} className="text-[var(--scheme-accent-text)]" />
       </div>
     </div>
   );

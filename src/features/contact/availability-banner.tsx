@@ -24,12 +24,13 @@ export function AvailabilityBanner({ availability }: AvailabilityBannerProps) {
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 text-sm">
         <div>
-          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-0.5">Clearance</p>
-          <p className="text-foreground/80">{availability.clearance}</p>
-        </div>
-        <div>
           <p className="text-xs uppercase tracking-widest text-muted-foreground mb-0.5">Location</p>
           <p className="text-foreground/80">{availability.location}</p>
+          <p className="text-foreground/80 whitespace-nowrap">{availability.workMode}</p>
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-0.5">Clearance</p>
+          <p className="text-foreground/80">{availability.clearance}</p>
         </div>
       </div>
     </div>

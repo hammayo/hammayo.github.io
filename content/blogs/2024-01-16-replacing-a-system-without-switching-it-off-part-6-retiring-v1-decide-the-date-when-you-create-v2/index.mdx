@@ -1,0 +1,113 @@
+---
+title: "Replacing a System Without Switching It Off, Part 6: Retiring v1, Decide the Date When You Create v2"
+date: "2024-01-16"
+summary: "Old API versions live for ever unless their end is planned from the start. Find out who still calls v1, pick a date once traffic drops, chase the stragglers and finally delete the code, using the mobile app API from Part 2 as the example."
+tags: ["dotnet", "api-design", "versioning", "operations"]
+series:
+  name: "Replacing a System Without Switching It Off"
+  part: 6
+published: true
+---
+
+Back in [Part 2](/blogs/replacing-a-system-without-switching-it-off-part-2-version-one-endpoint-not-the-whole-api/), a mobile app's address endpoint got a second version, running next to the first. The new app used the new one. Phones that hadn't updated carried on with the old one, and everyone was fine.
+
+That was a while ago. Ask now whether anything still calls the old version, and the honest answer in many teams is "probably, I'm not sure". Nobody switched it off because nobody was sure it was safe to. So it stays, and so does the code that supports it, and so does the cost.
+
+This part is about the other end of versioning: **retiring an old API version**. The rule I'd offer is to decide the date when you create the new one.
+
+## Why old versions stay
+
+Old versions survive for human reasons, not technical ones.
+
+Removing something feels risky, and keeping it feels free. The risk of switching it off is concentrated and visible: if a caller breaks, someone will notice, and it will be your change. The cost of keeping it is spread thin and invisible: a little more code, a little more testing, a little more to explain.
+
+Nobody owns the decision either. The team that created v2 moved on to the next thing. The clients are other people's. Unless somebody has made it their job, the default is that nothing happens.
+
+## The cost of leaving it
+
+A version that stays costs more than it appears to.
+
+**Code.** The old controller, its types, its mapping. Small for one endpoint, larger across many.
+
+**Tests.** Every behaviour of v1 has to be kept working, which means keeping its tests working, through every change to what's underneath.
+
+**Security.** An old endpoint is an old attack surface. It was written against the standards of its time and often has fewer checks than the newer one.
+
+**Confusion.** New developers find two ways of doing everything and wonder which matters.
+
+Together, that adds up to a steady tax that grows with each version left behind.
+
+## Know who calls it
+
+You can't retire what you can't measure. The first step is to find out who is still calling v1.
+
+Log the API version on every request, along with something that identifies the caller: the client ID, the app version, the integration name. Count calls by version and by caller over time.
+
+```csharp
+app.Use(async (context, next) =>
+{
+    var version = context.GetRequestedApiVersion()?.ToString() ?? "unversioned";
+    var client = context.Request.Headers["X-Client-Id"].FirstOrDefault() ?? "unknown";
+
+    _metrics.RequestsByVersion.WithLabels(version, client).Inc();
+    await next();
+});
+```
+
+That gives you a picture you can act on: a graph showing v1's traffic falling, and a list of who is left. Without it, every decision is a guess.
+
+## Pick a date once traffic drops
+
+Retirement has a natural moment. As clients move to v2, v1's traffic falls. At some point it's small enough to be a list of names, not a crowd.
+
+That's the time to choose a date. Announce it to the callers you can see, in writing, with enough notice for them to act. State what will happen on the day: v1 requests will be refused, with a clear error that points to v2.
+
+How much notice depends on who the callers are. For an internal tool, a few weeks. For a mobile app, which depends on people updating from an app store, much longer, and you may want a minimum supported app version that lets you refuse the oldest builds.
+
+If the date was set when v2 was created, even loosely, this step is easier. People have been told for months, so the announcement is a reminder, not news.
+
+## Chase the stragglers
+
+There will be callers who don't move. Some haven't seen the notice. Some have seen it and deferred it. Some are systems nobody remembers owning.
+
+Work through the list. Contact each directly. Find out what is blocking them. Offer help, where it's cheap to give. For the unknown ones, their identifiers in the logs are a start: an IP, a user agent, a client ID that matches a team.
+
+Treat it as a project with an owner and a list, not an afterthought. Decide in advance who is responsible for the stragglers and what you will do about those who remain on the day.
+
+## Turn it off, then delete it
+
+On the date, turn v1 off. Don't delete it yet. Return a clear error, such as a `410 Gone` with a message pointing to the replacement, and watch.
+
+```csharp
+[ApiVersion("1.0", Deprecated = true)]
+[HttpGet("{customerId}")]
+public IActionResult GetV1(Guid customerId) =>
+    StatusCode(StatusCodes.Status410Gone,
+        new ProblemDetails { Title = "This API version has been retired", Detail = "Use version 2.0 of this endpoint." });
+```
+
+A short period with the endpoint refusing, rather than vanishing, makes it easy to put back if something important turns up, and gives anyone who missed the notice a message that explains what happened.
+
+When the period passes without trouble, delete the code, the tests, the mapping and the documentation. Deleting it is the point of the exercise. A retired version that is left in the codebase is not retired, it is hidden.
+
+## Mark deprecation as you go
+
+The signals should begin well before the date. Mark v1 as deprecated in the API description from the moment v2 exists. Add a response header on v1 calls that says it's deprecated and when it ends.
+
+Callers who read the headers get warning for free. Those who don't, at least have no excuse when the date arrives, and your logs show who was told.
+
+## Where it falls over
+
+Some callers cannot be moved. A device in the field that can't be updated, a partner with a long release cycle, a contract that requires a version to be supported for years. You may have to keep v1, and the honest response is to make that explicit, with an owner and a review date, not to let it drift.
+
+Fixed dates also meet reality. If an important client misses the deadline, moving the date is sometimes right. Do it deliberately, and once, with a new date, rather than letting every date become soft.
+
+And the traffic numbers may mislead. A small amount of v1 traffic might be a critical process that runs once a month. Look at the callers, not just the volume.
+
+## The takeaway
+
+**Old API versions live for ever unless their end is planned from the start.** Log which clients call which version, set a date when v2 is created, announce it as traffic drops, chase the stragglers, switch the old version off and then delete it.
+
+Look at the oldest API version in your system and ask three questions: who still calls it, who owns the decision, and what date would you put on it. If you can't answer, that's the work.
+
+Coming next in Replacing a System Without Switching It Off: the async side was fine, and where our microservices actually broke.

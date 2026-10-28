@@ -5,20 +5,20 @@ export function StructuredData() {
     '@type': 'Person',
     '@id': `${SITE_URL}/#person`,
     name: 'Hammayo Babar',
-    jobTitle: 'Backend Software Engineer',
+    jobTitle: 'Senior Software Engineer',
     description: SITE.description,
     url: SITE_URL,
     address: {
       '@type': 'PostalAddress',
-      addressLocality: 'Sutton',
-      addressRegion: 'London',
+      addressLocality: 'Basingstoke',
+      addressRegion: 'Hampshire',
       addressCountry: 'GB',
     },
     sameAs: [SOCIAL.github, SOCIAL.linkedin],
     knowsAbout: [
       'C#', '.NET', 'Azure', 'Docker', 'microservices',
       'HMPPS', 'MoJ', 'finance', 'justice', 'CI/CD',
-      'backend engineering', 'payment systems',
+      'agentic engineering', 'Claude Code', 'payment systems',
     ],
   };
 

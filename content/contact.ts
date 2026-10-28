@@ -4,14 +4,15 @@
 export const contact = {
   availability: {
     roles: [
-      'Backend Engineering',
-      'DevOps',
-      'SQL Development',
-      'Technical Support',
+      'Senior Software Engineer',
+      'Agentic Engineering',
+      'C# / .NET',
+      'Legacy Modernisation',
     ],
     openTo: 'Permanent and contract roles',
     clearance: 'SC Cleared (previously held, eligible for renewal)',
-    location: 'Berkshire, Hampshire, Sutton, London — open to hybrid and remote',
+    location: 'Basingstoke, Hampshire · Berkshire · London',
+    workMode: 'Open to remote and hybrid roles',
   },
   copy: [
     "The fastest way to reach me is email. I read everything and reply within 24 hours on weekdays.",

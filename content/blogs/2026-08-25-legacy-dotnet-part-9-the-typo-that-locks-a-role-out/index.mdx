@@ -1,0 +1,189 @@
+---
+title: "Legacy .NET That Still Pays, Part 9: The Typo That Locks a Role Out"
+date: "2026-08-25"
+summary: "Role names as raw strings in attributes fail silently when misspelled. A controller gets locked to nobody, or opened to the wrong people, and the compiler says nothing. The fix is a move to constants, combined by concatenation instead of naming every combination, with a test per role to back it up."
+tags: ["dotnet", "security", "csharp", "aspnet"]
+series:
+  name: "Legacy .NET That Still Pays"
+  part: 9
+published: true
+---
+
+An attribute on a Web API controller said which roles could call it. One of the role names had a letter transposed.
+
+Nothing failed to compile. Nothing threw at start-up. The controller simply stopped accepting a role that should have been allowed, and the first anyone knew was a user getting refused for something they had always been able to do.
+
+This is Part 9, the last of this run of **Legacy .NET That Still Pays**, following [Part 8](/blogs/legacy-dotnet-part-8-the-exception-that-became-an-empty-list/). It's about a small, boring change that closes a whole class of mistakes: **role names as constants, not strings**.
+
+## How the typo hides
+
+The standard way to restrict a controller in ASP.NET Web API is an attribute that lists the roles allowed:
+
+```csharp
+[Authorize(Roles = "Admin,Swagger,SiteStaff")]
+public class FuelPricesController : ApiController
+{
+    // ...
+}
+```
+
+The roles are one comma-separated string. The framework compares the caller's role with each name at run time. A name that matches nothing isn't an error. It's just a name that nobody has.
+
+So "SiteStaf" with a missing letter gives a controller that allows Admin and Swagger and silently refuses the third role. Or, in the other direction, a name that accidentally matches a different role opens the controller to people who shouldn't be there.
+
+Both failures are quiet. The first shows up as a complaint. The second may not show up at all.
+
+## Why it gets worse over time
+
+One misspelling in one attribute is a single mistake. But the role names appeared as raw strings on many controllers, and each attribute was typed or copied by hand.
+
+Copying is how a typo becomes several. A string that's wrong in one place gets pasted into the next controller, and now there are three. When a role is renamed, every raw string has to be found by text search, and a search for the old name misses the one with the typo.
+
+Raw strings also hide the set of roles. There's no single place to see what exists, so a new person guesses.
+
+## The fix: constants
+
+Put the role names in one place, as constants.
+
+```csharp
+public static class Roles
+{
+    public const string Admin = "Admin";
+    public const string Swagger = "Swagger";
+    public const string SiteStaff = "SiteStaff";
+}
+```
+
+Then the attribute uses them.
+
+```csharp
+[Authorize(Roles = Roles.Admin + "," + Roles.Swagger + "," + Roles.SiteStaff)]
+public class FuelPricesController : ApiController
+```
+
+A misspelled constant doesn't compile. Renaming a role is one edit, and the compiler finds every use. The list of roles is the list of constants.
+
+The attribute argument has to be a compile-time constant, which is why concatenation of constants works and a method call doesn't.
+
+## Why I didn't name every combination
+
+The next temptation is to go further. Several controllers use the same combination of roles, so why not define a constant for the combination?
+
+I didn't, for most of them. A named constant for every combination turns a short list of roles into a long list of names, each of which has to be understood and kept in step. Most combinations were used once or twice, and a constant that is used once adds an indirection and no safety.
+
+Concatenation of the base constants is explicit. You read the attribute and see exactly which roles it allows. A combination constant makes you go and look.
+
+The rule I used was to name a combination only if it is used widely and has a meaning of its own. Otherwise, spell it out from the pieces.
+
+## The test that backs it up
+
+Constants stop typos. They don't stop a wrong decision, such as listing the wrong role on a controller.
+
+So I added a test per role. For each role, the test calls a representative set of endpoints as that role and asserts what must be allowed and what must be refused. It uses the real attributes, through the real pipeline.
+
+That is slower to write than the constants, and it is the part that proves the permissions matrix is what you think it is. If someone moves a role in an attribute, a test fails and says which role and which endpoint.
+
+## Why attributes only take constants
+
+It's worth knowing why this works the way it does, because it explains the limits.
+
+An attribute's arguments are baked into the compiled assembly as metadata. The compiler has to be able to work out their values when it builds, so it accepts literals and `const` values, and concatenations of them, but not anything computed at run time.
+
+That's why `Roles.Admin + "," + Roles.Swagger` is fine, and a method that builds the string isn't. It also explains why a `static readonly` field fails: it looks like a constant, but it's assigned when the type is first used, not when the code compiles.
+
+The practical rule is to declare the role names with `const`. If the compiler accepts it in an attribute, you've done it right.
+
+## Migrating safely
+
+The change touches many controllers, and I did it in a way that kept it reviewable and safe.
+
+First, an audit. I listed every role string used in an attribute, and compared the list with the set of roles that actually exist. Any string that matched nothing would be either a typo or dead, and finding one would be a result in itself.
+
+Second, the constants. A single static class, with one constant per role, and nothing else in it.
+
+Third, a mechanical replacement, controller by controller, with the exact roles preserved. The behaviour of every endpoint was meant to be identical before and after, and the point of the change was that it should be unremarkable.
+
+Finally, the tests. A test per role pins each controller's behaviour, and the same tests have to pass before and after the move. If they don't, something changed that shouldn't have.
+
+## Class-level, with opt-ins
+
+There's a related pattern I used for controllers where the roles differ by action, and it fits well with constants.
+
+For a controller where most actions should be admin-only, but a few read actions are fine for a restricted role, I set the roles on the class and override them on the individual actions that are allowed more.
+
+```csharp
+[Authorize(Roles = Roles.Admin + "," + Roles.Swagger)]
+public class DevicesController : ApiController
+{
+    [HttpGet]
+    [Authorize(Roles = Roles.Admin + "," + Roles.Swagger + "," + Roles.SiteStaff)]
+    public IHttpActionResult GetStatus() { /* ... */ }
+
+    [HttpPost]
+    public IHttpActionResult Close(int id) { /* admin only, by inheritance */ }
+}
+```
+
+That's deny by default. If someone adds a new write action next year, it inherits the class's restriction without anyone having to remember. Only the read actions that were deliberately opened carry the wider list.
+
+The constants make this readable. You can see at a glance which roles are on the class and which on the exceptions.
+
+## A test per role
+
+The tests I mentioned are the part that keeps the whole thing honest, so here is what one looks like.
+
+```csharp
+[Theory]
+[InlineData(Roles.Admin, "/api/devices", 200)]
+[InlineData(Roles.SiteStaff, "/api/devices", 200)]
+[InlineData(Roles.SiteStaff, "/api/devices/close", 401)]
+[InlineData(Roles.Swagger, "/api/devices/close", 200)]
+public async Task Role_gets_the_expected_answer(string role, string path, int expected)
+{
+    var response = await Client.As(role).SendAsync(path);
+
+    Assert.Equal(expected, (int)response.StatusCode);
+}
+```
+
+A table of role, endpoint and expected status. It's quick to read, and a change to a controller's roles shows up as a failing row with the role and path in the name. This is also the table that tells you the constants are being used correctly: a typo would fail to compile, and a wrong role would fail a row.
+
+## Roles that arrive from outside
+
+Constants protect the code you write. They can't protect values that arrive at run time.
+
+If a role comes from a configuration file, a database or a token, it's a string until something checks it. A misspelling there is not a compile error. It's a user who is refused, or worse, a user who matches nothing and falls through to a default.
+
+The defence is to validate on the way in. When roles are loaded, compare each against the set of known role constants, and refuse to start, or at least log loudly, if one is unknown. It's the same fail-fast idea as for any other configuration: a typo in a role name should stop the service at start-up, not surface as a puzzled user.
+
+## Should this be a policy instead?
+
+Attribute-based roles are the simple tool, and they have limits. Once the rules depend on more than a role name, such as a claim, a resource or a condition, a policy is the better fit.
+
+For this service, the rules were role-based and the roles were few. Constants in attributes were proportionate, and a move to policies would have been a change of architecture for no gain.
+
+If the rules grow, I'd move to policies and keep the constants as the names of the roles they refer to. The idea that a typo should fail at compile time carries over unchanged.
+
+## A five-minute audit you can run today
+
+You don't need to take on the whole change to see how exposed you are.
+
+Search the solution for authorisation attributes that take a roles string. Count how many distinct strings there are, and compare them with the roles you think exist. Any string that appears once is suspicious. Any that differs by a character from a common one is a probable typo.
+
+That alone, before any refactoring, often turns up something. And it gives you a number to take to whoever decides how much time the cleanup is worth.
+
+## Where it falls over
+
+Constants fix typos in code. They do nothing about roles that arrive from outside, such as a name in a configuration file or a database, which can still be wrong at run time.
+
+The compile-time constant requirement is limiting. If you need to build a role list dynamically, an attribute can't do it, and you'd move to a policy.
+
+And a test per role is a maintenance cost. When the matrix changes, the tests change with it. That is the point, but it's still work.
+
+## The position
+
+**Role names as raw strings in attributes fail silently when misspelled; constants let the compiler catch it.** Put the names in one place, build attribute lists by concatenating them, name a combination only when it earns one, and back it with a test per role.
+
+Search your controllers for a string in an authorise attribute. Each one is a typo waiting for a quiet afternoon.
+
+That's the end of this run of Legacy .NET That Still Pays. The rest of my writing is on [the blog](/blogs/).

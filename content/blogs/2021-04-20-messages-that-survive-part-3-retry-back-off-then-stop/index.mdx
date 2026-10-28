@@ -1,0 +1,108 @@
+---
+title: "Messages That Survive, Part 3: Retry, Back Off, Then Stop"
+date: "2021-04-20"
+summary: "Some messages will fail every time you process them. Retry them forever and one bad message becomes a permanent load. The retry policy we settled on, the exception that lets a handler say 'never', the watchdog that restarts a hung worker, and the part we still don't handle well."
+tags: ["dotnet", "kafka", "reliability", "error-handling"]
+series:
+  name: "Messages That Survive"
+  part: 3
+published: true
+---
+
+Picture a message that references a record that doesn't exist. The handler throws, the processor retries it, and it throws again. And again. Every few seconds, forever, the same message fails in the same way, filling the logs and holding a worker busy on something that was never going to work.
+
+That's a poison message. Every event-driven system meets one eventually, usually on a busy day.
+
+[Part 1](/blogs/messages-that-survive-part-1-kafka-was-down-and-nobody-noticed/) made sure messages get sent. [Part 2](/blogs/messages-that-survive-part-2-every-message-arrives-twice/) made sure a repeat does no harm. This part is about the messages that fail, and the three answers we settled on: **retry with back-off, let handlers say "never", and stop**.
+
+## Two kinds of failure
+
+It helps to separate failures by whether time can fix them.
+
+Some will fix themselves. The database was briefly unavailable. A downstream service was restarting. A lock timed out. Try again in a bit and it'll probably work.
+
+Some never will. The payload refers to something that doesn't exist. A required field is missing. The message was produced by a buggy version of another service. You can retry it a thousand times and get the same answer.
+
+A good retry policy is kind to the first kind and quick to give up on the second.
+
+## The weak fix: retry immediately, forever
+
+The simplest policy is "if it fails, try again". It's also the most harmful. For a transient failure it hammers a struggling dependency at exactly the moment it needs room to recover. For a permanent failure it never ends. And in a processor that works through messages in order, one stuck message can hold up everything behind it.
+
+## The better fix: back off, then stop
+
+In our shared messaging library, a failed message gets three more attempts, spaced further apart each time: after 5 seconds, then 5 minutes, then 5 hours. After that, it's marked as terminated and left alone.
+
+```csharp
+private static readonly TimeSpan[] Backoff =
+{
+    TimeSpan.FromSeconds(5),
+    TimeSpan.FromMinutes(5),
+    TimeSpan.FromHours(5)
+};
+
+public async Task HandleFailureAsync(InboxMessage message, Exception ex, CancellationToken ct)
+{
+    if (ex is NonRetriableMessageException || message.Attempts >= Backoff.Length)
+    {
+        await _inbox.MarkTerminatedAsync(message.MessageId, ex.ToString(), ct);
+        return;
+    }
+
+    var nextAttempt = DateTime.UtcNow + Backoff[message.Attempts];
+    await _inbox.ScheduleRetryAsync(message.MessageId, message.Attempts + 1, nextAttempt, ex.Message, ct);
+}
+```
+
+The shape of those numbers is deliberate. Five seconds covers a blip. Five minutes covers a service restart or a deploy. Five hours covers "someone's fixing it". Past that, a human needs to look.
+
+Scheduling the retry rather than sleeping means the worker moves straight on to the next message. One failure doesn't hold up the queue.
+
+## Letting a handler say "never"
+
+The back-off is right for failures we can't classify. But often the handler knows perfectly well that retrying is pointless. The record doesn't exist. The data is invalid.
+
+So the library has a specific exception for that. A handler throws it, and the message is terminated straight away, with no retries.
+
+```csharp
+var person = await _repository.FindAsync(message.PersonId, ct);
+if (person is null)
+{
+    throw new NonRetriableMessageException(
+        $"Person {message.PersonId} not found; message cannot be applied.");
+}
+```
+
+It sounds like a small thing. In practice it's what stops a known-bad message wasting three retries and five hours before anyone sees it. It also makes the handler's intent readable: this isn't a crash, it's a decision.
+
+The risk is using it too eagerly. "Not found" can be transient if messages arrive out of order and the record is about to be created. So we only use it where we're sure the answer won't change.
+
+## The failure that isn't a failure: a hung worker
+
+There's one more kind of failure that retries don't cover. The worker itself stops. No exception, no error, just a thread stuck on something and never coming back. The service looks healthy. It just isn't processing anything.
+
+Our fix was a heartbeat and a watchdog. Each worker raises a heartbeat as it goes round its loop. A watchdog looks at each worker about once a minute, and if one has missed its heartbeat deadline, the watchdog interrupts it and starts it again. There's a longer grace period at start-up, so a slow first run isn't mistaken for a hang.
+
+It's not glamorous, but it turned "the service silently stopped processing" from something a person discovered into something that fixed itself.
+
+## What "terminated" still doesn't solve
+
+Here's the honest part. A terminated message sits in the inbox table with its error, and we keep it for a week. That's good for investigating. It's not good for recovering.
+
+To replay one, someone has to find it, fix whatever was wrong, and resubmit it by hand. Usually that someone is a developer. And after a week, the evidence is gone.
+
+What I'd like is a dead-letter topic: terminated messages published somewhere with their error attached, plus a small tool that lets support see them and replay them once the cause is fixed. It's on the list. I'll come back to it later in this series once we've built it, or once I've admitted we haven't.
+
+## What it costs
+
+A retry schedule per message, which means a few more columns and an index on the next attempt time.
+
+Judgement about which failures are permanent. Get it wrong and you either waste retries or give up on something that would have worked.
+
+A watchdog that has to be right itself. A watchdog that restarts healthy workers is worse than none.
+
+## The takeaway
+
+**Retrying forever isn't resilience, it's a slow leak.** Back off so dependencies can recover, let handlers say "never" when they know, and stop after a sensible number of tries so a person can look.
+
+Coming next in Messages That Survive: version your events, don't edit them.

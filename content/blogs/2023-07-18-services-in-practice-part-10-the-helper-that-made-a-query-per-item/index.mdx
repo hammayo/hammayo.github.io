@@ -1,0 +1,135 @@
+---
+title: "Services in Practice, Part 10: The Helper That Made a Query per Item"
+date: "2023-07-18"
+summary: "An N+1 hides best inside a helper that looks cheap. A category page asked for translated product names one item at a time, and each call was a round trip. The fix is a batched query and a cache keyed by what callers actually ask for, with a weak spot in invalidating it."
+tags: ["dotnet", "performance", "caching", "redis"]
+series:
+  name: "Services in Practice"
+  part: 10
+published: true
+---
+
+A category page was slow. Not catastrophically, but enough that people noticed. The page listed products, and each product showed its name in the customer's language.
+
+The code that produced it was tidy. A small helper took a product and a language and returned the translated name. The page called it for each product in the list. Reading the code, nothing looked expensive.
+
+Looking at what the database actually received told a different story. The page was making one query per product, plus the one for the list itself. That's the classic **N+1 query problem**, and this part, the last of the series, is about how well it hides inside a helper that looks cheap. It follows [Part 9](/blogs/services-in-practice-part-9-a-saga-where-every-participant-answers/).
+
+## What the helper looked like
+
+The helper did something perfectly sensible in isolation:
+
+```csharp
+public async Task<string> GetNameAsync(int productId, string language, CancellationToken ct)
+{
+    return await _db.QuerySingleOrDefaultAsync<string>(
+        "SELECT Name FROM ProductTranslations WHERE ProductId = @productId AND Language = @language",
+        new { productId, language });
+}
+```
+
+One question, one answer. A reviewer reading it would find nothing wrong, and in a screen that shows a single product, there isn't.
+
+The problem appears at the call site, in a loop:
+
+```csharp
+foreach (var product in products)
+{
+    product.DisplayName = await _translations.GetNameAsync(product.Id, language, ct);
+}
+```
+
+A page with fifty products makes fifty round trips, one after another. Each is quick. Together, they aren't, and they get slower as the category grows.
+
+## Why it hides
+
+The cost is spread across a loop, and each iteration is cheap enough to pass unnoticed. No single line is slow, so a profiler's per-call view looks clean. The total only shows when you count the calls.
+
+It also hides in how code gets written. The helper was created for one product, then reused for a list because it was there. Reuse is usually good, and here it carried a shape that doesn't scale.
+
+And it looks fine in development, where the database is local and the test category has five products.
+
+## Find it by counting
+
+The way to find an N+1 is to count queries, not to time them. Log the number of database calls per request, and look for a count that rises with the size of the data.
+
+If the count for a page with ten items is twelve, and for fifty items is fifty-two, you have your answer. Anything proportional to the list is the pattern.
+
+Many data libraries can surface this in development. A simple counter that warns when a single request exceeds some number of queries is cheap to add and catches the next one early.
+
+## The fix: ask for many at once
+
+Replace the per-item question with one question about all the items.
+
+```csharp
+public async Task<IReadOnlyDictionary<int, string>> GetNamesAsync(
+    IReadOnlyCollection<int> productIds, string language, CancellationToken ct)
+{
+    var rows = await _db.QueryAsync<(int ProductId, string Name)>(
+        "SELECT ProductId, Name FROM ProductTranslations WHERE ProductId IN @productIds AND Language = @language",
+        new { productIds, language });
+
+    return rows.ToDictionary(r => r.ProductId, r => r.Name);
+}
+```
+
+The call site becomes a single lookup before the loop, and a dictionary read inside it.
+
+```csharp
+var names = await _translations.GetNamesAsync(products.Select(p => p.Id).ToArray(), language, ct);
+foreach (var product in products)
+{
+    product.DisplayName = names.GetValueOrDefault(product.Id, product.DefaultName);
+}
+```
+
+Two queries for the page, whatever its size. The loop no longer talks to the database.
+
+Keep the old single-item method if other callers need it, and have it call the batch version with a list of one. That way there is only one query to maintain.
+
+## Cache by the shape callers ask for
+
+A batched query is much better, and for data that rarely changes it can be better still. Translated names are an obvious candidate: they change when someone edits a translation, and are read constantly.
+
+The key question is what to cache by. Caching each name under a key of product and language helps, but the page still asks for fifty of them and has to look up fifty keys.
+
+Callers don't ask for one product at a time. They ask for the names of everything in a category. So cache by that shape: the set of translations for a parent, in one language, as one entry.
+
+```csharp
+var key = $"translations:category:{categoryId}:{language}";
+var names = await _cache.GetOrCreateAsync(key, () => LoadNamesForCategoryAsync(categoryId, language, ct));
+```
+
+One cache read serves the whole page. And because the cache is a shared Redis cache, not a per-instance one, every instance of the service benefits from a warm entry, and a change can be reflected for all of them at once.
+
+## Invalidation, and its weak spot
+
+The hard part of caching is knowing when to stop trusting it. Here the answer is straightforward: when a translation is saved, remove the entries it affects.
+
+```csharp
+public async Task SaveAsync(Translation translation, CancellationToken ct)
+{
+    await _db.SaveAsync(translation, ct);
+    await _cache.RemoveAsync($"translations:category:{translation.CategoryId}:{translation.Language}");
+}
+```
+
+That covers saves made through this code path. It doesn't cover everything.
+
+The weak spot is any change that bypasses it: a data fix applied directly to the database, an import that writes in bulk, a different service that edits the same table. The cache won't know, and will serve the old names until the entry expires.
+
+Give entries a sensible expiry so staleness is bounded, and be honest about which write paths clear the cache. If something outside the code can change the data, the expiry is your safety net.
+
+## Where it falls over
+
+A batch query can be too big. Passing thousands of identifiers in one statement can hit parameter limits or produce slow plans, and large lists may need splitting into chunks.
+
+Caching by parent assumes callers ask by parent. A new screen that asks by some other grouping gets no benefit, and you may find yourself caching three shapes of the same data, which multiplies invalidation.
+
+And a cache can hide a slow query as well as fix it. If the first request after an expiry still takes seconds, some users will always pay that cost. Fix the query first, and add the cache second.
+
+## The takeaway
+
+**An N+1 hides best inside a helper that looks cheap.** Count the queries per request, replace per-item lookups with one batched query, cache by the shape callers actually ask for, and be clear about which writes clear the cache.
+
+That closes this series. Between the ten parts: when to ask and when to announce, who owns the data, how to protect calls, what a probe should check, how to bridge to others, how to follow a message across systems, which assumptions block scaling, who owns a flow, why every participant answers, and why a cheap-looking helper isn't. The earlier posts are on [the blog](/blogs/) if you're catching up.

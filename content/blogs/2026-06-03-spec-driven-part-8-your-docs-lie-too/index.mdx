@@ -1,0 +1,132 @@
+---
+title: "Spec-Driven, Part 8: Your Docs Lie Too, Including the Ones Your Assistant Wrote"
+date: "2026-06-03"
+summary: "I audited our engineering docs against the code and made 13 corrections. Some of the wrong facts were ones an assistant had helped write, and every one of them was a fact an assistant would read next session and treat as true."
+tags: ["ai", "productivity", "architecture", "tooling"]
+series:
+  name: "Spec-Driven"
+  part: 8
+published: true
+---
+
+I audited our own engineering docs against the code in May and made 13 corrections across seven files. None of them was dramatic on its own.
+
+A test library listed as installed that had never been installed. A target framework missing from every page that mentioned target frameworks. A validator described in careful detail, where every single detail was wrong.
+
+Some of those wrong facts were ones an assistant had helped write. That's the part that made me take **documentation drift** seriously, because the same docs are the ones my assistant reads at the start of every session, and it treats them as true.
+
+This post is about that loop: docs that drift, assistants that read them, and assistants that write the next round. I'll show the kinds of drift I found, the weak habit that lets it through, the rule I put into the assistant's own instructions, and an honest section on why an audit on its own doesn't fix it.
+
+Part 7 was about a spec falling behind the code during a loop. This one is about the docs that were already behind before anyone started.
+
+## The kinds of drift I found
+
+The audit was a full cross-check of our docs folder against the codebase, including the shared library we build on. The method was dull on purpose. Every concrete claim got checked against the thing it described: frameworks against the project files, libraries against the package references, line numbers against the file, behaviour against the method itself.
+
+Anything that needed a code change rather than a doc change got logged as an open item instead of being fixed in a doc-only pass. I'm going to describe the drift by kind rather than by page, because the kinds are what you'll have too.
+
+### Missing facts that were true everywhere
+
+Every doc that listed our target frameworks listed two of them. The project files target three. Nobody had lied; a framework had been added after the docs were written, and nothing connected the two.
+
+### Facts that had never been true
+
+Two docs listed a second assertion library alongside the one we use. No project referenced it, and no test anywhere called it. I don't know how it got there.
+
+I do know what an assistant does with it. It writes a test with it, and the compiler has to tell it off.
+
+### Numbers that drifted
+
+Every approximate line number in one section of one guide had moved, some by a handful of lines and one by more than fifty. A line count quoted for one base class was a hundred-odd lines out. Line numbers in docs are a promise nobody keeps.
+
+### Descriptions that were confidently, completely wrong
+
+One config validator was documented with the library it used to parse, its behaviour on a blank value, the file it lived in and its signature. All four were wrong. The doc said blank values were accepted as "not yet configured"; the code rejects them.
+
+### Claims that generalised a special case
+
+One doc said any config key with a certain word in its name got validated automatically. The code actually had specific validators for two named keys, and a generic filter on a completely different kind of key.
+
+And a handful of missing categories in the config naming docs, present in live code and absent from the list. That's the least interesting kind and probably the most common.
+
+## Why assistant-written docs drift in a particular way
+
+Human-written docs usually drift by omission. Someone changes the code and doesn't update the page, so the page is out of date but was right once.
+
+Assistant-written docs can drift differently. An assistant writes fluent, specific, plausible prose from whatever it read at the time. If what it read was slightly wrong, or if it filled a gap with the most likely answer, the result doesn't look uncertain. It looks like documentation.
+
+The validator description is the pattern I'd watch for: specific about every detail, and wrong about every detail, in a voice that gives you no reason to doubt it.
+
+I didn't track which of the 13 corrections came from assistant-written text and which from human-written text, so I won't pretend to a split. What I can say is that both kinds were there, and the assistant-written ones read exactly as confidently as the right ones.
+
+## The loop that makes it worse
+
+Here's why this matters more with coding agents than without them. The docs aren't just for people any more. The same core docs load into the assistant's context, and the assistant treats a written rule as a fact about the codebase.
+
+So a wrong doc doesn't sit there waiting for a human to misread it. It gets read at the start of every session and acted on.
+
+Imagine the blank-value example. An assistant designing a "clear this setting" feature, reading that blank values are accepted, would build a flow that saves a blank and expects success. The validator would reject it, and you'd spend time debugging a feature that was designed against a doc instead of the code.
+
+The assertion library is the gentler version of the same thing. An assistant that believes the doc writes a test using a library that isn't there, and the build fails. That's annoying but safe, because the compiler is a second source of truth.
+
+The validator has no compiler to catch it. The wrong belief only shows up as behaviour, at runtime, in front of whoever tries to save a blank.
+
+That example is illustrative, not something that happened. But the mechanism is real, and it compounds. The assistant writes code from the doc, then helps write the next doc from the code and the old doc, and the error has two sources now instead of one.
+
+## The weak habit: it's written down, so it's true
+
+The weak habit is treating a doc as the source of truth because it's written down, and because it's in the repo, and because it looks careful. I've had that habit for most of my career, and it mostly worked, because docs were read by people who'd also read the code.
+
+With an assistant in the loop, the habit fails faster. The assistant doesn't have years of "that page is a bit old" in its head. It has the page.
+
+The code is the source of truth. The doc is a claim about the code, and on a long-lived codebase, a claim with an unknown age. **Treat every doc claim as a hypothesis until you've checked it against the code.**
+
+## The better habit, written into the assistant's instructions
+
+So I baked the check into the assistant's own instructions, in the skills that write and read our docs. Here's the gist, made generic:
+
+```markdown
+## Docs are claims, not facts
+
+- Before relying on a doc for a version, a library, a signature or a behaviour,
+  check it against the code.
+- If the doc and the code disagree, the code wins. Say so in your output,
+  and fix the doc in the same change.
+- Record evidence for any claim you write: where in the code you read it.
+```
+
+The last line matters for the next audit. A claim with a named source can be re-checked in a minute. A claim with no evidence has to be researched from scratch, which is how a doc audit turns into a project.
+
+The middle line matters for review. When the doc fix lands in the same change as the code that made it true, the reviewer sees both diffs side by side. They can check the claim against the code in the same sitting, instead of trusting that someone will update the page later. Later is how a target framework went missing from every page.
+
+I'd go one step further than I did at the time and avoid line numbers as evidence altogether. The stale line numbers were the easiest drift to find and the most pointless to maintain. A file and a member name survive most refactors; a line number survives until the next commit above it.
+
+The notes side of [the interview-first workflow](/blogs/spec-driven-part-4-interview-first-code-second/) follows the same rule. Each fact lives in exactly one document, with its evidence, because a fact written in three places gets written three slightly different ways, and one of them will be wrong.
+
+## Where the mirror check fits
+
+One more source of drift is worth naming, because it's specific to assistant setups. My assistant's live config lives in a folder git ignores, with a tracked copy kept for review. Two rule files drifted between the two, which I wrote about in Part 6.
+
+That's docs lying about the assistant, rather than about the code, and it's sneakier. The reviewed copy is the one colleagues read and copy from, so a drifted copy spreads a rule nobody is actually running.
+
+The fix there was a diff that runs at the end of any session that touches the config. It's the same principle as the audit, just small enough to run every time. The more of the audit I can turn into that kind of check, the less the next audit has to find.
+
+As always, none of this replaces review. Doc fixes go through the same PRs and human review as code, and the assistant stages the change for me to check rather than committing it.
+
+## Where it falls over
+
+**An audit is a snapshot.** On the day I finished, the docs were as right as I could make them. The next week, someone changed the code, and the drift started again. Without a check that runs on every change, the audit is a reset, not a fix.
+
+It wasn't even a clean reset. One stale mention of the assertion library that was never installed still survives in an index page. I found it after the audit was "complete", which tells you something about how complete a manual audit is.
+
+The "verify against the code" rule only helps when the assistant follows it, and it's an instruction, not a script. By my own rule from Part 6, some of it should be a script by now. A check that every framework, library and version mentioned in the docs actually appears in the project files is entirely mechanical, and I haven't written it.
+
+And I didn't track how much of the drift came from assistant-written text versus human-written text. I'd like to know. I don't, so I can't tell you assistants make docs worse, only that they don't make them immune.
+
+## Check the code before you trust the page
+
+My position: a doc is a claim about the code with an unknown age, and an assistant will treat it as a fact unless you tell it otherwise. That's true of the docs your assistant wrote, too, and they're the easiest ones to believe.
+
+Start small. Pick the one doc your assistant loads in every session and check its concrete claims against the code: frameworks, libraries, versions, anything with a number in it. Then add one line to the assistant's instructions telling it the code wins when the two disagree, and that it should fix the doc in the same change. Let those fixes go through the same PRs and human review as everything else.
+
+Next in the series is the one I got wrong: an AI-assisted log analysis that built a confident case around the loudest pattern in the logs, and the reviewer who rejected it. The earlier parts are on [the blog](/blogs/) if you're catching up.
