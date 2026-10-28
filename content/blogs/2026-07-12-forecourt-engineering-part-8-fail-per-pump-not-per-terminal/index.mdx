@@ -1,0 +1,126 @@
+---
+title: "Forecourt Engineering, Part 8: Fail per Pump, Not per Terminal"
+date: "2026-07-12"
+summary: "Choose the smallest failure domain you can, so one broken link takes out one pump, not a whole island. Here's how a card terminal at a fuel pump keeps one link per pump, what customers see when one fails, and why 'no link configured' and 'link down' are very different."
+tags: ["payments", "architecture", "reliability", "dotnet"]
+series:
+  name: "Forecourt Engineering"
+  part: 8
+published: true
+---
+
+Picture a car park with a row of ticket machines. Each one has its own connection to the payment provider. One day the connection to machine three drops. What should happen to machines two and four?
+
+If the answer is "nothing", you've chosen a small failure domain. If the answer is "they all stop", you've chosen a large one, and your customers will find out which.
+
+On a fuel forecourt the same choice exists, and it's the subject of this post. It follows [Part 7](/blogs/forecourt-engineering-part-7-the-simulator-was-too-polite/) in **Forecourt Engineering**. The lesson is to **fail per pump, not per terminal**.
+
+## One terminal, many pumps
+
+An outdoor payment terminal sits at the pumps and takes cards. A single terminal can serve several pumps, because it's a considerable piece of hardware and a forecourt may have a lot of pumps.
+
+The obvious way to connect that to the payment switch is one link per terminal. It's simple to set up and cheap to run. It's also a single point of failure for every pump behind it: lose the link, and every pump on that terminal can no longer take a card.
+
+## One link per pump
+
+The design I work with does something different. Each pump has its own link to the payment switch, with its own terminal ID. So a terminal holds several links, one for each pump it serves.
+
+I should be careful about what I'm claiming. This behaviour lives in the terminal software, not in the service I work on. I know it from reading the code that handles it and from site logs, and I'd rather say "the terminal does this" than "we built this".
+
+The consequence is the interesting part. When one pump's link fails, one pump is out of order. Its neighbour, on a different link, carries on selling.
+
+## What a customer sees
+
+Before a sale, if a pump's link can't sign in to the switch, the terminal switches the card reader off for that pump and shows an out-of-order screen. It tells the service, so the web UI shows the fault as well.
+
+The key property is that no card is ever taken that can't be authorised. A customer walks up to a pump that says it can't take cards, and not to a pump that takes their card and then fails to start. The failure happens before the customer has committed anything.
+
+Next door, the pump on a healthy link works as normal. A customer who can't use pump three drives to pump four and carries on.
+
+## Two kinds of "no link"
+
+There's a distinction here that's easy to miss and matters operationally.
+
+**No link configured.** A pump with no link at all is a pump that was never set up for card payments through this terminal. It stays usable for other kinds of payment, such as local-account fleet cards, because nothing is trying to use a link that doesn't exist.
+
+**A link configured and down.** The pump is supposed to take cards, and can't. That blocks it, because the system knows it ought to be able to authorise and can't.
+
+The two look similar from a distance, since in both cases a card payment doesn't work. But they mean opposite things. One is a deliberate configuration, and the other is a fault. If you treat them the same, you either block pumps that were never meant to take cards or let pumps through that should have been blocked.
+
+## How the failure domain shapes the experience
+
+A failure domain decides what the customer sees, what the site manager sees and what the support team has to work out.
+
+A small domain gives the customer a localised problem, with a clear alternative a few metres away. It gives the site a degraded forecourt rather than a closed one. And it gives support a precise question: which pump, which link, which terminal ID.
+
+A large domain turns the same cause into a bigger event. The root cause is identical, a dropped link, but the effect on a busy afternoon is a queue of cars and a site with nothing working.
+
+## What the terminal tells the service
+
+The terminal doesn't keep a link failure to itself. When it switches a pump's card reader off, it tells the service I work on, and the web interface shows the fault on that pump.
+
+That matters for the people running a site. A manager looking at the admin page sees which pump has a problem, not a vague "card payments are down". The information has the same granularity as the failure: one pump, one fault.
+
+It also means support can ask a precise question. "Pump six shows a link fault" is a different conversation from "cards aren't working". The first can be answered by looking at one link's configuration and logs. The second starts with finding out how many pumps are affected.
+
+## Configuration is where the links come from
+
+Each link needs its own terminal ID, and those IDs come from the payment switch's own configuration. Our service reads that configuration, things like each pump's terminal ID and the card and contactless settings, builds it into the terminal's configuration and pushes it out.
+
+One rule in that process is worth stating, because it comes from experience. The service only pushes configuration when what it fetched has actually changed.
+
+The reason is that applying new configuration makes the links sign out of the switch and back in. Push when nothing has changed, and you've created a burst of sign-ins for no reason. With one link per pump, a terminal serving several pumps signs in several times at once. One site showed me what six terminals signing back in together can do to the switch, and I'd rather not repeat it.
+
+There's a related design choice. If the configuration read fails, the service fails soft: the terminals keep their last good configuration. A failed read is not a reason to change anything.
+
+## The kiosk is the contrast
+
+It helps to compare this with the other way of paying. At a kiosk, the customer fuels first and pays in the shop. The terminal is only a bystander there: the pump is released to the till, the customer fuels and walks in, and the till takes payment with its own card reader.
+
+That reader still uses the same payment switch. So when the switch is down, kiosk cards fail too. But cash still works, and the site can keep selling fuel.
+
+That's a useful way to see what per-pump links buy. At the kiosk, the failure domain is the whole till and its connection. At the pump, it's one pump. The same switch outage takes down one and not the other, depending on how the links are drawn.
+
+## Reading the failure from the logs
+
+When something goes wrong at a site, the terminal logs are where I start, and the per-pump design makes them easier to read.
+
+Each link has its own identity, so a line about a sign-in failure names the link. I can filter to one pump's terminal ID and see its whole story: when it last signed in, when it dropped, how many times it has tried to reconnect. With a single link per terminal, that story would be mixed with every other pump's.
+
+It's a small thing, and it's one of the quiet benefits of a small failure domain. The smaller the unit that can fail, the more precisely the evidence points at it.
+
+## Questions to ask about your own failure domains
+
+The idea travels well beyond fuel pumps, so here are the questions I'd put to any system.
+
+- **What is the smallest unit that can fail independently?** If it's the whole service, that's a large domain. If it's one tenant, one device, one queue, that's a small one.
+- **What does a user see when it does?** The best answer is a clear, localised message and a nearby alternative. The worst is a vague error everywhere.
+- **Does the failure appear before the user has committed anything?** Failing before a payment is taken is very different from failing after.
+- **Is "never set up" distinguishable from "set up and broken"?** If the system treats them the same, you'll block things you shouldn't or let through things you shouldn't.
+- **What shared dependency defeats the whole design?** Every system has one. Know which it is, so you don't mistake isolation for immunity.
+
+Answering them honestly for your own system usually turns up one domain larger than it needs to be. That's a good place to start.
+
+## Why it's worth the extra setup
+
+The cost of this design is real, and I don't want to wave it away. A terminal with a link per pump needs more terminal IDs, more sign-ins and more configuration to keep correct. A mistake in one ID is a mistake in one pump.
+
+But the failure it prevents is the one nobody enjoys explaining: a whole forecourt unable to take cards because of one dropped connection. The extra setup is paid once, quietly, during installation. The benefit is paid every time a link drops, which in the real world happens more often than anyone would like.
+
+When a design costs a little on every install and saves a lot on every failure, I'm happy to take that trade.
+
+## Where it falls over
+
+More links means more to configure and more to go wrong. Each pump needs its own terminal ID, and each link needs to be signed in and kept alive. The setup is heavier, and a mistake in one ID is a mistake in one pump that might not be noticed until someone tries it.
+
+It also moves some of the cost to the switch. Many links at once means many sign-ins when configuration changes, and a burst of them can be a load of its own. The terminal avoids pushing configuration unless it has actually changed, for that reason.
+
+And a small failure domain doesn't help if the cause is shared. If the problem is upstream, at the switch or on the site's network, every link fails together. Per-pump links protect against a bad link, not against a bad switch.
+
+## The position
+
+**Choose the smallest failure domain you can, so one broken link takes out one pump, not an island.** Give each unit its own link and identity, make sure a failure shows before the customer has committed anything, and keep "never configured" separate from "configured and broken".
+
+Look at your own system and ask what the smallest thing is that a single failed connection can take down. If it's bigger than you'd choose, that's a design decision you can revisit.
+
+The rest of my writing is on [the blog](/blogs/).

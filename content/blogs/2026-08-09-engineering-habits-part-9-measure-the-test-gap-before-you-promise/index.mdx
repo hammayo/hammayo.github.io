@@ -1,0 +1,142 @@
+---
+title: "Engineering Habits, Part 9: Measure the Test Gap Before You Promise"
+date: "2026-08-09"
+summary: "'Bring the tests into line' can be a tidy-up or a project, and you only know which after you count. Here's a follow-up ticket that read like a tidy-up, what I found when I looked, how I split it into two pull requests, and the linked 'outstanding points' that turned out to be about something else."
+tags: ["testing", "estimation", "dotnet", "productivity"]
+series:
+  name: "Engineering Habits"
+  part: 9
+published: true
+---
+
+The ticket said: bring every controller's tests into line with the new ones. It read like a tidy-up. A few renames, a bit of consistency, an afternoon.
+
+Before I said so out loud, I counted. The service had 21 controllers, and only 9 of them had a test file at all. That isn't a tidy-up. It's two jobs.
+
+This is Part 9 of **Engineering Habits**, following [Part 8](/blogs/engineering-habits-part-8-401-or-403-say-which-problem-it-is/). The habit is simple: **measure the gap before you promise anything about it**.
+
+## Why the ticket looked small
+
+The ticket came from a real change. I had moved a set of endpoints onto one async pattern, and written tests for the first batch to show how the pattern should be tested. The follow-up asked for the rest to match.
+
+"Match the new tests" sounds like alignment. It implies the other tests exist and differ slightly. That's an assumption, and the whole estimate hung on it.
+
+I'd learned to be suspicious of tickets whose first verb is "align". Alignment presupposes there's something to align.
+
+## What I found
+
+I audited the controllers before changing anything.
+
+Nine had a test file, and one of those was for the shared base controller, which isn't an endpoint at all. So fewer than half the controllers had any test of their own, and the rest had none.
+
+It split cleanly into two pieces of work. Aligning the existing test files with the new pattern was small and mechanical. Writing tests for controllers that had none was large, and each suite needed understanding of what that controller actually did.
+
+I also checked something that would have bitten later: whether the new pattern even applied. The tests I was copying fit controllers that use the shared async helper. Where a controller doesn't, forcing the same shape would give a test that looked consistent and didn't test the real behaviour. For those, the honest plan is a suite that matches the controller's real shape.
+
+## Splitting the work
+
+I proposed two pull requests on one branch.
+
+The first aligned the existing tests and set the conventions. It was small enough to review properly. The second added the missing suites, which was much bigger.
+
+Putting them on one branch kept the conventions from the first in the second. Splitting them meant the reviewer could approve the pattern before the volume arrived, and the first review wouldn't be buried under the second's size.
+
+## Saying it plainly
+
+The most useful thing I did was tell the person who raised the ticket what I'd found, in a sentence: this isn't a tidy-up, it's two pieces of work, and the second is a project.
+
+That's an uncomfortable thing to say about a ticket that looked small. It is much better said at the start than discovered in the second week.
+
+A test-only job also tends to be undervalued. Nothing visible changes, so it's easy to treat it as a small task. But writing a good suite for a controller you didn't write takes real reading, and doing it for a dozen is not an afternoon.
+
+## The links that weren't about this
+
+The ticket also linked two earlier pull requests as "outstanding points" to address. I pulled them up.
+
+They were about something else entirely: a role-based access rollout. The real source of the request was a couple of review comments on an unrelated test file, asking for an authorisation test to become generic and data-driven. That's a reflection-based check on access rules, not an endpoint test.
+
+I wrote that down as a deferred item with the reason, and didn't let it quietly widen the scope. Linked items in a ticket are claims about relevance, and they're worth checking before you take them on.
+
+## How I audited
+
+The audit itself was dull and quick, which is a good sign for something that changes an estimate.
+
+I listed every controller in the service: 21 of them. For each, I checked whether a test file existed for it, and whether that file tested endpoints or something else. One file turned out to be for the shared base controller, which is infrastructure and not an endpoint.
+
+Then I looked at the base class each untested controller used. The tests I was meant to copy fit controllers that run their actions through a particular shared helper, because the tests assert on the result type that helper produces. A controller built differently needs a different kind of test. So I marked each controller as "copy the pattern", "needs its own shape" or "unclear".
+
+That third column is the honest one. For a few controllers I couldn't tell how to test them without reading them properly, and I said so.
+
+The whole audit fits in a table, and the table is what I put in front of the person who owned the ticket.
+
+## What the message looked like
+
+I didn't send a long explanation. I sent a short note, roughly:
+
+> I counted before starting. 21 controllers, 9 test files, one of which is for the base class. So this is two jobs: aligning the existing tests (small), and writing suites for the controllers that have none (large). I'd like to do the first as one PR and the second as another, on the same branch, so the first can be reviewed on its own. Some of the untested controllers don't fit the pattern I'm meant to copy, so those need their own approach.
+
+Four sentences, a number, a proposal. The reply was a decision, not a negotiation, because the facts were already on the table.
+
+## Estimating a test-only job
+
+Test work is easy to under-estimate, for a few specific reasons.
+
+You can't write a good test for code you don't understand, so every suite begins with reading the controller. That reading is most of the cost, and it doesn't produce a visible artefact.
+
+The first few tests in a suite are slow, because you're setting up fixtures, deciding on names and finding out what the controller depends on. The later ones are quicker. An estimate that assumes the quick rate for all of them is too low.
+
+And finding a real bug while writing a test is common. The honest response is to note it, and not quietly fix it inside a test-only change. That's another reason to keep the work separate from any behaviour change.
+
+When I estimate, I think in controllers, not tests, and I allow time for reading each one. It's not precise, but it's closer than counting endpoints.
+
+## Why two pull requests help the reviewer
+
+Splitting one large job into two reviews isn't only about size. It changes what each review is about.
+
+The first review is about conventions. How are the tests laid out? What do they assert? How are failures expressed? Once that's agreed, it's agreed, and the reviewer isn't relitigating it across thirteen new files.
+
+The second review is about coverage. Does each suite test the controller's real behaviour? Because the conventions are already settled, the reviewer can spend their attention there.
+
+If both were in one pull request, every comment about style would compete with every comment about substance, and the substance would be harder to see.
+
+## Defining done for a suite
+
+The thing I would agree before starting the large half is what a finished suite is.
+
+Without that, every controller becomes a negotiation. One person writes a single happy-path test and calls it done. Another writes thirty. The reviewer ends up applying a standard nobody wrote down.
+
+My working definition was short. Each endpoint has at least one test for the success case. Each guard or validation has a test for the failure it catches. Each role the controller accepts has a test that it can call it, and at least one role that must be refused has a test that it can't. And the test names say what behaviour they check.
+
+That isn't exhaustive, and it doesn't need to be. It is a floor, applied the same way to every controller, so that "tested" means the same thing everywhere. It also gives the reviewer something to check a suite against, and gives me something to stop at.
+
+## What I'd do differently
+
+Looking back, the one thing I would change is when I had the scope conversation. I counted before I started, which was right, but I counted after I'd already agreed to the ticket in principle.
+
+Next time I'd count first, when the ticket is still just a title. The number changes what the first reply should be, and it is far easier to say "this is bigger than it looks" before you've said "yes".
+
+I'd also write the definition of done into the ticket, not only into the pull request. That way the person who raised it can see what they're getting, and can say "that's more than we need" before it's built.
+
+## The cost of not counting
+
+It's worth saying what would have happened if I hadn't.
+
+I'd have agreed to a tidy-up, started on the first few files and found, a day in, that most controllers had no tests to align. The honest report then would have been "this is bigger than I said", delivered after I'd committed to a date. That conversation is always worse than the one at the start, because by then the other person has planned around your estimate.
+
+Counting took ten minutes. It turned a promise I couldn't keep into a plan I could.
+
+## Where it falls over
+
+Counting is only the first step, and it can mislead. Nine test files said nothing about how good they were. A file can exist and test almost nothing, so the real gap was probably larger than the count suggested.
+
+I also parked the second half. The branch got as far as the first phase before other work took priority, and as far as I know the larger part hasn't merged. Splitting the work was the right plan, and a plan isn't a delivery.
+
+And saying "it's a project" can be met with "then we won't do it". That is a legitimate answer. Better to hear it before the work than after.
+
+## The position
+
+**"Bring the tests into line" can be a tidy-up or a project, and you only know which after you count.** Audit before you estimate, split work that is really two jobs, say plainly when a test-only job isn't small, and check what linked tickets are actually about.
+
+Next time a ticket opens with "align" or "tidy", count first. The number often changes the conversation.
+
+The rest of my writing is on [the blog](/blogs/).

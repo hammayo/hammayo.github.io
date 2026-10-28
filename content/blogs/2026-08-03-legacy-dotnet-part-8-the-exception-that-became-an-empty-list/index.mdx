@@ -1,0 +1,199 @@
+---
+title: "Legacy .NET That Still Pays, Part 8: The Exception That Became an Empty List"
+date: "2026-08-03"
+summary: "Catching an exception and returning an empty list turns 'we couldn't find out' into 'there's nothing there', and the second one is much harder to debug. Here's how a null in a fetch became a quiet 'no data', and a small result type that says which it was."
+tags: ["dotnet", "error-handling", "csharp", "legacy"]
+series:
+  name: "Legacy .NET That Still Pays"
+  part: 8
+published: true
+---
+
+A repository method returned no customers. The caller showed an empty screen. Everything looked normal, because "no customers" is a perfectly reasonable thing for a screen to show.
+
+The database was down.
+
+That is the whole problem in one sentence. The method had caught the exception, logged it somewhere nobody was looking, and returned an empty list. It had turned "we couldn't find out" into "there's nothing there", and every caller took the second at its word.
+
+This is Part 8 of **Legacy .NET That Still Pays**, following [Part 7](/blogs/legacy-dotnet-part-7-your-singleton-is-shared-state/). It's about one pattern and one small fix.
+
+## How it starts
+
+It begins innocently. A fetch can fail, and the author doesn't want a failure to crash the caller. So the method catches, logs and returns something harmless.
+
+```csharp
+public IReadOnlyList<Customer> FetchCustomers()
+{
+    try
+    {
+        return _config.GetCustomers().ToList();
+    }
+    catch (Exception ex)
+    {
+        _log.Error(ex, "Exception fetching customers");
+        return new List<Customer>();
+    }
+}
+```
+
+It reads as defensive. In practice it removes a distinction the caller needs.
+
+## The null that started it
+
+In the case I looked at, the upstream call returned null when it couldn't reach its source. The next line called a method on that null result, which threw. The catch block logged the exception and returned the empty list.
+
+So the sequence was: the source is unreachable, then null, then an exception, then a log line, then an empty list. By the time the caller got anything, the failure had been laundered into a valid-looking answer.
+
+The log line existed. It said something like "exception fetching customers". It was one line among thousands, far from the symptom.
+
+## Every caller believes it
+
+A method that returns an empty list on failure doesn't just hide the failure once. It hides it from every caller, and each caller does something sensible with "nothing there".
+
+One screen shows an empty table. Another skips the work it would have done. A third decides, based on the count being zero, to create default entries. Each reaction is correct for an empty list, and wrong for a database outage.
+
+That last kind is the dangerous one. A zero count that triggers a behaviour turns a transient failure into a change of state.
+
+## Why it's hard to debug
+
+When the answer is wrong, you ask where the bad data came from. When the answer is "nothing", there's no bad data to follow. The symptom is an absence.
+
+You end up reading the code that consumes the list, looking for a reason it's empty, and the reason is somewhere upstream in a swallowed exception. The distance between cause and symptom is as long as the call chain.
+
+Compare that with a crash. A crash is annoying, and it points straight at the problem.
+
+## Return something that says which it was
+
+The fix isn't "never catch". Sometimes the right thing to do with a failure is to handle it. The fix is to stop collapsing two different outcomes into one value.
+
+A small result type does it.
+
+```csharp
+public readonly record struct FetchResult<T>(T? Value, bool Succeeded, string? Error)
+{
+    public static FetchResult<T> Ok(T value) => new(value, true, null);
+    public static FetchResult<T> Failed(string error) => new(default, false, error);
+}
+
+public FetchResult<IReadOnlyList<Customer>> FetchCustomers()
+{
+    try
+    {
+        var customers = _config.GetCustomers();
+        if (customers is null)
+            return FetchResult<IReadOnlyList<Customer>>.Failed("Customer source unavailable");
+
+        return FetchResult<IReadOnlyList<Customer>>.Ok(customers.ToList());
+    }
+    catch (Exception ex)
+    {
+        _log.Error(ex, "Exception fetching customers");
+        return FetchResult<IReadOnlyList<Customer>>.Failed(ex.Message);
+    }
+}
+```
+
+Now a caller has to decide. "Succeeded with zero customers" and "failed" are different values, and the compiler makes the caller look at which.
+
+It's not elaborate. It's the smallest change that keeps the difference alive.
+
+## Fixing it in a legacy codebase
+
+You can't change every signature at once. In an older codebase the method may have many callers, and changing a return type breaks all of them.
+
+I'd do it in steps. First, add the new method alongside the old one and move the callers that matter most, the ones that act on a zero count. Second, make the old method log loudly when it falls back to empty, so the swallowed failures are at least findable. Third, retire the old one as callers move.
+
+Start with callers where "empty" triggers a behaviour. Those are the ones where the confusion costs something.
+
+## Walking one failure through the stack
+
+It helps to follow a single failure from cause to symptom, because the distance between them is the whole point.
+
+The source of the data is unreachable. The call that fetches it doesn't throw. It returns null, because someone, years ago, decided null meant "couldn't get it". The next line, which builds a list of the results, calls a method on that null. That throws a null-reference exception.
+
+A catch block a few lines up logs the exception with a message that mentions the fetch, and returns an empty list. The caller receives a perfectly valid list with nothing in it. It renders an empty table, or skips its work, or decides there's nothing to do.
+
+From the first failure to the visible symptom there were four steps: unreachable, null, exception, empty. Only the first is the real problem. The other three are the system translating it into something that looks fine. By the time anyone sees the symptom, every clue except one log line has been erased.
+
+## Three ways to fix it
+
+There isn't only one cure, and they suit different codebases.
+
+**Let the exception propagate.** The simplest fix is to stop catching. The failure reaches the caller, which has to decide. It's honest and loud, and in an older codebase it can be a large change, because callers may never have been written to handle it.
+
+**Return a result type.** The approach I showed earlier. The method catches, but it reports the failure as a value. The caller must look at it, and can still choose to degrade gracefully.
+
+**A try-style method.** Following the framework's own convention, a method returns a boolean and hands back the data through an out parameter.
+
+```csharp
+public bool TryFetchCustomers(out IReadOnlyList<Customer> customers)
+{
+    customers = Array.Empty<Customer>();
+    try
+    {
+        var fetched = _config.GetCustomers();
+        if (fetched is null) return false;
+        customers = fetched.ToList();
+        return true;
+    }
+    catch (Exception ex)
+    {
+        _log.Error(ex, "Exception fetching customers");
+        return false;
+    }
+}
+```
+
+I lean towards the result type, because it carries a message and composes better. But the try-style is familiar to every .NET developer and needs no new type, which in a legacy codebase is a real advantage.
+
+## The order to migrate callers
+
+In a codebase with many callers, the order matters more than the style.
+
+Start with the callers that make a decision based on emptiness: anything that checks for a zero count and then creates, deletes or skips. Those are where a hidden failure becomes a change of state, and they're where the cost is highest.
+
+Next come the callers that display the result. An empty screen when the source is down should say so, with a message such as "couldn't load customers", rather than showing a blank table that looks like an answer.
+
+Last are the callers that just pass the list along. They're least likely to do harm, and they can wait.
+
+Along the way, the old method should log loudly whenever it falls back to empty. That doesn't fix anything, but it makes the swallowed failures visible while the migration runs.
+
+## What to log
+
+A failure that has to be reported deserves a better log line than "exception fetching customers".
+
+It should say what was being fetched, from where, with what identifier, and what the caller will do as a result. If the method returns a failed result, the log can say that the caller was told. It should include the exception once, with its stack, and not repeat it at every layer.
+
+And it should be findable. A consistent phrase, a stable event name, something an alert or a search can match. The log line that explains a problem is useless if nobody can find it among the thousands around it.
+
+## What "loud" means for a fallback
+
+I said the old method should log loudly while it falls back, and it's worth being specific.
+
+A message at warning level, with the same wording each time, so it can be searched for. The name of the method and the identifier of what was being fetched. The exception, once. And a counter, if you have metrics, so that you can see the rate of fallbacks over time.
+
+The counter is the most useful of those. A fallback that happens once a month is a blip. One that happens several times an hour is a dependency in trouble, and you'd like to know before a user tells you.
+
+It also gives you a way to know when the migration is finished. When the counter stops moving because the callers have all moved to the new method, the old one can be deleted.
+
+## A habit to take away
+
+Whenever I write a catch block now, I ask a single question: what does my caller do with what I'm about to return?
+
+If the answer is "it carries on as if nothing happened", the catch is probably hiding something. If the answer is "it knows the difference and chooses", it's probably fine. It's a ten-second check, and it has caught more of these than any rule I could write down.
+
+## Where it falls over
+
+A result type adds ceremony. Every caller now unwraps it, and in a hurry some will unwrap it and treat failure as empty anyway. The type makes the right thing easy, not compulsory.
+
+It also isn't always the right model. For a best-effort feature, such as an optional recommendation panel, returning nothing on failure may genuinely be the right behaviour. The rule isn't "never degrade". It's that degrading should be a decision made by the caller, who knows what it's for.
+
+And it can't tell you why. A failed result with a message is better than silence, but you still need the log and the context to find the cause.
+
+## The position
+
+**Catching an exception and returning an empty list turns "we couldn't find out" into "there's nothing there".** Return a result that says which it was, move the callers that act on emptiness first, and make the fallback loud while you migrate.
+
+Search your code for a catch block that returns an empty collection. For each one, ask what its callers do with a zero count.
+
+The rest of my writing is on [the blog](/blogs/).

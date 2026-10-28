@@ -1,0 +1,137 @@
+---
+title: "Forecourt Engineering, Part 11: One Transaction, Two Numbers"
+date: "2026-08-30"
+summary: "If a record is stored under one identifier and looked up by another, it will look missing, and the logs will make it look like something else entirely. Here's a receipt reprint that couldn't find its transaction, my best reading of why, and how to keep one real defect apart from declines and noise."
+tags: ["debugging", "payments", "dotnet", "investigation"]
+series:
+  name: "Forecourt Engineering"
+  part: 11
+published: true
+---
+
+A site reported three problems. A card terminal going to "sale cancelled" as soon as a card went in. A couple of pumps showing a sale in progress when nobody was fuelling. And the till being unable to print a receipt because the transaction didn't show up.
+
+When I took the logs apart, two of the three turned out to be ordinary: a gateway declining a card, and a safety net doing its job. The third was a real defect. That is the one this post is about, and it comes down to a simple idea: **one transaction, two numbers**.
+
+This is Part 11 of **Forecourt Engineering**, following [Part 10](/blogs/forecourt-engineering-part-10-keep-money-in-whole-pence/). How I got the other two wrong first is told in [The Loudest Log Line Wasn't the Bug](/blogs/spec-driven-part-9-the-loudest-log-line-wasnt-the-bug/). This one is about the receipt.
+
+## The symptom
+
+A driver finishes fuelling and asks for a receipt. The till tries to print it and can't, because the transaction doesn't show up. The sale happened and the money moved. The receipt simply can't find its own record.
+
+"Can't find a row that obviously exists" is a particular kind of bug, and it has a small number of causes. One of them is that you're looking in the right place for the wrong thing.
+
+## What the reprint does
+
+When a receipt is reprinted, the service updates a count of how many times it's been printed. That update needs to find the right row.
+
+In the logs, the update matched nothing. No row was changed. The reprint carried on, but the thing it needed to record wasn't there to record against.
+
+That is where a quiet failure gets confusing. The log line for an update that matches no rows doesn't say "wrong key". It says nothing much at all. And around it, the logs were full of other, louder events that looked like better suspects.
+
+## My best reading
+
+I should say how sure I am, because it's less sure than I would like. I couldn't query the live receipts table, so this is my reading of the code and the logs, not a confirmed cause.
+
+A transaction has more than one number. The terminal has its own number for a payment. The service has a transaction number of its own. When the receipt is stored, it's keyed by one of them.
+
+My best reading is that the row is stored with the service's number, which is zero in the case where the lookup misses, while the reprint searches using the terminal's number. Two numbers for one transaction, one used to store and the other to find. Search for the one that wasn't used, and the row looks missing.
+
+I'd call that the most likely explanation, and I wrote it up that way. The next step is cheap and decisive: query the receipts table for a row with the other number and see whether it's there.
+
+## Why this class of bug is slippery
+
+The two numbers are both real, both valid and both appear in logs. A reader sees a transaction number and assumes it's the one that matters, without asking which one.
+
+It also fails in a way that looks like something else. A missing row looks like data loss. A missing receipt looks like a printer problem. Neither is true, and each sends an investigation in the wrong direction first.
+
+The same shape turns up everywhere: an order stored by order number and fetched by payment reference, a customer saved by internal id and searched by account number. The identifier changed somewhere between write and read.
+
+## Separate the real defect from the noise
+
+The most useful thing I did was sort the symptoms into causes.
+
+"Sale cancelled" was a gateway declining a card, a pre-authorisation check rejected for one card range, and some drivers backing out of the PIN prompt. Those are not our defects.
+
+"Sale in progress" on idle pumps was a short, designed clear of a buffer, visible in the logs as a warning that looked alarming.
+
+The receipt was the single genuine defect: a lookup that couldn't find a row.
+
+Laying them side by side changed the conversation. The site had three complaints, and we had one bug and two behaviours that were working as intended. Writing that down is what lets the right thing get fixed.
+
+## Keep the claim to the evidence
+
+The temptation, once you have a plausible cause, is to state it as fact. A write-up that says "the cause is a key mismatch" reads better than one that says "my best reading is a key mismatch".
+
+But if the reading is wrong, the first version costs someone a day. The second tells them what to check before they act. I'd rather be accurate about my confidence than tidy.
+
+I also handed over the receipt as a recommendation, and not as a fix I'd shipped. The ticket moved to a colleague, so what I can honestly claim is a likely cause and a proposed change: align the key, or make the reprint cope with a missing row.
+
+## Mapping each symptom to a mechanism
+
+The method I used is the one I'd recommend for any report with several symptoms: take them one at a time, and for each, find a mechanism that explains it and a piece of evidence that would prove or kill it.
+
+**"Sale cancelled" straight after a card goes in.** If the terminal cancels the sale, the service's log should be nearly silent: a card-in notice, a receipt with no card number, then back to ready. Crucially, there should be no authorise request at all. That absence is the proof that the cancel happened upstream of the service, between the terminal and the payment gateway. And that is what the logs showed.
+
+**A pump showing a sale in progress.** The suspect was a loud pattern in the logs. The check that mattered was whether that pattern landed on the customer's pumps at all. It didn't, to any significant extent: the worst pump on the site was on another terminal. A pattern that doesn't land on the customer's pump isn't their problem.
+
+**The receipt.** The mechanism was the lookup. The evidence was an update that matched no row.
+
+Mapping like this turns three vague complaints into three testable statements. It also makes it clear which one you can't yet prove, and that is the honest part of the write-up.
+
+## The query that would settle it
+
+The reason I called my cause a best reading is that the decisive evidence was one query away, and I didn't have access to run it.
+
+The query would look for a row in the receipts table for the transaction in question, using the other number. If the row is there under the service's number, and the reprint searched with the terminal's, the reading is confirmed. If it isn't there under either, I'm wrong and there's a different cause.
+
+```sql
+select transaction_number, terminal_transaction_number, print_count
+from receipts
+where terminal_transaction_number = @terminalNumber
+   or transaction_number = @serviceNumber;
+```
+
+That one statement turns a plausible story into a fact, or into a correction. I put it in the write-up as the first thing to do, ahead of any code change.
+
+## Two ways to fix it
+
+If the reading is right, there are two reasonable fixes, and they're not equal.
+
+**Align the key.** Make the reprint search with the same number the row was stored under. It fixes the cause. It requires knowing for certain which number each side should use, and checking every other place that looks the receipt up.
+
+**Make the reprint cope with a missing row.** If the update matches nothing, handle it, for example by looking the receipt up another way, or by printing anyway without recording the count. It's more tolerant, and it can mask the original mismatch.
+
+I recommended aligning the key, because tolerance without a fix leaves the mismatch to bite elsewhere. I also noted the second option, as a safety net for the period before the first is done.
+
+## What I'd log differently
+
+The investigation was harder than it needed to be because the failure was silent. An update that affects no rows is, in this case, a significant event, and it logged nothing.
+
+I'd add a line whenever an update that is expected to change one row changes none. It's cheap, it names the identifiers involved, and it would have pointed at this defect on the day it first happened, not weeks later.
+
+More generally: when a lookup misses, log both the key it used and the key the record was stored under, if you know it. Bugs like this one hide in the gap between two identifiers, and a log line that names both shows the gap.
+
+## The write-up I handed over
+
+How you hand an investigation over matters as much as what it found. Mine had the same simple structure each time.
+
+At the top, a short summary: three complaints, one defect, two behaviours working as designed. Then a section per symptom: what the customer reported, what I found, how sure I am, and what would change my mind. Then the proposed fix for the one real defect, with the query that would confirm it. And last, anything I'd checked and ruled out, because that is what saves the next person from repeating it.
+
+The "how sure I am" line on each section is the one I'd keep above all. It lets a reader skim the confident parts and slow down on the uncertain ones, and it makes it obvious where to push.
+
+## Where it falls over
+
+My reading could be wrong. There may be a second reason the update matches nothing, and a second defect hiding behind the first. A confirming query would settle it, and I didn't run one.
+
+Sorting symptoms into causes also depends on having enough logs. A site that logs less would leave more of the picture to guesswork.
+
+And the neat three-way split is easy to overstate. Real incidents blur at the edges, and some of the cancels I put down to declines may have more than one cause.
+
+## The position
+
+**If a record is stored under one identifier and looked up by another, it will look missing, and the logs will make it look like something else entirely.** Ask which number each side used, separate the one real defect from the declines and the noise, and keep the claim to what the evidence supports.
+
+The next time something that obviously exists can't be found, check the identifiers on both sides before you check anything else.
+
+The rest of my writing is on [the blog](/blogs/).

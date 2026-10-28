@@ -1,0 +1,147 @@
+---
+title: "Engineering Habits, Part 7: Write the Options Down"
+date: "2026-07-07"
+summary: "When a fix has more than one reasonable shape, I write the options and their risks down before I choose. It makes the choice checkable, speeds up review and shows why the smallest safe fix won. Here's the list I wrote for a start-up ordering bug, and what it changed."
+tags: ["debugging", "code-review", "dotnet", "productivity"]
+series:
+  name: "Engineering Habits"
+  part: 7
+published: true
+---
+
+A service loaded a list of products before its database connection was ready. The load returned nothing, the code cleared the list anyway, and for a short window at start-up every reader of that list saw an empty catalogue.
+
+That bug has a post of its own, [The Empty Window at Start-Up](/blogs/forecourt-engineering-part-6-the-empty-window-at-start-up/). This one is about something I did before I touched a line of it: I wrote down every reasonable way to fix it, and what each one would cost.
+
+It's a small habit with an outsized effect, and it's the seventh in **Engineering Habits**. The habit is to **write the options down** before you choose.
+
+## Why I don't just fix it
+
+When you've traced a bug, a fix usually presents itself. It's the first one that occurs to you, and it feels like understanding.
+
+The trouble is that "the first fix I thought of" and "the right fix" are different things, and you can't tell which you have until you've put them side by side. If I fix it straight away, my reviewer sees one option. They can only judge whether it works, not whether it's the best of the choices I had.
+
+Writing the options down changes the review from "does this work?" to "is this the right shape?", which is a better conversation to have before the code exists.
+
+## The four options
+
+For the start-up bug there were four reasonable shapes.
+
+**Defer.** Don't make the first load until the database connection is ready. It's the simplest to explain. The risk is code that has quietly come to assume the list exists from the first instant, and now finds it missing.
+
+**Guard.** Leave the load where it is, but don't clear the list when nothing comes back. Low risk and a tiny change. The risk is that it could mask a genuine "there really is nothing here" case.
+
+**Allocate on connect.** Only fill the list when the connection-ready event fires, and not at start-up at all. More robust, because there's one path. It's also a bigger refactor, and it changes who is responsible for the first fill.
+
+**Split start-up into two phases.** Everything that needs the database waits for a second phase. The most principled answer, and the largest change by far.
+
+I wrote each in a few lines: what it does, what it fixes, what it risks, how big it is.
+
+## What the list did
+
+First, it stopped me falling in love with the fix I'd thought of first. Seeing four options, I could see that two of them were refactors that went well beyond a ticket about a list being cleared.
+
+Second, it made the choice defensible. The guard won because it was the smallest change that closed the problem. I could say that, and I could say exactly what it gave up: the "genuinely empty" case now keeps the old list, and I wrote that trade-off down next to the choice, along with the fact that I'd want the log to be loud about it.
+
+Third, and this is the part I didn't expect, it made the review faster. The reviewer didn't have to reconstruct the alternatives. They could agree, or say "I'd have picked allocate-on-connect, and here's why". Either way we were arguing about the decision, not rediscovering the problem.
+
+## What a good option list looks like
+
+It doesn't need to be long. Mine was a short table in the description of the change.
+
+| Option | What it fixes | Risk | Size |
+|---|---|---|---|
+| Defer the first load | The empty window | Code that assumes the list exists | Small |
+| Guard the clear | The empty window | Hides a genuine empty case | Tiny |
+| Allocate on connect | The empty window and the double fill | Bigger change of ownership | Medium |
+| Two-phase start-up | Everything about ordering | Large refactor | Large |
+
+Four rows, one line each. It took ten minutes, and it saved more than that in review.
+
+A few rules keep it honest. Include the option you're about to choose and at least one you're tempted not to. Write the risk of your favourite as carefully as the risks of the others. And say what you're deliberately not doing, so the scope is visible.
+
+## When to skip it
+
+Not every fix has options. A typo doesn't need a table. A change with one obviously correct shape, such as adding a missing null check at the point of failure, doesn't either.
+
+The trigger I use is whether I can think of a second reasonable shape. If I can, I write both down. If I genuinely can't, I fix it.
+
+## Do the analysis before the options
+
+An option list is only as good as the understanding behind it, so the first hour wasn't spent on options at all.
+
+I traced every place that called the load. There were three: one at start-up, before the database connection existed, and two that ran later, once it did. Only the first was wrong, because only the first ran with nothing to read from.
+
+Then I listed everything that read the list. A worker that flags products for special handling. Three places in a mode-switching component. A lookup used by a message listener. A journal writer. The screen that shows the catalogue. For each one I asked what it did when it saw an empty list, and that answer is what turned a "tech debt" ticket into something with a customer-visible consequence.
+
+The journal writer worried me most, because it checked for a count of zero and could create default entries as a result. An empty list wasn't just invisible to it. It was an instruction.
+
+I also found an upstream gap: when the source of the data couldn't be reached, the fetch returned null, the next line called a method on that null, and the exception was caught and turned into an empty result. That's the subject of its own post in the Legacy .NET series, and it mattered here because it meant "the data source is down" looked exactly like "there are no products".
+
+Finally, I added logging to each call that recorded who called it and how many items it found. After that, the logs said which caller had wiped the list and with what, which turned an argument about the order of start-up into a fact.
+
+None of that is an option list. All of it is why the option list was worth reading.
+
+## What each option looked like in code
+
+I find it easier to compare options when I can see how big each one is. For this bug, the two smallest looked like this.
+
+Deferring meant moving one call:
+
+```csharp
+// Before: runs at start-up, before the data source exists.
+catalogue.Load();
+
+// After: runs when the data source reports it is ready.
+dataSource.Connected += (_, _) => catalogue.Load();
+```
+
+Guarding meant changing what the load does with an empty result:
+
+```csharp
+var fresh = source.FetchProducts();
+if (fresh.Count == 0)
+{
+    log.Warn("Load returned nothing; keeping the existing catalogue");
+    return;
+}
+catalogue.Replace(fresh);
+```
+
+Seen side by side, the difference is clear. The deferral changes when something happens, and every reader has to cope with the catalogue not existing yet. The guard changes what happens, and no reader needs to know. That is the sort of difference that doesn't show up in a sentence in a ticket.
+
+The other two options didn't need code to understand. Allocating only on the connected event meant removing the start-up call altogether and rewriting who owned the first fill. A two-phase start-up meant reorganising what runs when across the whole application. Both are good ideas, and both are far larger than the ticket.
+
+## Writing the risk of your favourite properly
+
+The part of the list I'm most careful with is the risk of the option I expect to choose.
+
+It's tempting to write a generous description of the winner and a pointed one of the rest. A reviewer can smell that. So I wrote the guard's weakness as plainly as the others: if a site genuinely has no products, the service now keeps the old list instead of clearing it.
+
+I then wrote down what I'd do about it. At start-up, keeping the old list is the right default. But the log line has to be loud, so an operator can tell the difference between "nothing to load" and "couldn't load". That sentence went into the change description, and it became a review conversation about what "loud" should mean, which was better than discovering the problem on a site.
+
+If you write the winner's risk as honestly as the losers', the list becomes evidence. If you don't, it's marketing.
+
+## Sizing the options
+
+I give each option a rough size, and I try to be honest about it. Mine are labels, not estimates in hours: tiny, small, medium, large.
+
+The label does two jobs. It tells the reviewer how much to expect to review. And it protects against scope drift, because "tiny" in the description makes a "medium" diff look wrong. If the change turns out larger than the label, that's a signal to stop and talk, not to push on.
+
+I also note whether an option can be done in stages. A deferral can ship alone. A two-phase start-up can't, because it's all or nothing. Options that can be staged are cheaper to be wrong about.
+
+## Where it falls over
+
+An option list can become theatre. If the alternatives are strawmen written to make the preferred fix look good, the reviewer will see through it, and it's worse than nothing.
+
+It also costs time on small things. Applied to everything, it becomes a tax, and the habit dies. Keep it for decisions where the shapes differ in size or risk.
+
+And it doesn't make the decision for you. The table showed me the trade-offs. It didn't tell me that a guard hiding a genuinely empty site was an acceptable price. That was a judgement, and I made it.
+
+## The position
+
+**When a fix has more than one reasonable shape, write the options and their risks down before choosing.** The choice becomes checkable, the review gets faster, and the smallest safe fix wins on the evidence and not on whichever idea arrived first.
+
+On your next non-trivial fix, write the alternatives before the code. If you can't think of a second one, say so in the description, and let your reviewer find one.
+
+The rest of my writing is on [the blog](/blogs/).

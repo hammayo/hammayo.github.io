@@ -1,0 +1,132 @@
+---
+title: "Forecourt Engineering, Part 9: Store and Forward, and How Long the Store Can Hold"
+date: "2026-07-29"
+summary: "Store-and-forward doesn't remove risk, it moves it from 'the sale is lost' to 'how long can we wait'. Here's what a card terminal does with completions and reversals when the link to the switch is down, the one case where retrying is pointless, and what to monitor so a store that never drains gets noticed."
+tags: ["payments", "reliability", "architecture", "dotnet"]
+series:
+  name: "Forecourt Engineering"
+  part: 9
+published: true
+---
+
+A card reader on a train takes your payment between stations, where there's no signal. It doesn't refuse you. It writes the payment down, and uploads it at the next station.
+
+That is store-and-forward, and a fuel pump terminal does the same thing for the same reason. The interesting question isn't whether it works. It's what happens to the risk, because it doesn't disappear. It moves.
+
+This is Part 9 of **Forecourt Engineering**, following [Part 8](/blogs/forecourt-engineering-part-8-fail-per-pump-not-per-terminal/). I'll explain what the terminal stores, when it forwards, the one case where retrying is pointless, and why the real question is **how long the store can hold**.
+
+## A quick reminder of the flow
+
+At a pump, the terminal gets a pre-authorisation from the payment switch. The pump is authorised up to that limit. After fuelling, the terminal sends a completion for the real amount, or a reversal if nothing was taken.
+
+Those two messages, the completion and the reversal, are the ones that need to reach the switch. The customer's fuel was covered by a valid pre-auth, so the sale finishes normally for them regardless of what happens next.
+
+I should say the same thing I said in the last part: the failure behaviour here lives in the terminal software, not the service I work on. I know it from reading that code and from site logs, and I'm describing it, not claiming I built it.
+
+## What gets stored
+
+If the completion can't reach the switch because the link is down, the terminal doesn't drop it. It puts it in a local store.
+
+A background thread watches the links. It ticks regularly, checks each link is alive, and reconnects and signs in the ones that aren't. Once a link is back, it forwards the stored completions and reversals.
+
+The customer never sees any of it. The sale is already done from their side. What's in the store is the terminal's promise to tell the switch about it later.
+
+## The risk moves
+
+Before store-and-forward, a link failure at the wrong moment meant a lost sale: fuel delivered, nothing collected. With it, that doesn't happen. The sale is safe on the terminal.
+
+What you've done is trade one risk for another. The question is no longer "did we lose the sale?" It's "how long can we wait before this becomes a problem?".
+
+Several things hang on that. How long can the pre-authorisation hold stay valid before it expires? What happens to the customer's available balance while a hold is outstanding? What does the terminal do if its storage fills? Each of those is a clock that starts when the link drops.
+
+A store that drains in a minute is a non-event. A store that has been growing for a day is an incident that nobody has noticed yet.
+
+## The one case where retrying is pointless
+
+Retrying makes sense when the failure is the link. It makes no sense when the switch has heard you and said no.
+
+If the switch rejects a reversal outright, the message is not going to be accepted by sending it again. The terminal prints the receipt and deletes the transaction from the store.
+
+It's the same distinction as in the Messages That Survive series: some failures pass with time, and some never will. A retry policy that can't tell them apart will spend its life resending something the other end has already refused.
+
+## What to monitor
+
+A store-and-forward system fails quietly. By design, the customer-facing symptom is nothing at all, so you won't hear about it from a complaint.
+
+The signals worth watching are small and specific.
+
+**The depth of the store.** How many completions and reversals are waiting, per terminal. Healthy is near zero and returns there quickly.
+
+**The age of the oldest item.** Depth can mislead, since one stuck item and a hundred fresh ones look different. How long the oldest has been waiting is the number that predicts trouble.
+
+**Time since the last successful forward.** A terminal whose store is non-empty and hasn't forwarded anything for an hour is stuck, whatever the depth says.
+
+**Link state.** Which links are down, and for how long. It explains the first three.
+
+An alert on "store older than N minutes" is more useful than one on "link down". Links drop and recover all day. A store that doesn't drain is the thing a person needs to look at.
+
+## Walking through the failure moments
+
+The behaviour depends on when the link fails, so it's worth taking the moments one at a time.
+
+**Before a sale.** If a pump's link can't sign in, the terminal switches the card reader off for that pump and shows an out-of-order screen. Nothing is stored, because nothing has happened. No card is taken that can't be authorised.
+
+**During the pre-authorisation.** The terminal sends the request and waits. If no answer comes back in time, it sends a reversal, and the pump is never authorised, so no fuel flows. If even the reversal can't be sent, the terminal stores it and prints a cancelled receipt. This is the first place the store gets used, and it's a reversal, not a completion.
+
+**After fuelling.** The customer's fuel was covered by a valid pre-authorisation, so the sale finishes normally for them. If the completion can't reach the switch, it goes into the local store, and the forwarding thread takes it from there.
+
+**While the store drains.** While the terminal is working through stored transactions, it shows a distinct state on screen. That's useful on site, because staff can see it's busy catching up and not stuck.
+
+Putting it in order shows the shape of the risk. The earlier the failure, the less is at stake. The later it is, the more depends on the store.
+
+## The shape of the forwarding thread
+
+The forwarding side is a background loop, and it's simple by design. It ticks every second. On each tick it sends a heartbeat on each link to check it's alive. For the links that have died, it tries to reconnect and sign in, on its own interval so it doesn't hammer a switch that's struggling. Once a link is healthy, it forwards whatever is waiting for it.
+
+Because each pump has its own link, the loop treats each separately. One pump's link coming back means that pump's stored items drain, while another pump's remain until its link recovers.
+
+The design has one useful property: it makes no assumption about why a link is down. It checks, tries and moves on. That makes it robust to every cause from a cable fault to a switch restart.
+
+## Ordering and duplicates
+
+Two details are worth being careful about in any store-and-forward design, and they're the ones I'd check first in a review.
+
+**Order.** If a reversal and a completion for the same sale are both waiting, they must reach the switch in a sensible order. Forwarding them out of order could leave a sale charged when it should have been cancelled. The store has to preserve the order in which things happened, per transaction at least.
+
+**Duplicates.** If the terminal sends a stored item and the link drops before it hears the answer, it doesn't know whether the switch received it. Sending it again risks a duplicate. The safe design lets the receiver recognise a repeat, usually through an identifier on each message, so that a second delivery changes nothing.
+
+Both are the same ideas I wrote about for event-driven systems in the Messages That Survive series, and they show up for the same reasons.
+
+## An alert I'd actually set
+
+If I were designing the monitoring for this, I would not alert on a link dropping. Links drop all day, and an alert that fires on every blip teaches people to ignore it.
+
+The alert I'd set is on the age of the oldest stored item: if anything has been waiting longer than a threshold, someone should look. The threshold depends on how long a pre-authorisation hold lasts and how much delay the business can tolerate, and I'd choose it with the people who own those, not guess it.
+
+A second alert is on a store that is non-empty and hasn't forwarded anything for a while. Together they catch the two ways a store goes wrong: items stuck behind a bad one, and a thread that has quietly stopped.
+
+Both are cheap to build, and both tell a person something they can act on.
+
+## Designing the store itself
+
+The store is local storage on a device, so its limits are physical. It has a finite size, and a design that doesn't say what happens when it fills is leaving the most important case to chance.
+
+There are a few honest answers. Refuse new sales when the store is nearly full, so a customer is turned away before fuelling and not after. Keep the oldest items and stop storing, so nothing already promised is lost. Or accept that the oldest may be overwritten, and make sure that is logged and surfaced.
+
+None of them is free, and the right one depends on what each item is worth. A completion is money owed to a retailer. Losing one is a real cost, so refusing new sales before the store fills is usually the better trade. It is a decision that should be made on purpose, not discovered when the first terminal fills up.
+
+## Where it falls over
+
+A store is local storage on a device, and devices fail. A terminal that loses its store loses whatever was in it. The design helps only if the terminal survives long enough to forward.
+
+Some failures never drain. A malformed or rejected item can block the queue, or a terminal can be unable to reconnect for a reason that retrying won't fix. Without a way to see and clear those, the store becomes a place where problems accumulate.
+
+And I stop at the switch. What happens between the switch and the bank, including settlement and disputes, I know only at the level any payments engineer would. The honest scope of this post is the part from the pump to the switch.
+
+## The position
+
+**Store-and-forward doesn't remove risk, it moves it from "the sale is lost" to "how long can we wait".** Know which messages are stored, which failures are worth retrying and which aren't, and monitor the age of the oldest item, not just whether a link is up.
+
+If your system stores work to send later, ask what the longest acceptable wait is, and what would tell you it had been exceeded.
+
+The rest of my writing is on [the blog](/blogs/).

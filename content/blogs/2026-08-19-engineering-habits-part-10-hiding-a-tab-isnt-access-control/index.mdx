@@ -1,0 +1,160 @@
+---
+title: "Engineering Habits, Part 10: Hiding a Tab Isn't Access Control"
+date: "2026-08-19"
+summary: "A hidden nav item is a convenience. The route guard and the server are the security. Here's how an admin panel with a read-only mode for junior staff should be built: guards that redirect restricted routes, the server as the real enforcement, and tests that assert a control is absent by name."
+tags: ["security", "frontend", "angular", "testing"]
+series:
+  name: "Engineering Habits"
+  part: 10
+published: true
+---
+
+An admin panel has a read-only mode for junior staff. In that mode, the tabs they shouldn't use are gone from the navigation, and the buttons that change things are gone from the pages.
+
+It looks like access control. It isn't. Anyone who can type a URL can type the address of a tab that isn't in the menu, and anyone who can send a request can send the one the button would have sent.
+
+This is Part 10 of **Engineering Habits**, following [Part 9](/blogs/engineering-habits-part-9-measure-the-test-gap-before-you-promise/). It's about what a restricted mode in a front end is for, what it isn't for, and the three layers it takes to do it properly. The sentence to hold on to: **hiding a tab isn't access control**.
+
+## What hiding does
+
+Hiding things is a good idea. Showing a junior member of staff a screen of controls they're not allowed to use is confusing, and confusing screens cause mistakes.
+
+So the restricted mode removes what doesn't apply. The admin tabs disappear. The page that shows device status becomes read-only. The person using it sees a smaller, calmer interface that matches what they can do.
+
+That is a usability feature, and a worthwhile one. It's just not a security feature, and the two get confused because they look the same from the user's chair.
+
+## Anyone can type a URL
+
+The first hole is the simplest. A single-page application has routes. Take the tab out of the menu and the route is still there.
+
+Someone who knows or guesses the address, or who used it last week, can navigate straight to it. If nothing stops them, the page loads, and it shows whatever it shows.
+
+So each restricted route needs a guard. Not a hidden link, a check that runs when the route is entered and redirects somewhere harmless if the current mode doesn't allow it.
+
+```typescript
+export const adminOnly: CanActivateFn = () => {
+  const mode = inject(AccessModeService);
+  return mode.isRestricted() ? inject(Router).createUrlTree(['/devices']) : true;
+};
+```
+
+The guard should default to restrictive until the mode is known. A guard that lets everything through for the first moment of start-up, while it waits to learn the mode, is a window where the restricted user sees the full interface.
+
+## The server is the real enforcement
+
+The route guard stops a person navigating. It doesn't stop a request.
+
+Everything in the browser is under the user's control. They can open developer tools, change the code, replay a request or write their own. A check that exists only in client code is a suggestion to a cooperative user.
+
+The real enforcement sits in the API. A request that changes something must be refused by the server if the caller's role doesn't allow it, whatever the interface did or didn't show. If the read-only mode exists in the front end only, the system doesn't have a read-only mode.
+
+That's why the order of work matters. Get the server rules right first: which roles can do what, denied by default. Then build the restricted interface on top of those rules, so the screen reflects the server and doesn't try to substitute for it.
+
+## Derive the hiding from the rules
+
+A trap in building the restricted UI is inventing which tabs to hide. Someone decides, from memory, that these three are "admin things", and the list drifts away from what the server actually allows.
+
+Better to derive it. If the controller behind a tab denies the restricted role on every action, the tab is hidden and guarded. If it allows everything, it's left alone. Only a mixed controller, one that allows reads and denies writes, needs the page itself to be partly restricted.
+
+That way a change to the server's rules has an obvious consequence for the interface. The two don't have to be remembered separately.
+
+## Gate regions, then test controls by name
+
+On a page that's partly restricted, I'd rather gate a whole region than hide controls one by one. If the form that contains the changing controls is not rendered at all, then a control added to that form next month is covered without anyone remembering.
+
+Then, test each control by name. A test that says "in restricted mode, the save button is absent", and the same for each control that changes something, means a template refactor can't quietly bring one back. The test fails, loudly, with the control's name in the message.
+
+Tests that assert absence are easy to forget and valuable. Most tests check that things are there.
+
+## A way out for the legitimate user
+
+One more detail made the mode usable. If a restricted mode can be switched on, it needs a way to be switched off, by someone allowed to. If the control that does that lives on a tab the restricted mode hides, you've built a trap.
+
+The answer I'd use is a small, visible indicator that the mode is active, with a clear action to leave it. If the person using it isn't allowed to leave, the server refuses, and the interface shows that as an error and not a silent failure. The mode is a convenience for people who are allowed, and a clear message for people who aren't.
+
+## A worked example: one partly restricted page
+
+The device page is the interesting case, because it's the one tab that isn't simply in or out.
+
+Staff in the restricted mode should be able to see the status of each device. They shouldn't be able to open, close or reconfigure one. So the page stays, and its controls change.
+
+On the server, that's a controller that allows reads for the restricted role and denies writes. On the client, the page shows the status cards as normal, and the form that contains the buttons which change things isn't rendered.
+
+I gated the whole form as one region, not each button. A button added to that form next quarter is covered automatically, without anyone remembering to wrap it. The cost is that the region has to be defined carefully, so it contains only controls that change something and nothing that a restricted user legitimately needs.
+
+## A small matrix
+
+The decision for each tab came from a table that looked like this.
+
+| Tab               | Controller allows restricted role | Client behaviour |
+|-------------------|-------------|-----------------------------------------------------|
+| Fuel prices       | All actions | Unchanged, because staff editing prices is intended |
+| Devices           | Reads only  | Page visible, change controls not rendered          |
+| Connections       | Nothing     | Tab hidden and route guarded                        |
+| Advanced settings | Nothing     | Tab hidden and route guarded                        |
+
+The right-hand column isn't a design decision. It follows from the middle one. If the middle column changes, the right-hand one changes with it, and a reviewer can check the two against each other.
+
+I find this the most useful artefact in the whole feature. It turns "what should the restricted mode hide?" from an opinion into a lookup.
+
+## Testing the guard
+
+The route guard is a small piece of logic with an important job, so it gets a direct test.
+
+```typescript
+it('redirects a restricted user away from an admin route', () => {
+  mode.set('restricted');
+
+  const result = TestBed.runInInjectionContext(() => adminOnly(route, state));
+
+  expect(result).toEqual(router.createUrlTree(['/devices']));
+});
+
+it('defaults to restricted until the mode is known', () => {
+  mode.reset();
+
+  const result = TestBed.runInInjectionContext(() => adminOnly(route, state));
+
+  expect(result).not.toBe(true);
+});
+```
+
+The second test is the one I care about most. It pins down the default, that nothing is allowed until the mode is known. A refactor that flips the default would otherwise reopen the window at start-up and nobody would notice.
+
+## What to put in the pull request
+
+A restricted mode is easy to review badly, because the diff looks like a lot of conditionals.
+
+I describe it in terms of the matrix: which server rules the client reflects, which routes have guards, which regions are gated, and where the tests for each are. The reviewer can then check the description against the code, instead of trying to infer the intent from `if` statements.
+
+I also say what the change does not do. It does not make the interface secure on its own, and the server rules are unchanged. Stating that in the description sets the right expectation, and keeps the next reader from treating the restricted mode as a security feature.
+
+## What I'd tell a team adopting this
+
+If you're building a restricted mode in a front end, a few rules are worth agreeing early.
+
+Server first. Don't write a line of the restricted interface until the server's rules are in place and tested. The interface should mirror them.
+
+Default to restricted. Every guard, every region and every flag should start in the safest state and open up only once the mode is known.
+
+Test absence. For every control you hide, a test that says it's gone, by name. It's the only thing that stops a later change quietly bringing it back.
+
+And write down that it's a convenience. The first person to describe the feature as "access control" will be wrong, and the sooner the team has the right words for it, the fewer surprises there will be.
+
+## Where it falls over
+
+Client-side restrictions are brittle by nature. Someone will find a way round a guard, and that's acceptable only because the real checks are elsewhere. If the server enforcement is weak, the whole thing is decoration.
+
+It also adds work. Every route and region needs thought about the restricted mode, and every new feature has to decide where it stands. Without the habit of asking, new screens will appear unrestricted.
+
+And a restricted mode isn't an audit trail. It tells you the screen was restricted, not who did what. If you need to know that, you need identity on the server, which is a different piece of work.
+
+## The position
+
+**A hidden nav item is a convenience; the route guard and the server are the security.** Hide what doesn't apply to make the interface calmer, guard every restricted route, enforce on the server, and test that controls are absent by name.
+
+[Part 4](/blogs/engineering-habits-part-4-the-call-you-cant-deny/) was about the opposite risk, a restricted mode that locked itself out. Between them, they are the two ways this feature goes wrong.
+
+Try typing the address of a hidden tab in your own application as a restricted user. What happens next tells you which layer you have.
+
+The rest of my writing is on [the blog](/blogs/).
