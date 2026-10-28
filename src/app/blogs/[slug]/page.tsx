@@ -10,6 +10,7 @@ import { PostBreadcrumb } from '@/features/blogs/post-breadcrumb';
 import { ScrollProgress } from '@/features/blogs/scroll-progress';
 import { getAllSlugs, getPostBySlug, getAllPostsMeta } from '@/features/blogs/pipeline';
 import { SITE_URL } from '@/lib/constants';
+import { metaDescription } from '@/lib/utils';
 import type { Metadata } from 'next';
 
 interface Props {
@@ -24,14 +25,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const post = await getPostBySlug(slug);
   if (!post) return {};
+  const description = metaDescription(post.summary);
   return {
     title:       `${post.title} | Hammayo's Portfolio`,
-    description: post.summary,
+    description,
     authors:     [{ name: 'Hammy Babar', url: SITE_URL }],
     alternates:  { canonical: `${SITE_URL}/blogs/${slug}/` },
     openGraph: {
       title:         post.title,
-      description:   post.summary,
+      description,
       url:           `${SITE_URL}/blogs/${slug}/`,
       type:          'article',
       publishedTime: post.date,
@@ -40,7 +42,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
     twitter: {
       title:       post.title,
-      description: post.summary,
+      description,
     },
   };
 }

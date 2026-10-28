@@ -5,6 +5,20 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** Google truncates snippets at roughly this many characters. */
+export const META_DESCRIPTION_MAX = 155;
+
+/** Whole sentences up to `max` chars; a lone over-long first sentence is cut at a word with an ellipsis. */
+export function metaDescription(text: string, max = META_DESCRIPTION_MAX): string {
+  let out = '';
+  for (const sentence of text.split(/(?<=[.?!])\s+/)) {
+    const next = out ? `${out} ${sentence}` : sentence;
+    if (next.length > max) break;
+    out = next;
+  }
+  return out || `${text.slice(0, max - 1).replace(/\s+\S*$/, '')}…`;
+}
+
 export function formatDistanceToNow(date: Date): string {
   const now = new Date();
   const diffInMs = now.getTime() - date.getTime();
